@@ -1,0 +1,100 @@
+id,Tier,Championship,Sub_Champ,Championship_ID,Car_Class,Car_ID,Style,Num of Races,Race_Time,Game,Max_Opp,Min_Opp,Start_Type,Prestige
+1,1,Legends,,Legends,5,,Oval,4,12,Iracing,14,8,Rolling,1
+2,1,Mazda MX-5 Cup,,MX-5C,74,,Sports Car,4,12,Iracing,12,8,Standing,1
+3,1,Street Stock,,SS,4064,,Oval,4,12,Iracing,14,8,Rolling,1
+4,1,BMW M2 CSR,,BMWCSR,4073,,Sports Car,4,12,Iracing,12,8,Standing,1
+5,1,Mini Stock,,MS,4069,,Oval,4,12,Iracing,14,8,Rolling,1
+6,1,Formula Vee,,Vee,3002,,Open Wheel,4,12,Iracing,12,6,Standing,1
+7,1,Formula 1600,,F1600,4016,,Open Wheel,4,12,Iracing,12,6,Standing,1
+1001,1,G40 Cup,,G40,9001,,Sports Car,4,15,AMS2,14,8,Standing,1
+1002,1,Caterham Academy,,Caterham Academy,9002,,Sports Car,4,15,AMS2,14,8,Standing,1
+1003,1,Copa Classic B,,Copa Classic B,9003,,Sports Car,4,15,AMS2,20,10,Standing,1
+1004,1,TSI Cup,,TSI,9004,,Sports Car,4,15,AMS2,14,8,Standing,1
+1018,1,Formula Trainer,,FT,9036,,Open Wheel,4,15,AMS2,14,8,Standing,1
+1019,1,Formula Vee Gen1,,FVGen1,9018,,Open Wheel,4,15,AMS2,14,8,Standing,1
+1028,1,Nascar Roots,,Nascar Roots,9027,,Oval,4,15,AMS2,20,16,Rolling,1
+1033,1,Formula Dirt,,FD,9032,,Rallycross,4,15,AMS2,12,10,Standing,1
+1038,1,Rental Kart,,RK,9037,,Kart,4,10,AMS2,12,10,Standing,1
+8,2,Spec Racer Ford Challenge,,SRFC,20,,Sports Car,6,25,Iracing,12,8,Standing,10
+11,2,Toyota GR86 Dash,,TGR86D,4012,,Sports Car,6,15,Iracing,12,8,Rolling,30
+1005,2,Intro Sports Car,GT5,ISC,9005,,Sports Car,6,20,AMS2,30,15,Rolling,30
+9,2,Production Car Challenge,Global Mazda MX-5 Cup,PCC,74,,Sports Car,6,25,Iracing,40,32,Rolling,32
+10,2,Production Car Challenge,Toyota GR86,PCC,4012,,Sports Car,6,25,Iracing,40,32,Rolling,33
+12,2,Production Car Challenge,Renault Clio,PCC,4015,,Sports Car,6,25,Iracing,40,32,Rolling,35
+24,3,Advanced Mazda,,AM,74,,Sports Car,8,30,Iracing,26,12,Standing,35
+1006,2,Caterham Supersport,,CS,9006,,Sports Car,6,20,AMS2,20,10,Standing,35
+1020,2,Formula Vee Gen2,,FVGe2,9019,,Open Wheel,6,20,AMS2,18,10,Standing,35
+13,2,Production Car Challenge,BMW M2,PCC,4073,,Sports Car,6,25,Iracing,40,32,Rolling,38
+25,3,Sports Car Challenge,Cadillac CTS-V Racecar,SCC,45,,Sports Car,8,30,Iracing,25,12,Rolling,40
+26,3,Sports Car Challenge,Kia Optima,SCC,48,,Sports Car,8,30,Iracing,25,12,Rolling,40
+1021,2,Formula Trainer Advanced,,FTA,9020,,Open Wheel,6,20,AMS2,18,10,Standing,40
+1022,2,Formula Inter,,FI,9021,,Open Wheel,6,20,AMS2,18,10,Standing,40
+14,2,TCR Challenge,,TCRC,4101,,Sports Car,6,20,Iracing,18,12,Standing,45
+15,2,Mustang Challenge,,FMustang,,204,Sports Car,6,15,Iracing,18,10,Rolling,45
+17,2,SK Modified,,SKM,2,,Oval,6,15,Iracing,16,8,Rolling,35
+1007,2,Mini JCW,,MJCW,9007,,Sports Car,6,15,AMS2,20,10,Standing,45
+1034,2,KartCross,,KC,9033,,Rallycross,6,20,AMS2,14,12,Standing,45
+18,2,USF 2000,,USF20,2266,,80R/20O,6,15,Iracing,18,8,Rolling,50
+20,2,Late Model Stock,,LMS,4017,,Oval,6,15,Iracing,16,8,Rolling,25
+1039,3,German Group A,,GroupA,9038,,Sports Car,8,35,AMS2,30,15,Rolling,45
+27,3,Vintage IMSA,Audi 90 GTO,VIMSA,83,,Sports Car,10,40,Iracing,40,20,Rolling,50
+19,2,SRX,,SRX,4050,,Oval,6,15,Iracing,16,8,Rolling,40
+21,2,Indy Pro 2000,,IP2000,2265,,Oval,6,15,Iracing,16,8,Rolling,35
+1008,2,Intro Sports Car,P4,ISC,9008,,Sports Car,6,20,AMS2,30,15,Rolling,50
+1009,3,Sports Car Cup,GT4,SCC,9009,,Sports Car,10,30,AMS2,30,20,Rolling,55
+23,2,Skip Barber Formula 2000,,SBF2000,1,,Open Wheel,6,20,Iracing,23,13,Standing,60
+1011,3,LES,JS2 R,LES,9011,,Sports Car,10,30,AMS2,30,20,Rolling,58
+36,3,Super Late Model,,SLM,60,,Oval,8,30,Iracing,20,12,Rolling,60
+53,4,NASCAR Legends,,NL,2269,,Oval,10,35,Iracing,26,15,Rolling,60
+54,4,Silver Crown,,SC,16,,Oval,10,30,Iracing,24,14,Rolling,60
+28,3,Advanced Sports Car Challenge,GT4,ASCC,2268,,Sports Car,10,30,Iracing,40,20,Rolling,60
+22,2,Formula 4,,F4,3188,,Open Wheel,6,15,Iracing,24,12,Standing,65
+1013,3,GT3 Regionals,,GT3R,9013,,Sports Car,8,25,AMS2,25,15,Rolling,61
+38,3,Super Formula Lights,,SFL,4049,,Open Wheel,8,30,Iracing,28,14,Standing,65
+29,3,Stock Car Brasil,,SCB,3245,,Sports Car,8,20,Iracing,28,12,Rolling,65
+1035,3,RX2,,RX2,9034,,Rallycross,8,25,AMS2,16,14,Standing,65
+1017,3,Porsche Carrera Cup,,PCC,9016,,Sports Car,8,35,AMS2,28,14,Standing,65
+16,2,ARCA Menards,,ARCA,4086,,Oval,6,20,Iracing,24,16,Rolling,70
+1014,3,IMSA,GT3_Gen2,IMSA,9014,,Sports Car,12,45,AMS2,32,20,Rolling,69
+35,3,Gen 4 Cup,,G4C,4087,,Oval,8,30,Iracing,30,15,Rolling,70
+40,3,Classic Lotus GP,,LGP,22,,Open Wheel,8,40,Iracing,38,18,Standing,70
+41,3,Grand Prix Legends,,GPL,46,,Open Wheel,8,35,Iracing,40,20,Standing,70
+1023,3,F3,F309,F3,9022,,Open Wheel,8,25,AMS2,22,12,Standing,70
+1029,2,Nascar Truck,,Nascar Truck,9028,,Oval,6,20,AMS2,25,18,Rolling,70
+30,3,Radical Cup,,RC,3283,,Sports Car,8,22,Iracing,24,12,Standing,70
+31,3,SuperCars,,SuperC,4076,,Sports Car,8,35,Iracing,32,12,Standing,71
+32,3,Ferrari 296 Challenge,,F296C,4082,,Sports Car,8,15,Iracing,20,10,Rolling,73
+39,3,F3,,F3,870,,Open Wheel,8,25,Iracing,30,15,Standing,75
+1024,3,Formula Hitech,,FH2,9023,,Open Wheel,8,25,AMS2,22,12,Standing,75
+1030,3,ARCA,,ARCA,9029,,Oval,8,25,AMS2,32,24,Rolling,75
+1036,4,World RX,,WRX,9034,,Rallycross,10,25,AMS2,16,16,Standing,75
+34,3,Porsche Cup,,PCup,4093,,Sports Car,8,30,Iracing,25,12,Standing,75
+33,3,IMSA,GT3,IMSA,4091,,Sports Car,12,45,Iracing,40,25,Rolling,79
+1010,4,Sports Car Cup,P2,SCC,9017,,Sports Car,10,30,AMS2,30,20,Rolling,79
+37,3,NASCAR Truck Series,,NTS,71,,Oval,8,30,Iracing,28,15,Rolling,80
+42,3,Dallara iR,,DiR,2704,,Open Wheel,8,30,Iracing,30,15,Standing,80
+1012,4,LES,JS P4,LES,9012,,Sports Car,10,30,AMS2,30,20,Rolling,79
+43,4,Proto/GT,HPD ARX-01c,PGT,40,,Sports Car,10,30,Iracing,40,15,Rolling,80
+44,4,Proto/GT,GT1 Class,PGT,73,,Sports Car,10,30,Iracing,40,15,Rolling,80
+45,4,Vintage IMSA,Nissan GTP,VIMSA,84,,Sports Car,10,40,Iracing,40,20,Rolling,80
+46,4,Proto/GT,Ford GT,PGT,98,,Sports Car,10,30,Iracing,40,15,Rolling,80
+1015,4,IMSA,LMP2,IMSA,9010,,Sports Car,12,45,AMS2,32,20,Rolling,80
+51,4,INDY NXT,,INXT,4089,,80R/20O,10,30,Iracing,24,12,Rolling,85
+1025,4,Formula 2,,F2,9024,,Open Wheel,10,35,AMS2,22,12,Standing,85
+1031,4,O'Reilly Auto Parts,,O'Reilly Auto Parts,9030,,20R/80O,10,30,AMS2,32,26,Rolling,85
+1037,5,Super Trophy Truck,,STT,9035,,Rallycross,12,30,AMS2,20,18,Standing,85
+47,4,GTE,,GTE,100,,Sports Car,10,45,Iracing,30,12,Rolling,81
+52,4,NASCAR O'Reilly Series,,NOS,1455,,Oval,10,45,Iracing,28,15,Rolling,90
+55,4,Super Formula,,SF,4033,,Open Wheel,10,45,Iracing,25,16,Standing,90
+50,4,GT3 Regionals,,GT3R,4091,,Sports Car,10,20,Iracing,20,15,Rolling,90
+1016,5,IMSA,LMDh,IMSA,9015,,Sports Car,12,45,AMS2,32,20,Rolling,90
+49,4,Advanced Sports Car Challenge,Ligier JS P320,ASCC,4018,,Sports Car,10,30,Iracing,40,20,Rolling,94
+58,5,INDYCAR,,INDY,117,,80R/20O,12,60,Iracing,26,15,Rolling,95
+1026,5,INDYCAR,,INDY,9025,,80R/20O,12,45,AMS2,24,18,Rolling,95
+48,4,IMSA,P217,IMSA,2523,,Sports Car,12,45,Iracing,40,25,Rolling,95
+57,5,Nascar Cup Series,,NCS,2978,,20R/80O,12,60,Iracing,30,20,Rolling,100
+59,5,Formula 1,,F1,4013,,Open Wheel,12,60,Iracing,22,18,Standing,100
+1027,5,Formula 1,,F1,9026,,Open Wheel,12,60,AMS2,20,18,Standing,100
+1032,5,Nascar Cup Series,,NCS,9031,,20R/80O,12,45,AMS2,32,28,Rolling,100
+56,5,IMSA,GTP,IMSA,4029,,Sports Car,12,45,Iracing,40,25,Rolling,100
+1040,4,Group C,,GroupC,9039,,Sports Car,8,40,AMS2,36,15,Rolling,65

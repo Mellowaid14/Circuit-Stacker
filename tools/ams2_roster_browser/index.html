@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Race Pace to iRacing Roster Exporter</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="app-shell">
+    <header class="hero">
+      <p class="eyebrow">Standalone Extractor</p>
+      <h1>Race Pace to iRacing Roster Exporter</h1>
+      <p class="hero-copy">
+        This app reads the Race Pace IndexedDB profile directly, detects save slots and championships,
+        then exports an iRacing-ready roster JSON without a manual collection export step.
+      </p>
+    </header>
+
+    <section class="card">
+      <div class="field-grid">
+        <label class="field">
+          <span>Race Pace Data Folder</span>
+          <input id="dataPath" type="text" readonly>
+        </label>
+
+        <label class="field">
+          <span>Save Slot</span>
+          <select id="slotSelect"></select>
+        </label>
+
+        <label class="field">
+          <span>Championship</span>
+          <select id="championshipSelect"></select>
+        </label>
+
+        <label class="field">
+          <span>Player Driver</span>
+          <select id="playerSelect"></select>
+        </label>
+
+        <label class="field">
+          <span>iRacing Car</span>
+          <select id="carSelect"></select>
+        </label>
+      </div>
+
+      <div class="button-row">
+        <button id="refreshButton" type="button">Refresh Data</button>
+        <button id="exportButton" type="button" class="primary">Export Roster JSON</button>
+      </div>
+
+      <p id="status" class="status">
+        Close Race Pace before launching this tool for the most reliable IndexedDB access.
+      </p>
+    </section>
+
+    <section class="card">
+      <h2>Summary</h2>
+      <pre id="summary" class="summary">Waiting for scan...</pre>
+    </section>
+  </main>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

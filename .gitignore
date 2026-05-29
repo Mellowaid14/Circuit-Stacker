@@ -1,0 +1,14 @@
+.venv/
+.idea/
+__pycache__/
+.pytest_cache/
+*.pyc
+dist/
+build/
+output/
+*.egg-info/
+saves/
+_uploaded_project/
+settings.json
+data_root.txt
+src/circuit_stackers - Copy/

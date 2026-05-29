@@ -1,0 +1,1110 @@
+{
+	"adaptiveAIEnabled": false,
+	"adaptiveAIDifficulty": 0,
+	"aiCarClassIds": [],
+	"avoidUser": false,
+	"carId": 142,
+	"carSettings": [
+		{
+			"car_id": 142,
+			"max_pct_fuel_fill": 100,
+			"max_dry_tire_sets": 0
+		}
+	],
+	"category_id": 6,
+	"damage_model": 0,
+	"do_not_count_caution_laps": false,
+	"full_course_cautions": false,
+	"gridPosition": 1,
+	"incident_limit": 18,
+	"incident_warn_mode": 0,
+	"incident_warn_param1": 0,
+	"incident_warn_param2": 0,
+	"lucky_dog": false,
+	"max_drivers": 22,
+	"maxSkill": 100,
+	"minSkill": 0,
+	"max_visor_tearoffs": -1,
+	"multiclassType": 2,
+	"must_use_diff_tire_types_in_race": false,
+	"no_lapper_wave_arounds": false,
+	"num_fast_tows": -1,
+	"practice_length": 15,
+	"qualify_laps": 2,
+	"qualify_length": 10,
+	"race_laps": 0,
+	"race_length_type": 2,
+	"race_length": 10,
+	"restarts": 2,
+	"rolling_starts": false,
+	"rosterName": "CS - Formula Vee Levels",
+	"short_parade_lap": false,
+	"start_on_qual_tire": false,
+	"startZone": 0,
+	"subsessions": [
+		3,
+		4,
+		6
+	],
+	"time_of_day": 0,
+	"track_state": {
+		"leave_marbles": true,
+		"practice_rubber": -1,
+		"qualify_rubber": -1,
+		"race_rubber": -1,
+		"warmup_rubber": -1
+	},
+	"unsport_conduct_rule_mode": 2,
+	"userCarClassId": 0,
+	"weather": {
+		"type": 3,
+		"temp_units": 0,
+		"temp_value": 78,
+		"rel_humidity": 45,
+		"fog": 0,
+		"wind_dir": 0,
+		"wind_units": 0,
+		"wind_value": 2,
+		"skies": 1,
+		"simulated_start_time": "2026-05-15T12:00:00",
+		"simulated_time_multiplier": 1,
+		"simulated_time_offsets": [
+			25,
+			45
+		],
+		"version": 1,
+		"weather_var_initial": 0,
+		"weather_var_ongoing": 0,
+		"time_of_day": 4,
+		"track_water": 0,
+		"weather_id": "712588_c9f6f154-ceb6-49f3-a4f7-3b7c459a0755",
+		"guided_parameters": {
+			"temperature": 0,
+			"wind_dir": 0,
+			"wind_speed": 0,
+			"skies": 0,
+			"precipitation": 1,
+			"stop_precip": 0,
+			"allow_fog": false
+		},
+		"allow_fog": false,
+		"precip_option": 0,
+		"weather_seed": -3656731777444453,
+		"loading": false,
+		"keyframes": [
+			{
+				"index": 0,
+				"timestamp": "2026-05-15T06:00:00",
+				"time_offset": -360,
+				"allow_precip": false,
+				"valid_stats": true,
+				"affects_session": false,
+				"cloud_cover": 540,
+				"air_temp": 1977,
+				"rel_humidity": 3500,
+				"pressure": 10162,
+				"wind_dir": 205,
+				"wind_speed": 50,
+				"precip_chance": 0,
+				"precip_amount": 0,
+				"raw_air_temp": 1530,
+				"weather_seed": -3656731777444453,
+				"wind_dir_z": -624,
+				"pressure_z": 1.7080242452155925,
+				"simulated_start_time": "2026-05-15T12:00:00",
+				"track_pkg_id": 410,
+				"is_sun_up": true
+			},
+			{
+				"index": 1,
+				"timestamp": "2026-05-15T06:15:00",
+				"time_offset": -345,
+				"allow_precip": false,
+				"valid_stats": true,
+				"affects_session": false,
+				"cloud_cover": 487,
+				"air_temp": 1994,
+				"rel_humidity": 3315,
+				"pressure": 10167,
+				"wind_dir": 191,
+				"wind_speed": 50,
+				"precip_chance": 0,
+				"precip_amount": 0,
+				"raw_air_temp": 1589,
+				"wind_dir_z": -765,
+				"pressure_z": 1.708935567025507,
+				"is_sun_up": true
+			},
+			{
+				"index": 2,
+				"timestamp": "2026-05-15T06:30:00",
+				"time_offset": -330,
+				"allow_precip": false,
+				"valid_stats": true,
+				"affects_session": false,
+				"cloud_cover": 337,
+				"air_temp": 1997,
+				"rel_humidity": 3355,
+				"pressure": 10181,
+				"wind_dir": 189,
+				"wind_speed": 50,
+				"precip_chance": 0,
+				"precip_amount": 0,
+				"raw_air_temp": 1598,
+				"wind_dir_z": -795,
+				"pressure_z": 1.714381902581442,
+				"is_sun_up": true
+			},
+			{
+				"index": 3,
+				"timestamp": "2026-05-15T06:45:00",
+				"time_offset": -315,
+				"allow_precip": false,
+				"valid_stats": true,
+				"affects_session": false,
+				"cloud_cover": 285,
+				"air_temp": 2000,
+				"rel_humidity": 3322,
+				"pressure": 10187,
+				"wind_dir": 186,
+				"wind_speed": 50,
+				"precip_chance": 0,
+				"precip_amount": 0,
+				"raw_air_temp": 1606,
+				"wind_dir_z": -824,
+				"pressure_z": 1.7265659728457499,
+				"is_sun_up": true
+			},
+			{
+				"index": 4,
+				"timestamp": "2026-05-15T07:00:00",
+				"time_offset": -300,
+				"allow_precip": false,
+				"valid_stats": true,
+				"affects_session": false,
+				"cloud_cover": 293,
+				"air_temp": 2005,
+				"rel_humidity": 3273,
+				"pressure": 10189,
+				"wind_dir": 187,
+				"wind_speed": 50,
+				"precip_chance": 0,
+				"precip_amount": 0,
+				"raw_air_temp": 1622,
+				"wind_dir_z": -815,
+				"pressure_z": 1.7456173496397458,
+				"is_sun_up": true
+			},
+			{
+				"index": 5,
+				"timestamp": "2026-05-15T07:15:00",
+				"time_offset": -285,
+				"allow_precip": false,
+				"valid_stats": true,
+				"affects_session": false,
+				"cloud_cover": 320,
+				"air_temp": 2018,
+				"rel_humidity": 3175,
+				"pressure": 10189,
+				"wind_dir": 190,
+				"wind_speed": 50,
+				"precip_chance": 0,
+				"precip_amount": 0,
+				"raw_air_temp": 1660,
+				"wind_dir_z": -782,
+				"pressure_z": 1.7701107429289662,
+				"is_sun_up": true
+			},
+			{
+				"index": 6,
+				"timestamp": "2026-05-15T07:30:00",
+				"time_offset": -270,
+				"allow_precip": false,
+				"valid_stats": true,
+				"affects_session": false,
+				"cloud_cover": 373,
+				"air_temp": 2032,
+				"rel_humidity": 3077,
+				"pressure": 10188,
+				"wind_dir": 193,
+				"wind_speed": 50,
+				"precip_chance": 0,
+				"precip_amount": 0,
+				"raw_air_temp": 1701,
+				"wind_dir_z": -749,
+				"pressure_z": 1.7975842881084283,
+				"is_sun_up": true
+			},
+			{
+				"index": 7,
+				"timestamp": "2026-05-15T07:45:00",
+				"time_offset": -255,
+				"allow_precip": false,
+				"valid_stats": true,
+				"affects_session": false,
+				"cloud_cover": 448,
+				"air_temp": 2048,
+				"rel_humidity": 2990,
+				"pressure": 10184,
+				"wind_dir": 194,
+				"wind_speed": 50,
+				"precip_chance": 0,
+				"precip_amount": 0,
+				"raw_air_temp": 1742,
+				"wind_dir_z": -740,
+				"pressure_z": 1.8250578332878906,
+				"is_sun_up": true
+			},
+			{
+				"index": 8,
+				"timestamp": "2026-05-15T08:00:00",
+				"time_offset": -240,
+				"allow_precip": false,
+				"valid_stats": true,
+				"affects_session": false,
+				"cloud_cover": 535,
+				"air_temp": 2062,
+				"rel_humidity": 2923,
+				"pressure": 10180,
+				"wind_dir": 192,
+				"wind_speed": 50,
+				"precip_chance": 0,
+				"precip_amount": 0,
+				"raw_air_temp": 1778,
+				"wind_dir_z": -757,
+				"pressure_z": 1.849551226577111,
+				"is_sun_up": true
+			},
+			{
+				"index": 9,
+				"timestamp": "2026-05-15T08:15:00",
+				"time_offset": -225,
+				"allow_precip": false,
+				"valid_stats": true,
+				"affects_session": false,
+				"cloud_cover": 619,
+				"air_temp": 2077,
+				"rel_humidity": 2848,
+				"pressure": 10176,
+				"wind_dir": 186,
+				"wind_speed": 50,
+				"precip_chance": 0,
+				"precip_amount": 0,
+				"raw_air_temp": 1813,
+				"wind_dir_z": -834,
+				"pressure_z": 1.868602603371107,
+				"is_sun_up": true
+			},
+			{
+				"index": 10,
+				"timestamp": "2026-05-15T08:30:00",
+				"time_offset": -210,
+				"allow_precip": false,
+				"valid_stats": true,
+				"affects_session": false,
+				"cloud_cover": 690,
+				"air_temp": 2094,
+				"rel_humidity": 2782,
+				"pressure": 10172,
+				"wind_dir": 176,
+				"wind_speed": 50,
+				"precip_chance": 0,
+				"precip_amount": 0,
+				"raw_air_temp": 1850,
+				"wind_dir_z": -943,
+				"pressure_z": 1.8807866736354149,
+				"is_sun_up": true
+			},
+			{
+				"index": 11,
+				"timestamp": "2026-05-15T08:45:00",
+				"time_offset": -195,
+				"allow_precip": false,
+				"valid_stats": true,
+				"affects_session": false,
+				"cloud_cover": 737,
+				"air_temp": 2109,
+				"rel_humidity": 2731,
+				"pressure": 10171,
+				"wind_dir": 170,
+				"wind_speed": 50,
+				"precip_chance": 0,
+				"precip_amount": 0,
+				"raw_air_temp": 1883,
+				"wind_dir_z": -1020,
+				"pressure_z": 1.88623300919135,
+				"is_sun_up": true
+			},
+			{
+				"index": 12,
+				"timestamp": "2026-05-15T09:00:00",
+				"time_offset": -180,
+				"allow_precip": false,
+				"valid_stats": true,
+				"affects_session": false,
+				"cloud_cover": 758,
+				"air_temp": 2124,
+				"rel_humidity": 2689,
+				"pressure": 10170,
+				"wind_dir": 169,
+				"wind_speed": 50,
+				"precip_chance": 0,
+				"precip_amount": 0,
+				"raw_air_temp": 1914,
+				"wind_dir_z": -1037,
+				"pressure_z": 1.8871443310012643,
+				"is_sun_up": true
+			},
+			{
+				"index": 13,
+				"timestamp": "2026-05-15T09:15:00",
+				"time_offset": -165,
+				"allow_precip": false,
+				"valid_stats": true,
+				"affects_session": false,
+				"cloud_cover": 763,
+				"air_temp": 2141,
+				"rel_humidity": 2622,
+				"pressure": 10170,
+				"wind_dir": 170,
+				"wind_speed": 50,
+				"precip_chance": 0,
+				"precip_amount": 0,
+				"raw_air_temp": 1947,
+				"wind_dir_z": -1038,
+				"pressure_z": 1.8850884103185073,
+				"is_sun_up": true
+			},
+			{
+				"index": 14,
+				"timestamp": "2026-05-15T09:30:00",
+				"time_offset": -150,
+				"allow_precip": false,
+				"valid_stats": true,
+				"affects_session": false,
+				"cloud_cover": 765,
+				"air_temp": 2156,
+				"rel_humidity": 2572,
+				"pressure": 10169,
+				"wind_dir": 171,
+				"wind_speed": 50,
+				"precip_chance": 0,
+				"precip_amount": 0,
+				"raw_air_temp": 1976,
+				"wind_dir_z": -1042,
+				"pressure_z": 1.8735227243630848,
+				"is_sun_up": true
+			},
+			{
+				"index": 15,
+				"timestamp": "2026-05-15T09:45:00",
+				"time_offset": -135,
+				"allow_precip": false,
+				"valid_stats": true,
+				"affects_session": false,
+				"cloud_cover": 765,
+				"air_temp": 2169,
+				"rel_humidity": 2544,
+				"pressure": 10168,
+				"wind_dir": 171,
+				"wind_speed": 50,
+				"precip_chance": 0,
+				"precip_amount": 0,
+				"raw_air_temp": 1999,
+				"wind_dir_z": -1053,
+				"pressure_z": 1.8497301973428069,
+				"is_sun_up": true
+			},
+			{
+				"index": 16,
+				"timestamp": "2026-05-15T10:00:00",
+				"time_offset": -120,
+				"allow_precip": false,
+				"valid_stats": true,
+				"affects_session": false,
+				"cloud_cover": 766,
+				"air_temp": 2179,
+				"rel_humidity": 2533,
+				"pressure": 10166,
+				"wind_dir": 171,
+				"wind_speed": 50,
+				"precip_chance": 0,
+				"precip_amount": 0,
+				"raw_air_temp": 2017,
+				"wind_dir_z": -1072,
+				"pressure_z": 1.8164279050498637,
+				"is_sun_up": true
+			},
+			{
+				"index": 17,
+				"timestamp": "2026-05-15T10:15:00",
+				"time_offset": -105,
+				"allow_precip": false,
+				"valid_stats": true,
+				"affects_session": false,
+				"cloud_cover": 766,
+				"air_temp": 2186,
+				"rel_humidity": 2533,
+				"pressure": 10164,
+				"wind_dir": 169,
+				"wind_speed": 58,
+				"precip_chance": 0,
+				"precip_amount": 0,
+				"raw_air_temp": 2030,
+				"wind_dir_z": -1100,
+				"pressure_z": 1.7795934142270733,
+				"is_sun_up": true
+			},
+			{
+				"index": 18,
+				"timestamp": "2026-05-15T10:30:00",
+				"time_offset": -90,
+				"allow_precip": false,
+				"valid_stats": true,
+				"affects_session": false,
+				"cloud_cover": 766,
+				"air_temp": 2194,
+				"rel_humidity": 2529,
+				"pressure": 10163,
+				"wind_dir": 166,
+				"wind_speed": 66,
+				"precip_chance": 0,
+				"precip_amount": 0,
+				"raw_air_temp": 2044,
+				"wind_dir_z": -1136,
+				"pressure_z": 1.7462911219341302,
+				"is_sun_up": true
+			},
+			{
+				"index": 19,
+				"timestamp": "2026-05-15T10:45:00",
+				"time_offset": -75,
+				"allow_precip": false,
+				"valid_stats": true,
+				"affects_session": false,
+				"cloud_cover": 766,
+				"air_temp": 2204,
+				"rel_humidity": 2510,
+				"pressure": 10163,
+				"wind_dir": 162,
+				"wind_speed": 72,
+				"precip_chance": 0,
+				"precip_amount": 0,
+				"raw_air_temp": 2061,
+				"wind_dir_z": -1181,
+				"pressure_z": 1.7224985949138523,
+				"is_sun_up": true
+			},
+			{
+				"index": 20,
+				"timestamp": "2026-05-15T11:00:00",
+				"time_offset": -60,
+				"allow_precip": false,
+				"valid_stats": true,
+				"affects_session": false,
+				"cloud_cover": 767,
+				"air_temp": 2216,
+				"rel_humidity": 2473,
+				"pressure": 10163,
+				"wind_dir": 158,
+				"wind_speed": 76,
+				"precip_chance": 0,
+				"precip_amount": 0,
+				"raw_air_temp": 2080,
+				"wind_dir_z": -1232,
+				"pressure_z": 1.71093290895843,
+				"is_sun_up": true
+			},
+			{
+				"index": 21,
+				"timestamp": "2026-05-15T11:15:00",
+				"time_offset": -45,
+				"allow_precip": false,
+				"valid_stats": true,
+				"affects_session": false,
+				"cloud_cover": 767,
+				"air_temp": 2228,
+				"rel_humidity": 2419,
+				"pressure": 10163,
+				"wind_dir": 152,
+				"wind_speed": 77,
+				"precip_chance": 0,
+				"precip_amount": 0,
+				"raw_air_temp": 2100,
+				"wind_dir_z": -1289,
+				"pressure_z": 1.7088769882756727,
+				"is_sun_up": true
+			},
+			{
+				"index": 22,
+				"timestamp": "2026-05-15T11:30:00",
+				"time_offset": -30,
+				"allow_precip": false,
+				"valid_stats": true,
+				"affects_session": false,
+				"cloud_cover": 766,
+				"air_temp": 2237,
+				"rel_humidity": 2374,
+				"pressure": 10162,
+				"wind_dir": 147,
+				"wind_speed": 79,
+				"precip_chance": 0,
+				"precip_amount": 0,
+				"raw_air_temp": 2115,
+				"wind_dir_z": -1349,
+				"pressure_z": 1.7058785922915725,
+				"is_sun_up": true
+			},
+			{
+				"index": 23,
+				"timestamp": "2026-05-15T11:45:00",
+				"time_offset": -15,
+				"allow_precip": false,
+				"valid_stats": true,
+				"affects_session": false,
+				"cloud_cover": 758,
+				"air_temp": 2244,
+				"rel_humidity": 2347,
+				"pressure": 10161,
+				"wind_dir": 141,
+				"wind_speed": 83,
+				"precip_chance": 0,
+				"precip_amount": 0,
+				"raw_air_temp": 2127,
+				"wind_dir_z": -1410,
+				"pressure_z": 1.6895413244390411,
+				"is_sun_up": true
+			},
+			{
+				"index": 24,
+				"timestamp": "2026-05-15T12:00:00",
+				"time_offset": 0,
+				"allow_precip": false,
+				"valid_stats": true,
+				"affects_session": true,
+				"cloud_cover": 741,
+				"air_temp": 2251,
+				"rel_humidity": 2340,
+				"pressure": 10160,
+				"wind_dir": 136,
+				"wind_speed": 91,
+				"precip_chance": 0,
+				"precip_amount": 0,
+				"raw_air_temp": 2137,
+				"wind_dir_z": -1470,
+				"pressure_z": 1.6574710282288732,
+				"is_sun_up": true
+			},
+			{
+				"index": 25,
+				"timestamp": "2026-05-15T12:15:00",
+				"time_offset": 15,
+				"allow_precip": false,
+				"valid_stats": true,
+				"affects_session": true,
+				"cloud_cover": 723,
+				"air_temp": 2254,
+				"rel_humidity": 2374,
+				"pressure": 10158,
+				"wind_dir": 131,
+				"wind_speed": 101,
+				"precip_chance": 0,
+				"precip_amount": 0,
+				"raw_air_temp": 2142,
+				"wind_dir_z": -1527,
+				"pressure_z": 1.6154820837062822,
+				"is_sun_up": true
+			},
+			{
+				"index": 26,
+				"timestamp": "2026-05-15T12:30:00",
+				"time_offset": 30,
+				"allow_precip": false,
+				"valid_stats": true,
+				"affects_session": true,
+				"cloud_cover": 707,
+				"air_temp": 2259,
+				"rel_humidity": 2404,
+				"pressure": 10155,
+				"wind_dir": 127,
+				"wind_speed": 112,
+				"precip_chance": 0,
+				"precip_amount": 0,
+				"raw_air_temp": 2151,
+				"wind_dir_z": -1579,
+				"pressure_z": 1.5734931391836913,
+				"is_sun_up": true
+			},
+			{
+				"index": 27,
+				"timestamp": "2026-05-15T12:45:00",
+				"time_offset": 45,
+				"allow_precip": false,
+				"valid_stats": true,
+				"affects_session": true,
+				"cloud_cover": 700,
+				"air_temp": 2268,
+				"rel_humidity": 2415,
+				"pressure": 10152,
+				"wind_dir": 123,
+				"wind_speed": 121,
+				"precip_chance": 0,
+				"precip_amount": 0,
+				"raw_air_temp": 2164,
+				"wind_dir_z": -1624,
+				"pressure_z": 1.5414228429735233,
+				"is_sun_up": true
+			},
+			{
+				"index": 28,
+				"timestamp": "2026-05-15T13:00:00",
+				"time_offset": 60,
+				"allow_precip": false,
+				"valid_stats": true,
+				"affects_session": true,
+				"cloud_cover": 700,
+				"air_temp": 2280,
+				"rel_humidity": 2398,
+				"pressure": 10149,
+				"wind_dir": 120,
+				"wind_speed": 127,
+				"precip_chance": 0,
+				"precip_amount": 0,
+				"raw_air_temp": 2184,
+				"wind_dir_z": -1660,
+				"pressure_z": 1.525085575120992,
+				"is_sun_up": true
+			},
+			{
+				"index": 29,
+				"timestamp": "2026-05-15T13:15:00",
+				"time_offset": 75,
+				"allow_precip": false,
+				"valid_stats": true,
+				"affects_session": false,
+				"cloud_cover": 718,
+				"air_temp": 2289,
+				"rel_humidity": 2377,
+				"pressure": 10148,
+				"wind_dir": 119,
+				"wind_speed": 127,
+				"precip_chance": 0,
+				"precip_amount": 0,
+				"raw_air_temp": 2197,
+				"wind_dir_z": -1688,
+				"pressure_z": 1.5220871791368917,
+				"is_sun_up": true
+			},
+			{
+				"index": 30,
+				"timestamp": "2026-05-15T13:30:00",
+				"time_offset": 90,
+				"allow_precip": false,
+				"valid_stats": true,
+				"affects_session": false,
+				"cloud_cover": 795,
+				"air_temp": 2277,
+				"rel_humidity": 2423,
+				"pressure": 10139,
+				"wind_dir": 118,
+				"wind_speed": 132,
+				"precip_chance": 0,
+				"precip_amount": 0,
+				"raw_air_temp": 2179,
+				"wind_dir_z": -1707,
+				"pressure_z": 1.493197275542375,
+				"is_sun_up": true
+			},
+			{
+				"index": 31,
+				"timestamp": "2026-05-15T13:45:00",
+				"time_offset": 105,
+				"allow_precip": false,
+				"valid_stats": true,
+				"affects_session": false,
+				"cloud_cover": 903,
+				"air_temp": 2250,
+				"rel_humidity": 2523,
+				"pressure": 10125,
+				"wind_dir": 118,
+				"wind_speed": 136,
+				"precip_chance": 0,
+				"precip_amount": 0,
+				"raw_air_temp": 2136,
+				"wind_dir_z": -1718,
+				"pressure_z": 1.4643073719478583,
+				"is_sun_up": true
+			},
+			{
+				"index": 32,
+				"timestamp": "2026-05-15T14:00:00",
+				"time_offset": 120,
+				"allow_precip": false,
+				"valid_stats": true,
+				"affects_session": false,
+				"cloud_cover": 978,
+				"air_temp": 2219,
+				"rel_humidity": 2643,
+				"pressure": 10115,
+				"wind_dir": 119,
+				"wind_speed": 140,
+				"precip_chance": 0,
+				"precip_amount": 0,
+				"raw_air_temp": 2086,
+				"wind_dir_z": -1722,
+				"pressure_z": 1.4445557214301457,
+				"is_sun_up": true
+			},
+			{
+				"index": 33,
+				"timestamp": "2026-05-15T14:15:00",
+				"time_offset": 135,
+				"allow_precip": false,
+				"valid_stats": true,
+				"affects_session": false,
+				"cloud_cover": 996,
+				"air_temp": 2193,
+				"rel_humidity": 2761,
+				"pressure": 10111,
+				"wind_dir": 119,
+				"wind_speed": 142,
+				"precip_chance": 0,
+				"precip_amount": 0,
+				"raw_air_temp": 2041,
+				"wind_dir_z": -1723,
+				"pressure_z": 1.4248040709124332,
+				"is_sun_up": true
+			}
+		]
+	},
+	"events": [
+		{
+			"trackId": 353,
+			"num_opt_laps": 0,
+			"paceCar": {
+				"category_id": 2,
+				"car_id": 90,
+				"is_oval": false,
+				"is_dirt": false,
+				"car_name": "Pace Car - Truck",
+				"car_class_id": 11,
+				"order": 5
+			},
+			"short_parade_lap": false,
+			"must_use_diff_tire_types_in_race": false,
+			"subsessions": [
+				3,
+				4,
+				6
+			],
+			"eventId": "9e7d9b7d-486c-f413-9777-8df7b1afec55"
+		},
+		{
+			"trackId": 166,
+			"num_opt_laps": 0,
+			"paceCar": {
+				"category_id": 2,
+				"car_id": 90,
+				"is_oval": false,
+				"is_dirt": false,
+				"car_name": "Pace Car - Truck",
+				"car_class_id": 11,
+				"order": 5
+			},
+			"short_parade_lap": false,
+			"must_use_diff_tire_types_in_race": false,
+			"subsessions": [
+				3,
+				4,
+				6
+			],
+			"eventId": "af724224-4b76-6ce2-4acb-f0300a5d0202"
+		},
+		{
+			"trackId": 326,
+			"num_opt_laps": 0,
+			"paceCar": {
+				"category_id": 2,
+				"car_id": 90,
+				"is_oval": false,
+				"is_dirt": false,
+				"car_name": "Pace Car - Truck",
+				"car_class_id": 11,
+				"order": 5
+			},
+			"short_parade_lap": false,
+			"must_use_diff_tire_types_in_race": false,
+			"subsessions": [
+				3,
+				4,
+				6
+			],
+			"eventId": "6d82d23a-7954-7bbc-ce64-2ce13b91a187"
+		},
+		{
+			"trackId": 454,
+			"num_opt_laps": 0,
+			"paceCar": {
+				"category_id": 2,
+				"car_id": 90,
+				"is_oval": false,
+				"is_dirt": false,
+				"car_name": "Pace Car - Truck",
+				"car_class_id": 11,
+				"order": 5
+			},
+			"short_parade_lap": false,
+			"must_use_diff_tire_types_in_race": false,
+			"subsessions": [
+				3,
+				4,
+				6
+			],
+			"eventId": "dc621bf9-e740-c290-7901-2646c595ab35"
+		}
+	],
+	"points_system_id": 3,
+	"name": "CS - Difficulty Finder Open Wheel",
+	"custom_points": [
+		{
+			"position": 1,
+			"points": 0
+		},
+		{
+			"position": 2,
+			"points": 0
+		},
+		{
+			"position": 3,
+			"points": 0
+		},
+		{
+			"position": 4,
+			"points": 0
+		},
+		{
+			"position": 5,
+			"points": 0
+		},
+		{
+			"position": 6,
+			"points": 0
+		},
+		{
+			"position": 7,
+			"points": 0
+		},
+		{
+			"position": 8,
+			"points": 0
+		},
+		{
+			"position": 9,
+			"points": 0
+		},
+		{
+			"position": 10,
+			"points": 0
+		},
+		{
+			"position": 11,
+			"points": 0
+		},
+		{
+			"position": 12,
+			"points": 0
+		},
+		{
+			"position": 13,
+			"points": 0
+		},
+		{
+			"position": 14,
+			"points": 0
+		},
+		{
+			"position": 15,
+			"points": 0
+		},
+		{
+			"position": 16,
+			"points": 0
+		},
+		{
+			"position": 17,
+			"points": 0
+		},
+		{
+			"position": 18,
+			"points": 0
+		},
+		{
+			"position": 19,
+			"points": 0
+		},
+		{
+			"position": 20,
+			"points": 0
+		},
+		{
+			"position": 21,
+			"points": 0
+		},
+		{
+			"position": 22,
+			"points": 0
+		},
+		{
+			"position": 23,
+			"points": 0
+		},
+		{
+			"position": 24,
+			"points": 0
+		},
+		{
+			"position": 25,
+			"points": 0
+		},
+		{
+			"position": 26,
+			"points": 0
+		},
+		{
+			"position": 27,
+			"points": 0
+		},
+		{
+			"position": 28,
+			"points": 0
+		},
+		{
+			"position": 29,
+			"points": 0
+		},
+		{
+			"position": 30,
+			"points": 0
+		},
+		{
+			"position": 31,
+			"points": 0
+		},
+		{
+			"position": 32,
+			"points": 0
+		},
+		{
+			"position": 33,
+			"points": 0
+		},
+		{
+			"position": 34,
+			"points": 0
+		},
+		{
+			"position": 35,
+			"points": 0
+		},
+		{
+			"position": 36,
+			"points": 0
+		},
+		{
+			"position": 37,
+			"points": 0
+		},
+		{
+			"position": 38,
+			"points": 0
+		},
+		{
+			"position": 39,
+			"points": 0
+		},
+		{
+			"position": 40,
+			"points": 0
+		},
+		{
+			"position": 41,
+			"points": 0
+		},
+		{
+			"position": 42,
+			"points": 0
+		},
+		{
+			"position": 43,
+			"points": 0
+		},
+		{
+			"position": 44,
+			"points": 0
+		},
+		{
+			"position": 45,
+			"points": 0
+		},
+		{
+			"position": 46,
+			"points": 0
+		},
+		{
+			"position": 47,
+			"points": 0
+		},
+		{
+			"position": 48,
+			"points": 0
+		},
+		{
+			"position": 49,
+			"points": 0
+		},
+		{
+			"position": 50,
+			"points": 0
+		},
+		{
+			"position": 51,
+			"points": 0
+		},
+		{
+			"position": 52,
+			"points": 0
+		},
+		{
+			"position": 53,
+			"points": 0
+		},
+		{
+			"position": 54,
+			"points": 0
+		},
+		{
+			"position": 55,
+			"points": 0
+		},
+		{
+			"position": 56,
+			"points": 0
+		},
+		{
+			"position": 57,
+			"points": 0
+		},
+		{
+			"position": 58,
+			"points": 0
+		},
+		{
+			"position": 59,
+			"points": 0
+		},
+		{
+			"position": 60,
+			"points": 0
+		}
+	]
+}

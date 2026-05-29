@@ -1,0 +1,49 @@
+{
+  "version": "auto-py-to-exe-configuration_v1",
+  "pyinstallerOptions": [
+    {
+      "optionDest": "filenames",
+      "value": "C:/Users/hfaur/OneDrive/Documents/New project/launch_circuit_stackers.py"
+    },
+    {
+      "optionDest": "name",
+      "value": "Circuit Stackers"
+    },
+    {
+      "optionDest": "onefile",
+      "value": false
+    },
+    {
+      "optionDest": "console",
+      "value": false
+    },
+    {
+      "optionDest": "icon_file",
+      "value": "C:/Users/hfaur/OneDrive/Documents/New project/src/circuit_stackers/assets/circuit_stacker_icon.ico"
+    },
+    {
+      "optionDest": "add_data",
+      "value": "C:/Users/hfaur/OneDrive/Documents/New project/src/circuit_stackers/data;data"
+    },
+    {
+      "optionDest": "add_data",
+      "value": "C:/Users/hfaur/OneDrive/Documents/New project/src/circuit_stackers/assets;assets"
+    },
+    {
+      "optionDest": "hidden-import",
+      "value": "customtkinter"
+    },
+    {
+      "optionDest": "noconfirm",
+      "value": true
+    },
+    {
+      "optionDest": "clean_build",
+      "value": true
+    }
+  ],
+  "nonPyinstallerOptions": {
+    "increaseRecursionLimit": false,
+    "manualArguments": ""
+  }
+}

@@ -1,0 +1,599 @@
+from __future__ import annotations
+
+import csv
+import random
+from collections import defaultdict, deque
+from pathlib import Path
+from typing import Any
+from xml.etree import ElementTree as ET
+
+from .driver_pool import driver_profile_map
+from .paths import resource_path
+from .settings_manager import game_directory
+
+
+AMS2_LIVERIES_CSV = resource_path("data", "AMS2liveries.csv")
+AMS2_CARS_CSV = resource_path("data", "Cars.csv")
+_AMS2_LIVERY_ROWS_CACHE: list[dict[str, str]] | None = None
+_AMS2_CAR_ROWS_CACHE: list[dict[str, str]] | None = None
+_CUSTOM_LIVERY_ROWS_CACHE: dict[str, list[dict[str, str]]] = {}
+
+
+def _driver_class_name(driver: dict[str, Any]) -> str:
+    return str(driver.get("class_name", "")).strip() or "Overall"
+
+
+def _load_livery_rows() -> list[dict[str, str]]:
+    global _AMS2_LIVERY_ROWS_CACHE
+    if _AMS2_LIVERY_ROWS_CACHE is not None:
+        return [dict(row) for row in _AMS2_LIVERY_ROWS_CACHE]
+    with AMS2_LIVERIES_CSV.open(newline="", encoding="utf-8") as file_obj:
+        _AMS2_LIVERY_ROWS_CACHE = [dict(row) for row in csv.DictReader(file_obj)]
+    return [dict(row) for row in _AMS2_LIVERY_ROWS_CACHE]
+
+
+def _load_ams2_car_rows() -> list[dict[str, str]]:
+    global _AMS2_CAR_ROWS_CACHE
+    if _AMS2_CAR_ROWS_CACHE is not None:
+        return [dict(row) for row in _AMS2_CAR_ROWS_CACHE]
+    with AMS2_CARS_CSV.open(newline="", encoding="utf-8") as file_obj:
+        _AMS2_CAR_ROWS_CACHE = [
+            dict(row)
+            for row in csv.DictReader(file_obj)
+            if str(row.get("Game", "")).strip().casefold() == "ams2"
+        ]
+    return [dict(row) for row in _AMS2_CAR_ROWS_CACHE]
+
+
+def _custom_livery_root() -> Path | None:
+    ams2_root = Path(game_directory("AMS2"))
+    if not str(ams2_root).strip():
+        return None
+    overrides = ams2_root / "Vehicles" / "Textures" / "CustomLiveries" / "Overrides"
+    return overrides if overrides.exists() else None
+
+
+def _add_unique_livery_name(names: list[str], seen: set[str], livery_name: str) -> None:
+    cleaned_name = str(livery_name).strip()
+    if not cleaned_name or cleaned_name.casefold() in seen:
+        return
+    seen.add(cleaned_name.casefold())
+    names.append(cleaned_name)
+
+
+def _custom_ai_livery_names_for_roster(roster_name: str) -> list[str]:
+    ams2_root = Path(game_directory("AMS2"))
+    if not str(ams2_root).strip():
+        return []
+    custom_ai_dir = ams2_root / "UserData" / "CustomAIDrivers"
+    if not custom_ai_dir.exists():
+        return []
+
+    roster_stem = Path(str(roster_name).strip()).stem.casefold()
+    names: list[str] = []
+    seen: set[str] = set()
+    for xml_path in custom_ai_dir.glob("*.xml"):
+        # Match related roster files, like F-Ultimate_Gen2_2025.xml for F-Ultimate_Gen2.xml.
+        if roster_stem and roster_stem not in xml_path.stem.casefold():
+            continue
+        try:
+            tree = ET.parse(xml_path)
+        except ET.ParseError:
+            continue
+        for node in tree.iter():
+            if str(node.tag).split("}")[-1].casefold() != "driver":
+                continue
+            if str(node.attrib.get("tracks", "")).strip():
+                continue
+            _add_unique_livery_name(names, seen, str(node.attrib.get("livery_name", "")))
+    return names
+
+
+def _custom_livery_names_for_folder(folder_name: str) -> list[str]:
+    cleaned_folder = str(folder_name).strip()
+    if not cleaned_folder:
+        return []
+    root = _custom_livery_root()
+    if root is None:
+        return []
+    folder_path = root / cleaned_folder
+    if not folder_path.exists():
+        return []
+
+    names: list[str] = []
+    seen: set[str] = set()
+    for xml_path in folder_path.rglob("*.xml"):
+        if xml_path.name.casefold().endswith("_dist.xml"):
+            continue
+        try:
+            tree = ET.parse(xml_path)
+        except ET.ParseError:
+            continue
+        for node in tree.iter():
+            if str(node.tag).split("}")[-1].casefold() != "livery_override":
+                continue
+            _add_unique_livery_name(names, seen, str(node.attrib.get("NAME", "") or node.attrib.get("Name", "")))
+    return names
+
+
+def _car_ids_for_class(class_name: str) -> set[str]:
+    normalized_class = str(class_name).strip().casefold()
+    return {
+        str(row.get("id", "")).strip()
+        for row in _load_ams2_car_rows()
+        if str(row.get("id", "")).strip()
+        and str(row.get("Car class", "")).strip().casefold() == normalized_class
+    }
+
+
+def _custom_livery_rows_for_class(class_name: str, default_rows: list[dict[str, str]]) -> list[dict[str, str]]:
+    cache_key = str(class_name).strip().casefold()
+    if cache_key in _CUSTOM_LIVERY_ROWS_CACHE:
+        return [dict(row) for row in _CUSTOM_LIVERY_ROWS_CACHE[cache_key]]
+
+    class_car_ids = _car_ids_for_class(class_name)
+    if not class_car_ids:
+        _CUSTOM_LIVERY_ROWS_CACHE[cache_key] = []
+        return []
+
+    default_by_car_id: dict[str, dict[str, str]] = {}
+    fallback_row = default_rows[0] if default_rows else {}
+    for row in default_rows:
+        for car_id in str(row.get("car_id", "")).replace("|", ";").replace(",", ";").split(";"):
+            cleaned_car_id = car_id.strip()
+            if cleaned_car_id:
+                default_by_car_id.setdefault(cleaned_car_id, row)
+
+    custom_rows: list[dict[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+    custom_ai_names = _custom_ai_livery_names_for_roster(str(fallback_row.get("Roster_Name", "")).strip())
+    for car in _load_ams2_car_rows():
+        car_id = str(car.get("id", "")).strip()
+        if car_id not in class_car_ids:
+            continue
+        folder_name = str(car.get("ams2_livery_folder", "")).strip()
+        if not folder_name:
+            continue
+        template = default_by_car_id.get(car_id, fallback_row)
+        if not template:
+            continue
+        livery_names = _custom_livery_names_for_folder(folder_name) + custom_ai_names
+        for livery_name in livery_names:
+            key = (car_id, livery_name.casefold())
+            if key in seen:
+                continue
+            seen.add(key)
+            row = dict(template)
+            row["car_id"] = car_id
+            row["Car_Name"] = str(car.get("Car", "")).strip() or str(template.get("Car_Name", "")).strip()
+            row["Class"] = str(template.get("Class", "")).strip()
+            row["livery_name"] = livery_name
+            row["Roster_Name"] = str(template.get("Roster_Name", "")).strip()
+            row["_custom_livery"] = "yes"
+            row["_override_folder"] = folder_name
+            custom_rows.append(row)
+
+    _CUSTOM_LIVERY_ROWS_CACHE[cache_key] = [dict(row) for row in custom_rows]
+    return custom_rows
+
+
+def _livery_rows_for_class(class_name: str) -> list[dict[str, str]]:
+    normalized_class = str(class_name).strip().casefold()
+    rows = [
+        row
+        for row in _load_livery_rows()
+        if str(row.get("Car_Name", "")).strip().casefold() == normalized_class
+    ]
+    if rows:
+        return _custom_livery_rows_for_class(class_name, rows) + rows
+    class_rows = [
+        row
+        for row in _load_livery_rows()
+        if str(row.get("Class", "")).strip().casefold() == normalized_class
+    ]
+    return _custom_livery_rows_for_class(class_name, class_rows) + class_rows
+
+
+def _compact_text(value: Any) -> str:
+    return "".join(ch for ch in str(value).casefold() if ch.isalnum())
+
+
+def _livery_rows_for_player_car(
+    player_car: dict[str, str] | None,
+    class_name: str,
+    class_rows: list[dict[str, str]],
+) -> list[dict[str, str]]:
+    if not player_car:
+        return class_rows
+
+    selected_class = str(player_car.get("Car class", "")).strip()
+    if selected_class and selected_class.casefold() != str(class_name).strip().casefold():
+        return class_rows
+
+    car_id = str(player_car.get("id", "")).strip()
+    if car_id:
+        id_rows = [
+            row
+            for row in class_rows
+            if car_id in {
+                value.strip()
+                for value in str(row.get("car_id", "")).replace("|", ";").replace(",", ";").split(";")
+                if value.strip()
+            }
+        ]
+        if id_rows:
+            return id_rows
+
+    car_name = str(player_car.get("Car", "")).strip()
+    normalized_car = _compact_text(car_name)
+    if not normalized_car:
+        return class_rows
+
+    exact_rows = [
+        row
+        for row in class_rows
+        if _compact_text(row.get("Car_Name", "")) == normalized_car
+    ]
+    if exact_rows:
+        return exact_rows
+
+    name_rows = [
+        row
+        for row in class_rows
+        if normalized_car in _compact_text(row.get("livery_name", ""))
+    ]
+    if name_rows:
+        return name_rows
+
+    return class_rows
+
+
+def preview_player_livery_for_car(player_car: dict[str, str] | None) -> dict[str, str]:
+    if not player_car:
+        return {}
+    class_name = str(player_car.get("Car class", "")).strip() or str(player_car.get("Car", "")).strip()
+    if not class_name:
+        return {}
+    rows = _livery_rows_for_class(class_name)
+    if not rows:
+        return {}
+    player_rows = _livery_rows_for_player_car(player_car, class_name, rows)
+    if not player_rows:
+        return {}
+    return dict(random.choice(player_rows))
+
+
+def _general_ams2_skill(profile: dict[str, Any], fallback_skill: int) -> float:
+    try:
+        general_skill = float(profile.get("ams2_general_skill", -1))
+    except (TypeError, ValueError):
+        general_skill = -1
+    if general_skill >= 0:
+        return max(0.0, min(100.0, general_skill))
+
+    try:
+        race_skill = float(profile.get("ams2_race_skill", 0) or 0)
+    except (TypeError, ValueError):
+        race_skill = 0
+    if race_skill > 0:
+        return max(0.0, min(100.0, race_skill * 100.0))
+    return max(0.0, min(100.0, float(fallback_skill)))
+
+
+def ams2_export_skill_floor_for_prestige(prestige: int | str | None) -> float:
+    try:
+        normalized_prestige = int(prestige or 1)
+    except (TypeError, ValueError):
+        normalized_prestige = 1
+    normalized_prestige = max(1, min(100, normalized_prestige))
+    scale = (normalized_prestige - 1) / 99
+    return round(0.40 + (scale * 0.30), 2)
+
+
+def _scale_roster_ams2_skills(
+    drivers: list[dict[str, Any]],
+    profiles: dict[str, dict[str, Any]],
+    low: float = 0.40,
+    high: float = 0.90,
+) -> dict[str, float]:
+    driver_skills: dict[str, float] = {}
+    for driver in drivers:
+        driver_name = str(driver.get("name", "")).strip()
+        if not driver_name:
+            continue
+        profile = profiles.get(driver_name, {})
+        fallback_skill = int(driver.get("skill", 60) or 60)
+        driver_skills[driver_name] = _general_ams2_skill(profile, fallback_skill)
+
+    if not driver_skills:
+        return {}
+
+    # Drivers above the normal AMS2 export ceiling should read as true outliers in-game.
+    elite_skills = {
+        name: round(skill / 100.0, 2)
+        for name, skill in driver_skills.items()
+        if skill >= 93.0
+    }
+    scaled_driver_skills = {
+        name: skill
+        for name, skill in driver_skills.items()
+        if name not in elite_skills
+    }
+    if not scaled_driver_skills:
+        return elite_skills
+
+    min_skill = min(scaled_driver_skills.values())
+    max_skill = max(scaled_driver_skills.values())
+    if max_skill == min_skill:
+        midpoint = round((low + high) / 2.0, 2)
+        return {**{name: midpoint for name in scaled_driver_skills}, **elite_skills}
+
+    spread = max_skill - min_skill
+    ranked_drivers = sorted(scaled_driver_skills.items(), key=lambda item: (item[1], item[0]))
+    max_rank = max(1, len(ranked_drivers) - 1)
+    scaled: dict[str, float] = {}
+    for rank, (name, skill) in enumerate(ranked_drivers):
+        rank_percent = rank / max_rank
+        skill_percent = (skill - min_skill) / spread
+        # Blend true skill with roster rank, then use an easing curve to avoid a bottom-heavy AMS2 field.
+        blended_percent = (rank_percent * 0.70) + (skill_percent * 0.30)
+        curved_percent = blended_percent ** 0.70
+        scaled[name] = round(low + curved_percent * (high - low), 2)
+    scaled.update(elite_skills)
+    return scaled
+
+
+def _normalized_qualifying_skill(
+    profile: dict[str, Any],
+    normalized_race_skill: float,
+    low: float = 0.40,
+) -> float:
+    try:
+        raw_qualifying = float(profile.get("ams2_qualifying_skill", normalized_race_skill) or normalized_race_skill)
+        raw_race = float(profile.get("ams2_race_skill", normalized_race_skill) or normalized_race_skill)
+    except (TypeError, ValueError):
+        return normalized_race_skill
+    offset = max(-0.2, min(0.2, raw_qualifying - raw_race))
+    high = 1.00 if normalized_race_skill > 0.90 else 0.90
+    return round(max(low, min(high, normalized_race_skill + offset)), 2)
+
+
+def _build_driver_stats(
+    profile: dict[str, Any],
+    fallback_skill: int,
+    normalized_race_skill: float | None = None,
+    normalized_skill_floor: float = 0.40,
+) -> dict[str, str]:
+    race_skill = (
+        normalized_race_skill
+        if normalized_race_skill is not None
+        else float(profile.get("ams2_race_skill", fallback_skill / 100.0) or fallback_skill / 100.0)
+    )
+    qualifying_skill = (
+        _normalized_qualifying_skill(profile, race_skill, normalized_skill_floor)
+        if normalized_race_skill is not None
+        else float(profile.get("ams2_qualifying_skill", fallback_skill / 100.0) or fallback_skill / 100.0)
+    )
+    return {
+        "aggression": f"{float(profile.get('ams2_aggression', 0.5) or 0.5):.2f}",
+        "avoidance_of_forced_mistakes": f"{float(profile.get('ams2_avoidance_of_forced_mistakes', 0.8) or 0.8):.2f}",
+        "avoidance_of_mistakes": f"{float(profile.get('ams2_avoidance_of_mistakes', 0.8) or 0.8):.2f}",
+        "blue_flag_conceding": f"{float(profile.get('ams2_blue_flag_conceding', 0.8) or 0.8):.2f}",
+        "consistency": f"{float(profile.get('ams2_consistency', 0.8) or 0.8):.2f}",
+        "defending": f"{float(profile.get('ams2_defending', 0.5) or 0.5):.2f}",
+        "fuel_management": f"{float(profile.get('ams2_fuel_management', 0.8) or 0.8):.2f}",
+        "qualifying_skill": f"{qualifying_skill:.2f}",
+        "race_skill": f"{race_skill:.2f}",
+        "stamina": f"{float(profile.get('ams2_stamina', 0.8) or 0.8):.2f}",
+        "start_reactions": f"{float(profile.get('ams2_start_reactions', 0.8) or 0.8):.2f}",
+        "tyre_management": f"{float(profile.get('ams2_tyre_management', 0.8) or 0.8):.2f}",
+        "vehicle_reliability": f"{float(profile.get('ams2_vehicle_reliability', 0.85) or 0.85):.2f}",
+        "weather_tyre_changes": f"{float(profile.get('ams2_weather_tyre_changes', 0.8) or 0.8):.2f}",
+        "wet_skill": f"{float(profile.get('ams2_wet_skill', fallback_skill / 100.0) or fallback_skill / 100.0):.2f}",
+    }
+
+
+def _indent_xml(element: ET.Element, level: int = 0) -> None:
+    indent = "\n" + ("    " * level)
+    if len(element):
+        if not element.text or not element.text.strip():
+            element.text = indent + "    "
+        for child in element:
+            _indent_xml(child, level + 1)
+        if not child.tail or not child.tail.strip():
+            child.tail = indent
+    elif level and (not element.tail or not element.tail.strip()):
+        element.tail = indent
+
+
+def _write_roster_xml(path: Path, drivers: list[dict[str, str]]) -> None:
+    root = ET.Element("custom_ai_drivers")
+    for driver in drivers:
+        driver_node = ET.SubElement(root, "driver", {"livery_name": driver["livery_name"]})
+        for tag in [
+            "aggression",
+            "avoidance_of_forced_mistakes",
+            "avoidance_of_mistakes",
+            "blue_flag_conceding",
+            "consistency",
+            "country",
+            "defending",
+            "fuel_management",
+            "name",
+            "qualifying_skill",
+            "race_skill",
+            "stamina",
+            "start_reactions",
+            "tyre_management",
+            "vehicle_reliability",
+            "weather_tyre_changes",
+            "wet_skill",
+        ]:
+            node = ET.SubElement(driver_node, tag)
+            node.text = driver[tag]
+    _indent_xml(root)
+    tree = ET.ElementTree(root)
+    tree.write(path, encoding="utf-8", xml_declaration=True)
+
+
+def export_ams2_roster(
+    save_name: str,
+    championship: dict[str, Any],
+    standings: list[dict[str, Any]],
+    player_names: list[str],
+    player_car: dict[str, str] | None,
+    existing_player_liveries: list[dict[str, str]] | None = None,
+) -> tuple[Path, list[dict[str, str]]]:
+    ams2_root = Path(game_directory("AMS2"))
+    if not str(ams2_root).strip():
+        raise ValueError("AMS2 folder is not set in Settings.")
+
+    custom_ai_dir = ams2_root / "UserData" / "CustomAIDrivers"
+    custom_ai_dir.mkdir(parents=True, exist_ok=True)
+
+    player_set = {str(name).strip() for name in player_names if str(name).strip()}
+    grouped_drivers: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    profiles = driver_profile_map(save_name)
+    reserved_player_rows: list[dict[str, str]] = []
+    roster_to_queue: dict[str, deque[dict[str, str]]] = {}
+    roster_to_all_rows: dict[str, list[dict[str, str]]] = {}
+    roster_to_player_liveries: dict[str, set[str]] = defaultdict(set)
+    existing_livery_map: dict[tuple[str, str, str], str] = {}
+
+    for row in existing_player_liveries or []:
+        if not isinstance(row, dict):
+            continue
+        driver_name = str(row.get("driver_name", "")).strip()
+        class_name = str(row.get("class_name", "")).strip()
+        roster_name = str(row.get("roster_name", "")).strip()
+        livery_name = str(row.get("livery_name", "")).strip()
+        car_name = str(row.get("car_name", "")).strip()
+        car_id = str(row.get("car_id", "")).strip()
+        if driver_name and class_name and roster_name and livery_name:
+            existing_livery_map[(driver_name, class_name, roster_name)] = livery_name
+
+    def ensure_roster_pool(class_name: str) -> tuple[str, list[dict[str, str]]]:
+        rows = _livery_rows_for_class(class_name)
+        if not rows:
+            raise ValueError(f"No AMS2 livery rows were found for class '{class_name}'.")
+        roster_name = str(rows[0].get("Roster_Name", "")).strip()
+        if not roster_name:
+            raise ValueError(f"AMS2 livery rows for class '{class_name}' are missing Roster_Name.")
+        if roster_name not in roster_to_queue:
+            custom_rows = [row for row in rows if str(row.get("_custom_livery", "")).strip().casefold() == "yes"]
+            default_rows = [row for row in rows if str(row.get("_custom_livery", "")).strip().casefold() != "yes"]
+            random.shuffle(custom_rows)
+            random.shuffle(default_rows)
+            roster_to_queue[roster_name] = deque(custom_rows + default_rows)
+            roster_to_all_rows[roster_name] = rows[:]
+        return roster_name, rows
+
+    def reserve_player_livery(driver_name: str, class_name: str, roster_name: str, rows: list[dict[str, str]]) -> dict[str, str]:
+        reserved = roster_to_player_liveries.get(roster_name, set())
+        existing_livery = existing_livery_map.get((driver_name, class_name, roster_name), "")
+        if existing_livery:
+            matching_row = next(
+                (
+                    row
+                    for row in rows
+                    if str(row.get("livery_name", "")).strip() == existing_livery
+                    and str(row.get("livery_name", "")).strip() not in reserved
+                ),
+                None,
+            )
+            if matching_row is not None:
+                roster_to_player_liveries[roster_name].add(existing_livery)
+                return matching_row
+        available_rows = [
+            row for row in rows if str(row.get("livery_name", "")).strip() not in reserved
+        ]
+        if not available_rows:
+            raise ValueError(f"Not enough unique AMS2 player liveries are available for roster '{roster_name}'.")
+        chosen = random.choice(available_rows)
+        roster_to_player_liveries[roster_name].add(str(chosen.get("livery_name", "")).strip())
+        return chosen
+
+    for driver in standings:
+        class_name = _driver_class_name(driver)
+        roster_name, rows = ensure_roster_pool(class_name)
+        if driver["name"] in player_set:
+            player_rows = _livery_rows_for_player_car(player_car, class_name, rows)
+            player_choice = reserve_player_livery(str(driver["name"]), class_name, roster_name, player_rows)
+            reserved_player_rows.append(
+                {
+                    "driver_name": str(driver["name"]),
+                    "class_name": class_name,
+                    "roster_name": roster_name,
+                    "livery_name": str(player_choice.get("livery_name", "")).strip(),
+                    "car_name": str(player_choice.get("Car_Name", "")).strip(),
+                    "car_id": str(player_choice.get("car_id", "")).strip(),
+                }
+            )
+            continue
+        grouped_drivers[roster_name].append(driver)
+
+    player_livery_rows: list[dict[str, str]] = []
+    for reserved in reserved_player_rows:
+        player_livery_rows.append(dict(reserved))
+
+    export_skill_floor = ams2_export_skill_floor_for_prestige(championship.get("Prestige", 1))
+    export_skill_map = _scale_roster_ams2_skills(
+        [
+            driver
+            for drivers in grouped_drivers.values()
+            for driver in drivers
+        ],
+        profiles,
+        low=export_skill_floor,
+    )
+
+    for roster_name, drivers in grouped_drivers.items():
+        roster_rows = roster_to_all_rows.get(roster_name, [])
+        if not roster_rows:
+            continue
+        available_queue = roster_to_queue[roster_name]
+        player_liveries = roster_to_player_liveries.get(roster_name, set())
+        ai_entries: list[dict[str, str]] = []
+
+        for driver in drivers:
+            chosen_row: dict[str, str] | None = None
+            checked = 0
+            while available_queue and checked < len(available_queue):
+                candidate = available_queue.popleft()
+                checked += 1
+                livery_name = str(candidate.get("livery_name", "")).strip()
+                if livery_name in player_liveries:
+                    available_queue.append(candidate)
+                    continue
+                chosen_row = candidate
+                break
+            if chosen_row is None:
+                fallback_rows = [
+                    row
+                    for row in roster_rows
+                    if str(row.get("livery_name", "")).strip() not in player_liveries
+                ]
+                if not fallback_rows:
+                    raise ValueError(f"No AMS2 liveries are available for roster '{roster_name}' after reserving player skins.")
+                chosen_row = random.choice(fallback_rows)
+
+            available_queue.append(chosen_row)
+            profile = profiles.get(str(driver.get("name", "")), {})
+            fallback_skill = int(driver.get("skill", 60) or 60)
+            stats = _build_driver_stats(
+                profile,
+                fallback_skill,
+                export_skill_map.get(str(driver.get("name", "")).strip()),
+                normalized_skill_floor=export_skill_floor,
+            )
+            ai_entries.append(
+                {
+                    "livery_name": str(chosen_row.get("livery_name", "")).strip(),
+                    "country": str(profile.get("country_code", "USA") or "USA"),
+                    "name": str(driver.get("name", "AI Driver")).strip(),
+                    **stats,
+                }
+            )
+        xml_path = custom_ai_dir / roster_name
+        _write_roster_xml(xml_path, ai_entries)
+    return custom_ai_dir, player_livery_rows

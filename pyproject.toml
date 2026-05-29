@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "circuit-stackers"
+version = "1.0.0"
+description = "Circuit Stackers Python project."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+  { name = "Circuit Stackers" }
+]
+dependencies = [
+  "customtkinter>=5.2",
+  "pillow>=10.0",
+  "PySide6>=6.7",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+]
+build = [
+  "pyinstaller>=6.0",
+]
+
+[project.scripts]
+circuit-stackers = "circuit_stackers.cli:main"
+ams2-iracing-roster-tool = "ams2_iracing_roster_tool.__main__:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
