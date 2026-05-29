@@ -26,7 +26,13 @@ The goal of Circuit Stacker is to make offline racing feel like a real motorspor
 
 ## Quick Start
 
-Players can start a career in either iRacing or AMS2, receive team and championship offers based on performance, and work their way up through more prestigious series. The app tracks results, MMR, wins, podiums, top 5s, rivalries, team history, and driver history. It also supports multiclass racing, custom championships, owned content filtering, and manual difficulty adjustments.
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -e .[dev]
+python -m pytest
+python -m circuit_stackers
+```
 
 ## Windows Installer Export
 
