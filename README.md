@@ -1,46 +1,11 @@
 # Circuit Stackers
 
-Circuit Stackers is a Python desktop app for running an iRacing-style career mode.
-You can create a save, choose a championship, simulate races, and track standings
-across a season.
+Circuit Stacker is a racing career management app for players who want a deeper single-player career experience in iRacing and Automobilista 2.
 
-## Quick start
+Instead of just running one-off races, Circuit Stacker creates a living racing world around you. It generates drivers, teams, championships, schedules, standings, rivalries, team offers, promotions, retirements, and news stories. As you race, the rest of the world keeps moving too, with AI drivers and teams building their own careers over multiple seasons.
 
-```powershell
-python -m venv .venv
-.venv\Scripts\Activate.ps1
-pip install -e .[dev]
-python -m pytest
-python -m circuit_stackers
-```
+Players can start a career in either iRacing or AMS2, receive team and championship offers based on performance, and work their way up through more prestigious series. The app tracks results, MMR, wins, podiums, top 5s, rivalries, team history, and driver history. It also supports multiclass racing, custom championships, owned content filtering, and manual difficulty adjustments.
 
-## Windows export
+For iRacing, Circuit Stacker can export AI rosters and season files. For AMS2, it can export custom AI driver rosters with matching cars and liveries. It also includes live race sync features, so results and driver order can be pulled from the game more easily.
 
-To build a shareable Windows app folder:
-
-```powershell
-py -m pip install -e .[build]
-py -m PyInstaller --clean --noconfirm .\circuit_stackers.spec
-```
-
-Or run:
-
-```powershell
-.\build_windows.ps1
-```
-
-The exported app will be created in:
-
-```text
-dist\Circuit Stackers
-```
-
-Share that whole folder, not just the `.exe`, so the bundled files stay together.
-
-## Current structure
-
-- `src/circuit_stackers/app.py`: CustomTkinter app entry point
-- `src/circuit_stackers/screens/`: UI screens for menu, saves, championships, and gameplay
-- `src/circuit_stackers/game_logic.py`: season creation, race simulation, and persistence flow
-- `src/circuit_stackers/data/`: championship and track data
-- `tests/test_save_and_logic.py`: smoke tests for save and season logic
+The goal of Circuit Stacker is to make offline racing feel like a real motorsport career. You are not just picking random races. You are joining teams, watching rivals develop, seeing championships evolve, and building a racing legacy inside a world that keeps growing around you.
