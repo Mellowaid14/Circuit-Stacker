@@ -92,6 +92,7 @@ def default_settings() -> dict[str, Any]:
         "custom_overlay_defaulted_off": True,
         "ams2_leaderboard_overlay_geometry": "520x520+80+80",
         "check_for_updates_on_launch": True,
+        "menu_music_volume": 0.45,
     }
 
 
@@ -133,6 +134,7 @@ def load_settings() -> dict[str, Any]:
         "check_for_updates_on_launch": bool(
             saved.get("check_for_updates_on_launch", defaults["check_for_updates_on_launch"])
         ),
+        "menu_music_volume": _clamp_float(saved.get("menu_music_volume", defaults["menu_music_volume"]), 0.0, 1.0),
     }
 
 
@@ -152,8 +154,17 @@ def save_settings(settings: dict[str, Any]) -> None:
         "custom_overlay_defaulted_off": True,
         "ams2_leaderboard_overlay_geometry": str(settings.get("ams2_leaderboard_overlay_geometry", "520x520+80+80")),
         "check_for_updates_on_launch": bool(settings.get("check_for_updates_on_launch", True)),
+        "menu_music_volume": _clamp_float(settings.get("menu_music_volume", 0.45), 0.0, 1.0),
     }
     SETTINGS_PATH.write_text(json.dumps(payload, indent=4), encoding="utf-8")
+
+
+def _clamp_float(value: Any, minimum: float, maximum: float) -> float:
+    try:
+        numeric_value = float(value)
+    except (TypeError, ValueError):
+        return minimum
+    return max(minimum, min(maximum, numeric_value))
 
 
 def update_custom_overlay_enabled(enabled: bool) -> None:
@@ -171,6 +182,12 @@ def update_ams2_leaderboard_overlay_geometry(geometry: str) -> None:
 def update_check_for_updates_on_launch(enabled: bool) -> None:
     settings = load_settings()
     settings["check_for_updates_on_launch"] = bool(enabled)
+    save_settings(settings)
+
+
+def update_menu_music_volume(volume: float) -> None:
+    settings = load_settings()
+    settings["menu_music_volume"] = _clamp_float(volume, 0.0, 1.0)
     save_settings(settings)
 
 

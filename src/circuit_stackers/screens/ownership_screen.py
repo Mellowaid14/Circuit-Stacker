@@ -21,6 +21,8 @@ class OwnershipScreen(ctk.CTkFrame):
         self.current_game = "iRacing"
         self.car_vars: dict[str, tk.BooleanVar] = {}
         self.track_vars: dict[str, tk.BooleanVar] = {}
+        self.car_select_all_var: tk.BooleanVar | None = None
+        self.track_select_all_var: tk.BooleanVar | None = None
         self.title_label = ctk.CTkLabel(self, text="Owned Cars and Tracks", font=ctk.CTkFont(size=24, weight="bold"))
         self.title_label.pack(
             pady=(28, 8)
@@ -126,10 +128,13 @@ class OwnershipScreen(ctk.CTkFrame):
 
         self.car_vars = {}
         self.track_vars = {}
+        self.car_select_all_var = None
+        self.track_select_all_var = None
 
         if self.current_game == "AMS2":
             self._populate_ams2_car_dlcs(owned_car_ids)
             self._populate_ams2_track_dlcs(owned_track_names)
+            self._sync_select_all_vars()
         else:
             for car in sorted(list_all_cars(), key=lambda row: row.get("Car", "").casefold()):
                 if str(car.get("Game", "")).strip().casefold() not in {"", "iracing"}:
@@ -200,10 +205,25 @@ class OwnershipScreen(ctk.CTkFrame):
             dlc_to_car_ids.setdefault(dlc_name, set()).add(car_id)
 
         for dlc_name in sorted(dlc_to_car_ids, key=str.casefold):
+            if self.car_select_all_var is None:
+                self.car_select_all_var = tk.BooleanVar(value=False)
+                ctk.CTkCheckBox(
+                    self.cars_frame,
+                    text="Select All Car DLCs",
+                    variable=self.car_select_all_var,
+                    command=lambda: self._set_all_asset_vars("cars", self.car_select_all_var),
+                    font=ctk.CTkFont(size=12, weight="bold"),
+                ).pack(anchor="w", padx=6, pady=(4, 10))
+
             dlc_car_ids = dlc_to_car_ids[dlc_name]
             variable = tk.BooleanVar(value=bool(dlc_car_ids & owned_car_ids))
             self.car_vars[dlc_name] = variable
-            ctk.CTkCheckBox(self.cars_frame, text=dlc_name, variable=variable).pack(anchor="w", padx=6, pady=4)
+            ctk.CTkCheckBox(
+                self.cars_frame,
+                text=dlc_name,
+                variable=variable,
+                command=self._sync_select_all_vars,
+            ).pack(anchor="w", padx=6, pady=4)
 
     def _populate_ams2_track_dlcs(self, owned_track_names: set[str]) -> None:
         dlc_to_track_names: dict[str, set[str]] = {}
@@ -219,7 +239,37 @@ class OwnershipScreen(ctk.CTkFrame):
             dlc_to_track_names.setdefault(dlc_name, set()).add(track_name)
 
         for dlc_name in sorted(dlc_to_track_names, key=str.casefold):
+            if self.track_select_all_var is None:
+                self.track_select_all_var = tk.BooleanVar(value=False)
+                ctk.CTkCheckBox(
+                    self.tracks_frame,
+                    text="Select All Track DLCs",
+                    variable=self.track_select_all_var,
+                    command=lambda: self._set_all_asset_vars("tracks", self.track_select_all_var),
+                    font=ctk.CTkFont(size=12, weight="bold"),
+                ).pack(anchor="w", padx=6, pady=(4, 10))
+
             dlc_track_names = dlc_to_track_names[dlc_name]
             variable = tk.BooleanVar(value=bool(dlc_track_names & owned_track_names))
             self.track_vars[dlc_name] = variable
-            ctk.CTkCheckBox(self.tracks_frame, text=dlc_name, variable=variable).pack(anchor="w", padx=6, pady=4)
+            ctk.CTkCheckBox(
+                self.tracks_frame,
+                text=dlc_name,
+                variable=variable,
+                command=self._sync_select_all_vars,
+            ).pack(anchor="w", padx=6, pady=4)
+
+    def _set_all_asset_vars(self, asset_type: str, source_var: tk.BooleanVar | None) -> None:
+        if source_var is None:
+            return
+        selected = bool(source_var.get())
+        target_vars = self.car_vars if asset_type == "cars" else self.track_vars
+        for variable in target_vars.values():
+            variable.set(selected)
+        self._sync_select_all_vars()
+
+    def _sync_select_all_vars(self) -> None:
+        if self.car_select_all_var is not None:
+            self.car_select_all_var.set(bool(self.car_vars) and all(var.get() for var in self.car_vars.values()))
+        if self.track_select_all_var is not None:
+            self.track_select_all_var.set(bool(self.track_vars) and all(var.get() for var in self.track_vars.values()))

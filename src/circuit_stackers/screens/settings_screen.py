@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from tkinter import filedialog
 
 import customtkinter as ctk
@@ -116,17 +117,25 @@ class SettingsScreen(ctk.CTkFrame):
         super().__init__(parent, fg_color="transparent")
         self.parent = parent
         self.show_screen = show_screen
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_rowconfigure(1, weight=1)
 
-        ctk.CTkLabel(self, text="Settings", font=ctk.CTkFont(size=24, weight="bold")).pack(pady=(40, 8))
+        header = ctk.CTkFrame(self, fg_color="transparent")
+        header.grid(row=0, column=0, sticky="ew", padx=20, pady=(28, 10))
+        ctk.CTkLabel(header, text="Settings", font=ctk.CTkFont(size=24, weight="bold")).pack(pady=(0, 8))
         ctk.CTkLabel(
-            self,
+            header,
             text="Set your game folders and manage owned content for both iRacing and AMS2.",
             font=ctk.CTkFont(size=13),
             text_color="gray",
-        ).pack(pady=(0, 24))
+        ).pack()
 
-        content = ctk.CTkFrame(self, fg_color="transparent")
-        content.pack(fill="x", padx=180, pady=(0, 16))
+        body = ctk.CTkScrollableFrame(self, fg_color="transparent")
+        body.grid(row=1, column=0, sticky="nsew", padx=20, pady=(0, 10))
+        body.grid_columnconfigure(0, weight=1)
+
+        content = ctk.CTkFrame(body, fg_color="transparent")
+        content.pack(fill="x", padx=120, pady=(0, 16))
         content.grid_columnconfigure(0, weight=1)
         content.grid_columnconfigure(1, weight=1)
 
@@ -139,6 +148,8 @@ class SettingsScreen(ctk.CTkFrame):
             save_command=lambda: self.save_path(self.iracing_path_entry, "iRacing"),
             ownership_command=lambda: self.open_ownership("iRacing"),
         )
+        self.iracing_warning_label = self._build_path_warning(iracing_box)
+        self.iracing_path_entry.bind("<KeyRelease>", lambda _event: self.validate_path_entry("iRacing"))
 
         ams2_box = self._build_game_box(content, "AMS2")
         ams2_box.grid(row=0, column=1, sticky="nsew", padx=(10, 0))
@@ -149,38 +160,11 @@ class SettingsScreen(ctk.CTkFrame):
             save_command=lambda: self.save_path(self.ams2_path_entry, "AMS2"),
             ownership_command=lambda: self.open_ownership("AMS2"),
         )
+        self.ams2_warning_label = self._build_path_warning(ams2_box)
+        self.ams2_path_entry.bind("<KeyRelease>", lambda _event: self.validate_path_entry("AMS2"))
 
-        overlay_box = ctk.CTkFrame(self, fg_color=("gray90", "gray15"), corner_radius=12)
-        overlay_box.pack(fill="x", padx=180, pady=(0, 16))
-        ctk.CTkLabel(
-            overlay_box,
-            text="Custom Overlays (Experimental)",
-            font=ctk.CTkFont(size=14, weight="bold"),
-        ).pack(anchor="w", padx=18, pady=(16, 6))
-        self.overlay_enabled_var = ctk.BooleanVar(value=False)
-        self.overlay_switch = ctk.CTkSwitch(
-            overlay_box,
-            text="Enable AMS2 leaderboard overlay (experimental)",
-            variable=self.overlay_enabled_var,
-            command=self.save_overlay_enabled,
-            font=ctk.CTkFont(size=12),
-        )
-        self.overlay_switch.pack(anchor="w", padx=18, pady=(0, 10))
-        overlay_actions = ctk.CTkFrame(overlay_box, fg_color="transparent")
-        overlay_actions.pack(anchor="w", padx=18, pady=(0, 16))
-        ctk.CTkButton(
-            overlay_actions,
-            text="Overlay Layout Editor",
-            command=self.open_overlay_editor,
-            height=34,
-            width=180,
-            font=ctk.CTkFont(size=12, weight="bold"),
-        ).pack(side="left")
-        self.overlay_geometry_label = ctk.CTkLabel(overlay_actions, text="", text_color="gray", font=ctk.CTkFont(size=11))
-        self.overlay_geometry_label.pack(side="left", padx=(12, 0))
-
-        custom_box = ctk.CTkFrame(self, fg_color=("gray90", "gray15"), corner_radius=12)
-        custom_box.pack(fill="x", padx=180, pady=(0, 16))
+        custom_box = ctk.CTkFrame(body, fg_color=("gray90", "gray15"), corner_radius=12)
+        custom_box.pack(fill="x", padx=120, pady=(0, 16))
         ctk.CTkLabel(
             custom_box,
             text="Custom Championships",
@@ -213,8 +197,8 @@ class SettingsScreen(ctk.CTkFrame):
             font=ctk.CTkFont(size=12, weight="bold"),
         ).pack(side="left", padx=(10, 0))
 
-        updates_box = ctk.CTkFrame(self, fg_color=("gray90", "gray15"), corner_radius=12)
-        updates_box.pack(fill="x", padx=180, pady=(0, 16))
+        updates_box = ctk.CTkFrame(body, fg_color=("gray90", "gray15"), corner_radius=12)
+        updates_box.pack(fill="x", padx=120, pady=(0, 16))
         ctk.CTkLabel(
             updates_box,
             text="App Updates",
@@ -249,19 +233,52 @@ class SettingsScreen(ctk.CTkFrame):
         self.update_config_label = ctk.CTkLabel(update_actions, text="", text_color="gray", font=ctk.CTkFont(size=11))
         self.update_config_label.pack(side="left", padx=(12, 0))
 
-        self.status_label = ctk.CTkLabel(self, text="", font=ctk.CTkFont(size=11), text_color="gray")
-        self.status_label.pack(pady=(0, 12))
+        overlay_box = ctk.CTkFrame(body, fg_color=("gray90", "gray15"), corner_radius=12)
+        overlay_box.pack(fill="x", padx=120, pady=(0, 16))
+        ctk.CTkLabel(
+            overlay_box,
+            text="Custom Overlays (Experimental)",
+            font=ctk.CTkFont(size=14, weight="bold"),
+        ).pack(anchor="w", padx=18, pady=(16, 6))
+        self.overlay_enabled_var = ctk.BooleanVar(value=False)
+        self.overlay_switch = ctk.CTkSwitch(
+            overlay_box,
+            text="Enable AMS2 leaderboard overlay (experimental)",
+            variable=self.overlay_enabled_var,
+            command=self.save_overlay_enabled,
+            font=ctk.CTkFont(size=12),
+        )
+        self.overlay_switch.pack(anchor="w", padx=18, pady=(0, 10))
+        overlay_actions = ctk.CTkFrame(overlay_box, fg_color="transparent")
+        overlay_actions.pack(anchor="w", padx=18, pady=(0, 16))
+        ctk.CTkButton(
+            overlay_actions,
+            text="Overlay Layout Editor",
+            command=self.open_overlay_editor,
+            height=34,
+            width=180,
+            font=ctk.CTkFont(size=12, weight="bold"),
+        ).pack(side="left")
+        self.overlay_geometry_label = ctk.CTkLabel(overlay_actions, text="", text_color="gray", font=ctk.CTkFont(size=11))
+        self.overlay_geometry_label.pack(side="left", padx=(12, 0))
+
+        footer = ctk.CTkFrame(self, fg_color="transparent")
+        footer.grid(row=2, column=0, sticky="ew", padx=20, pady=(0, 18))
+        footer.grid_columnconfigure(0, weight=1)
+
+        self.status_label = ctk.CTkLabel(footer, text="", font=ctk.CTkFont(size=11), text_color="gray")
+        self.status_label.grid(row=0, column=0, pady=(0, 8))
 
         ctk.CTkButton(
-            self,
+            footer,
             text="<- Back",
-            command=lambda: self.show_screen("MenuScreen"),
+            command=self.go_back,
             height=36,
             width=140,
             fg_color="gray30",
             hover_color="gray40",
             font=ctk.CTkFont(size=12),
-        ).pack()
+        ).grid(row=1, column=0)
 
     def _build_game_box(self, parent, game_name: str) -> ctk.CTkFrame:
         box = ctk.CTkFrame(parent, fg_color=("gray90", "gray15"), corner_radius=12)
@@ -275,6 +292,19 @@ class SettingsScreen(ctk.CTkFrame):
         entry = ctk.CTkEntry(parent, width=420, height=38, font=ctk.CTkFont(size=12))
         entry.pack(padx=18, pady=(0, 12))
         return entry
+
+    @staticmethod
+    def _build_path_warning(parent) -> ctk.CTkLabel:
+        label = ctk.CTkLabel(
+            parent,
+            text="",
+            font=ctk.CTkFont(size=11, weight="bold"),
+            text_color="#ff5c5c",
+            wraplength=390,
+            justify="left",
+        )
+        label.pack(anchor="w", padx=18, pady=(0, 16))
+        return label
 
     def _build_path_buttons(self, parent, browse_command, save_command, ownership_command) -> None:
         path_buttons = ctk.CTkFrame(parent, fg_color="transparent")
@@ -295,9 +325,9 @@ class SettingsScreen(ctk.CTkFrame):
             command=save_command,
             height=34,
             width=150,
-            font=ctk.CTkFont(size=12),
-            fg_color="gray30",
-            hover_color="gray40",
+            font=ctk.CTkFont(size=12, weight="bold"),
+            fg_color="#1f8f45",
+            hover_color="#176f35",
         ).pack(side="left", padx=(10, 0))
 
         ctk.CTkButton(
@@ -327,14 +357,17 @@ class SettingsScreen(ctk.CTkFrame):
         self.overlay_geometry_label.configure(
             text=f"AMS2 leaderboard: {settings.get('ams2_leaderboard_overlay_geometry', '520x520+80+80')}"
         )
+        self.validate_path_entry("iRacing")
+        self.validate_path_entry("AMS2")
         self.status_label.configure(text="")
 
     def save_path(self, entry: ctk.CTkEntry, game: str) -> None:
+        warning = self.validate_path_entry(game)
         if game == "AMS2":
             update_ams2_directory(entry.get())
         else:
             update_iracing_directory(entry.get())
-        self.status_label.configure(text=f"{game} folder saved.")
+        self.status_label.configure(text=f"{game} folder saved." if not warning else f"{game} folder saved with warning.")
 
     def browse_for_path(self, entry: ctk.CTkEntry, game: str) -> None:
         selected_path = filedialog.askdirectory(initialdir=entry.get() or None)
@@ -344,11 +377,43 @@ class SettingsScreen(ctk.CTkFrame):
         entry.insert(0, selected_path)
         self.save_path(entry, game)
 
+    def validate_path_entry(self, game: str) -> str:
+        entry = self.ams2_path_entry if game == "AMS2" else self.iracing_path_entry
+        label = self.ams2_warning_label if game == "AMS2" else self.iracing_warning_label
+        warning = self._directory_warning(game, entry.get())
+        label.configure(text=warning)
+        return warning
+
+    @staticmethod
+    def _directory_warning(game: str, path_value: str) -> str:
+        path_text = str(path_value or "").strip()
+        if not path_text:
+            return f"Select your {game} folder."
+
+        root = Path(path_text)
+        if not root.exists() or not root.is_dir():
+            return "Folder does not exist."
+
+        if game == "iRacing":
+            if any(not (root / name).is_dir() for name in ("airosters", "aiseasons")):
+                return "Folder does not seem to be correct. Please verify before moving forward."
+            return ""
+
+        if not (root / "UserData").is_dir():
+            return "Folder does not seem to be correct. Please verify before moving forward."
+        return ""
+
     def open_ownership(self, game: str) -> None:
         ownership_screen = self.parent.screens["OwnershipScreen"]
         if hasattr(ownership_screen, "set_game"):
             ownership_screen.set_game(game)
         self.show_screen("OwnershipScreen")
+
+    def go_back(self) -> None:
+        if hasattr(self.parent, "return_from_settings"):
+            self.parent.return_from_settings()
+            return
+        self.show_screen("MenuScreen")
 
     def save_overlay_enabled(self) -> None:
         update_custom_overlay_enabled(bool(self.overlay_enabled_var.get()))

@@ -32,7 +32,7 @@ from .screens.world_championship_detail_screen import WorldChampionshipDetailScr
 from .screens.schedule_screen import ScheduleScreen
 from .menu_music import MenuMusicPlayer
 from .paths import resource_path
-from .settings_manager import load_settings
+from .settings_manager import load_settings, update_menu_music_volume
 from .update_checker import UpdateInfo, check_for_update, update_check_configured
 from .version import APP_VERSION
 
@@ -44,6 +44,11 @@ ICON_CANDIDATES = [
     resource_path("assets", "circuit_stacker_icon.ico"),
 ]
 MENU_MUSIC_PATH = resource_path("assets", "Circuit Stacker Splash Screen Loop.mp3")
+SETTINGS_CHILD_SCREENS = {
+    "CustomChampionshipScreen",
+    "CustomChampionshipManageScreen",
+    "OwnershipScreen",
+}
 
 
 class UpdateAvailablePopup(ctk.CTkToplevel):
@@ -51,7 +56,7 @@ class UpdateAvailablePopup(ctk.CTkToplevel):
         super().__init__(parent)
         self.update_info = update_info
         self.title("Circuit Stacker Update Available")
-        self.geometry("520x360")
+        self.geometry("560x460")
         self.resizable(False, False)
         self.transient(parent)
         self.grab_set()
@@ -72,10 +77,15 @@ class UpdateAvailablePopup(ctk.CTkToplevel):
             wraplength=460,
         ).pack(anchor="w", padx=18, pady=(0, 12))
 
-        notes = update_info.release_notes.strip() or "No release notes were added for this update."
-        if len(notes) > 700:
-            notes = notes[:700].rstrip() + "..."
-        notes_box = ctk.CTkTextbox(shell, height=120, wrap="word", font=ctk.CTkFont(size=11))
+        ctk.CTkLabel(
+            shell,
+            text="Patch Notes",
+            font=ctk.CTkFont(size=14, weight="bold"),
+            text_color=("#1a6fc4", "#4da6ff"),
+        ).pack(anchor="w", padx=18, pady=(0, 6))
+
+        notes = _format_release_notes(update_info.release_notes)
+        notes_box = ctk.CTkTextbox(shell, height=190, wrap="word", font=ctk.CTkFont(size=11))
         notes_box.pack(fill="x", padx=18, pady=(0, 14))
         notes_box.insert("1.0", notes)
         notes_box.configure(state="disabled")
@@ -106,6 +116,14 @@ class UpdateAvailablePopup(ctk.CTkToplevel):
         self.destroy()
 
 
+def _format_release_notes(release_notes: str) -> str:
+    notes = release_notes.strip() or "No patch notes were added for this update."
+    notes = notes.replace("\r\n", "\n").replace("\r", "\n")
+    if len(notes) > 2200:
+        notes = notes[:2200].rstrip() + "\n\n...open the GitHub release page to read the full notes."
+    return notes
+
+
 class App(ctk.CTk):
     def __init__(self) -> None:
         super().__init__()
@@ -117,9 +135,16 @@ class App(ctk.CTk):
         self._window_change_after_id: str | None = None
         self._menu_music_active = False
         self._menu_music_muted = False
+        self._music_volume_hide_after_id: str | None = None
+        self._music_volume_save_after_id: str | None = None
         self._update_check_running = False
         self._update_popup_shown = False
+        self.current_screen_name = ""
+        self.settings_return_screen = "MenuScreen"
+        settings = load_settings()
+        self._menu_music_volume = float(settings.get("menu_music_volume", 0.45))
         self.menu_music = MenuMusicPlayer(MENU_MUSIC_PATH)
+        self.menu_music.set_volume(self._menu_music_volume)
         self._apply_window_icon()
         self.bind("<Configure>", self._track_window_change)
 
@@ -142,7 +167,7 @@ class App(ctk.CTk):
         self.settings_btn = ctk.CTkButton(
             footer,
             text="Settings",
-            command=lambda: self.show_screen("SettingsScreen"),
+            command=self.open_settings,
             width=120,
             height=28,
             font=ctk.CTkFont(size=11),
@@ -164,6 +189,39 @@ class App(ctk.CTk):
             text_color=("gray30", "gray70"),
         )
         self.music_btn.pack(side="left", padx=(10, 0))
+        self.music_btn.bind("<Enter>", self._show_music_volume_slider)
+        self.music_btn.bind("<Leave>", self._schedule_hide_music_volume_slider)
+
+        self.music_volume_popup = ctk.CTkFrame(
+            self,
+            width=178,
+            height=64,
+            fg_color=("gray88", "gray16"),
+            corner_radius=10,
+            border_width=1,
+            border_color=("gray65", "gray35"),
+        )
+        self.music_volume_popup.bind("<Enter>", self._show_music_volume_slider)
+        self.music_volume_popup.bind("<Leave>", self._schedule_hide_music_volume_slider)
+        ctk.CTkLabel(
+            self.music_volume_popup,
+            text="Volume",
+            font=ctk.CTkFont(size=10, weight="bold"),
+            text_color=("gray25", "gray75"),
+        ).pack(anchor="w", padx=12, pady=(8, 2))
+        self.music_volume_slider = ctk.CTkSlider(
+            self.music_volume_popup,
+            from_=0,
+            to=1,
+            number_of_steps=100,
+            width=150,
+            height=16,
+            command=self.set_menu_music_volume,
+        )
+        self.music_volume_slider.set(self._menu_music_volume)
+        self.music_volume_slider.pack(padx=12, pady=(0, 10))
+        self.music_volume_slider.bind("<Enter>", self._show_music_volume_slider)
+        self.music_volume_slider.bind("<Leave>", self._schedule_hide_music_volume_slider)
 
         self.screens: dict[str, ctk.CTkFrame] = {}
         for screen_class in [
@@ -232,6 +290,14 @@ class App(ctk.CTk):
         self.after(1200, self._run_launch_update_check)
 
     def show_screen(self, name: str) -> None:
+        if (
+            name == "SettingsScreen"
+            and self.current_screen_name
+            and self.current_screen_name != "SettingsScreen"
+            and self.current_screen_name not in SETTINGS_CHILD_SCREENS
+        ):
+            self.settings_return_screen = self.current_screen_name
+
         for screen in self.screens.values():
             if screen.winfo_ismapped() and hasattr(screen, "on_hide"):
                 screen.on_hide()
@@ -239,8 +305,18 @@ class App(ctk.CTk):
 
         target = self.screens[name]
         target.pack(fill="both", expand=True)
+        self.current_screen_name = name
         if hasattr(target, "on_show"):
             target.on_show()
+
+    def open_settings(self) -> None:
+        self.show_screen("SettingsScreen")
+
+    def return_from_settings(self) -> None:
+        target = self.settings_return_screen
+        if target not in self.screens or target == "SettingsScreen":
+            target = "MenuScreen"
+        self.show_screen(target)
 
     def window_is_changing(self) -> bool:
         return self._window_changing
@@ -253,6 +329,54 @@ class App(ctk.CTk):
         self._menu_music_muted = not self._menu_music_muted
         self.music_btn.configure(text="\U0001f507" if self._menu_music_muted else "\U0001f50a")
         self._sync_menu_music()
+
+    def set_menu_music_volume(self, volume: float) -> None:
+        self._menu_music_volume = max(0.0, min(1.0, float(volume)))
+        self.menu_music.set_volume(self._menu_music_volume)
+        if self._music_volume_save_after_id is not None:
+            try:
+                self.after_cancel(self._music_volume_save_after_id)
+            except Exception:
+                pass
+        self._music_volume_save_after_id = self.after(350, self._save_menu_music_volume)
+
+    def _save_menu_music_volume(self) -> None:
+        self._music_volume_save_after_id = None
+        update_menu_music_volume(self._menu_music_volume)
+
+    def _show_music_volume_slider(self, _event=None) -> None:
+        if self._music_volume_hide_after_id is not None:
+            try:
+                self.after_cancel(self._music_volume_hide_after_id)
+            except Exception:
+                pass
+            self._music_volume_hide_after_id = None
+        self._position_music_volume_popup()
+        self.music_volume_popup.lift()
+
+    def _schedule_hide_music_volume_slider(self, _event=None) -> None:
+        if self._music_volume_hide_after_id is not None:
+            try:
+                self.after_cancel(self._music_volume_hide_after_id)
+            except Exception:
+                pass
+        self._music_volume_hide_after_id = self.after(450, self._hide_music_volume_slider)
+
+    def _hide_music_volume_slider(self) -> None:
+        self._music_volume_hide_after_id = None
+        if self.music_volume_popup.winfo_ismapped():
+            self.music_volume_popup.place_forget()
+
+    def _position_music_volume_popup(self) -> None:
+        self.update_idletasks()
+        popup_width = 178
+        popup_height = 64
+        button_x = self.music_btn.winfo_rootx() - self.winfo_rootx()
+        button_y = self.music_btn.winfo_rooty() - self.winfo_rooty()
+        button_center_x = button_x + self.music_btn.winfo_width() // 2
+        x = max(8, min(self.winfo_width() - popup_width - 8, button_center_x - popup_width // 2))
+        y = max(8, button_y - popup_height - 8)
+        self.music_volume_popup.place(x=x, y=y)
 
     def _sync_menu_music(self) -> None:
         if self._menu_music_active and not self._menu_music_muted:

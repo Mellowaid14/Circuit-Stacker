@@ -10,12 +10,14 @@ class MenuMusicPlayer:
         self._alias = "circuit_stacker_menu_music"
         self._is_open = False
         self._is_playing = False
+        self._volume = 0.45
 
     def play_loop(self) -> None:
         if not self.audio_path.exists():
             return
         if not self._is_open and not self._send(f'open "{self.audio_path}" type mpegvideo alias {self._alias}'):
             return
+        self.set_volume(self._volume)
         if self._send(f"play {self._alias} repeat"):
             self._is_playing = True
 
@@ -26,6 +28,11 @@ class MenuMusicPlayer:
         self._send(f"close {self._alias}")
         self._is_open = False
         self._is_playing = False
+
+    def set_volume(self, volume: float) -> None:
+        self._volume = max(0.0, min(1.0, float(volume)))
+        if self._is_open:
+            self._send(f"setaudio {self._alias} volume to {int(self._volume * 1000)}")
 
     def _send(self, command: str) -> bool:
         buffer = ctypes.create_unicode_buffer(255)
