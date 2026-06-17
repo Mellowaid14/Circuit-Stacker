@@ -26,6 +26,7 @@ from .driver_pool import (
     finalize_driver_season,
     get_world_year,
     initialize_driver_pool,
+    latest_close_title_battles,
     latest_tier_champions,
     list_drivers,
     notable_retirements,
@@ -50,7 +51,7 @@ from .game_adapters import get_game_adapter
 from .paths import resource_path
 from .save_manager import create_save, load_save, update_save
 from .season_exporter import update_exported_season_difficulty
-from .settings_manager import list_all_cars, owned_car_id_set_for_game, owned_track_id_set_for_game
+from .settings_manager import load_settings, list_all_cars, owned_car_id_set_for_game, owned_track_id_set_for_game
 from .weather import generate_ams2_weather
 
 
@@ -539,6 +540,27 @@ def _championship_entry_name(entry: dict[str, Any]) -> str:
     return championship_pool_display_name(championship) or str(championship.get("Championship", "")).strip() or "World Championship"
 
 
+def _entry_completed_race_count(entry: dict[str, Any]) -> int:
+    completed = 0
+    for race in entry.get("schedule") or []:
+        if not bool(race.get("completed")):
+            continue
+        full_results = race.get("full_results") or []
+        if isinstance(full_results, list) and full_results:
+            completed += 1
+    return completed
+
+
+def _world_news_is_season_opening(
+    save_data: dict[str, Any],
+    player_championship: dict[str, Any] | None = None,
+) -> bool:
+    entries = _news_entries(save_data, player_championship=player_championship)
+    if not entries:
+        return int(save_data.get("current_race", 0) or 0) <= 0
+    return all(_entry_completed_race_count(entry) <= 0 for entry in entries)
+
+
 def _recent_race_news_candidates(
     save_data: dict[str, Any],
     player_championship: dict[str, Any] | None = None,
@@ -664,9 +686,10 @@ def _title_fight_news_candidates(
     for entry in raw_entries:
         standings = list(entry.get("standings") or [])
         schedule = list(entry.get("schedule") or [])
+        completed_races = _entry_completed_race_count(entry)
         current_race = int(entry.get("current_race", 0) or 0)
         remaining_races = max(0, len(schedule) - current_race)
-        if remaining_races <= 0 or remaining_races > 2 or len(standings) < 2:
+        if completed_races <= 0 or remaining_races <= 0 or remaining_races > 2 or len(standings) < 2:
             continue
 
         sorted_standings = sorted(
@@ -677,7 +700,7 @@ def _title_fight_news_candidates(
         leader = sorted_standings[0]
         challenger = sorted_standings[1]
         gap = int(leader.get("points", 0) or 0) - int(challenger.get("points", 0) or 0)
-        if gap > 15:
+        if gap <= 0 or gap > 15:
             continue
 
         championship_name = _championship_entry_name(entry)
@@ -958,6 +981,51 @@ def _championship_clinch_news_candidates(save_name: str, world_year: int) -> lis
     return candidates
 
 
+def _season_opening_wrap_news_candidates(
+    save_name: str,
+    save_data: dict[str, Any],
+    world_year: int,
+    completed_year: int,
+    player_championship: dict[str, Any] | None = None,
+) -> list[dict[str, str]]:
+    if completed_year <= 0 or not _world_news_is_season_opening(save_data, player_championship=player_championship):
+        return []
+
+    candidates: list[dict[str, str]] = []
+    close_battles = latest_close_title_battles(save_name, completed_year, max_gap=8, limit=4)
+    for battle in close_battles:
+        championship_name = str(battle.get("championship_name", "")).strip() or "a championship"
+        class_name = str(battle.get("class_name", "Overall")).strip()
+        class_note = "" if not class_name or class_name.casefold() == "overall" else f" in {class_name}"
+        gap = int(battle.get("gap", 0) or 0)
+        candidates.append(
+            {
+                "title": "Last Season Went To The Wire",
+                "body": (
+                    f"Before the {world_year} opener, the paddock is still talking about {championship_name}{class_note}: "
+                    f"**{battle.get('champion_name', 'Unknown')}** beat **{battle.get('runner_up_name', 'Unknown')}** "
+                    f"by just {gap} point{'s' if gap != 1 else ''} last season."
+                ),
+            }
+        )
+
+    if not candidates:
+        champions = latest_tier_champions(save_name, completed_year, tier=5) + latest_tier_champions(save_name, completed_year, tier=4)
+        if champions:
+            champion = champions[0]
+            candidates.append(
+                {
+                    "title": "Last Season Recap",
+                    "body": (
+                        f"The {world_year} season opens with **{champion.get('driver_name', 'Unknown')}** carrying the momentum "
+                        f"from a {completed_year} title in {champion.get('championship_name', 'a championship')}."
+                    ),
+                }
+            )
+
+    return candidates
+
+
 def _team_form_news_candidates(
     save_data: dict[str, Any],
     player_championship: dict[str, Any] | None = None,
@@ -966,7 +1034,7 @@ def _team_form_news_candidates(
     for entry in _news_entries(save_data, player_championship=player_championship):
         standings = list(entry.get("standings") or [])
         schedule = [race for race in (entry.get("schedule") or []) if bool(race.get("completed")) and isinstance(race.get("full_results"), list)]
-        if len(standings) < 4:
+        if len(standings) < 4 or not schedule:
             continue
 
         championship_name = _championship_entry_name(entry)
@@ -1042,8 +1110,9 @@ def _upcoming_pressure_news_candidates(
     for entry in _news_entries(save_data, player_championship=player_championship):
         standings = list(entry.get("standings") or [])
         schedule = list(entry.get("schedule") or [])
+        completed_races = _entry_completed_race_count(entry)
         current_race = int(entry.get("current_race", 0) or 0)
-        if current_race >= len(schedule) or len(standings) < 2:
+        if completed_races <= 0 or current_race >= len(schedule) or len(standings) < 2:
             continue
 
         championship_name = _championship_entry_name(entry)
@@ -1057,7 +1126,7 @@ def _upcoming_pressure_news_candidates(
         leader = sorted_standings[0]
         challenger = sorted_standings[1]
         gap = int(leader.get("points", 0) or 0) - int(challenger.get("points", 0) or 0)
-        if gap <= 10:
+        if 0 < gap <= 10:
             candidates.append(
                 {
                     "title": "Pressure Round",
@@ -1080,7 +1149,7 @@ def _upcoming_pressure_news_candidates(
         midfield = sorted_standings[3:8]
         if len(midfield) >= 3:
             spread = int(midfield[0].get("points", 0) or 0) - int(midfield[-1].get("points", 0) or 0)
-            if spread <= 8:
+            if 0 < spread <= 8:
                 candidates.append(
                     {
                         "title": "Midfield Squeeze",
@@ -1322,6 +1391,16 @@ def build_world_news_items(
                 ),
             }
         )
+
+    season_opening_items = _season_opening_wrap_news_candidates(
+        save_name,
+        save_data,
+        world_year,
+        completed_year,
+        player_championship=player_championship,
+    )
+    if season_opening_items:
+        items.extend(season_opening_items)
 
     recent_race_items = _recent_race_news_candidates(save_data, player_championship=player_championship)
     if recent_race_items:
@@ -2071,12 +2150,14 @@ def _opponent_count_for_championship(
     player_names: list[str],
     player_car: dict[str, str],
 ) -> int:
-    max_opponents = int(championship.get("Max_Opp", 4))
-    multiclass = str(championship.get("Multiclass", "no")).strip().casefold() == "yes"
-    if multiclass:
-        max_total_drivers = min(40, max_opponents + len(player_names))
-        max_opponents = max(0, max_total_drivers - len(player_names))
-    return max(0, max_opponents)
+    player_count = len([name for name in player_names if str(name).strip()])
+    try:
+        max_grid_size = int(championship.get("Max_Opp", 4))
+    except (TypeError, ValueError):
+        max_grid_size = 4
+    max_grid_size = max(player_count, max_grid_size)
+    max_grid_size = min(40, max_grid_size)
+    return max(0, max_grid_size - player_count)
 
 
 def _apply_player_team_offer(
@@ -2182,6 +2263,185 @@ def _rivalry_heat(value: Any) -> dict[str, int]:
     return heat
 
 
+def _career_mode(value: Any, player_names: list[str] | None = None) -> str:
+    normalized = str(value or "").strip().casefold()
+    if normalized == "rivals":
+        return "Rivals"
+    if normalized in {"co-op", "coop", "co op"}:
+        return "Co-op"
+    if normalized == "solo":
+        return "Solo"
+    return "Co-op" if len(player_names or []) > 1 else "Solo"
+
+
+def _active_player_name(value: Any, player_names: list[str]) -> str:
+    cleaned = str(value or "").strip()
+    if cleaned in player_names:
+        return cleaned
+    return player_names[0] if player_names else ""
+
+
+def _normalize_player_perspectives(
+    value: Any,
+    player_names: list[str],
+    fallback_heat: Any = None,
+) -> dict[str, dict[str, Any]]:
+    raw = value if isinstance(value, dict) else {}
+    perspectives: dict[str, dict[str, Any]] = {}
+    fallback = _rivalry_heat(fallback_heat)
+    for index, player_name in enumerate(player_names):
+        existing = raw.get(player_name) if isinstance(raw.get(player_name), dict) else {}
+        heat = _rivalry_heat(existing.get("rivalry_heat"))
+        if not heat and index == 0:
+            heat = dict(fallback)
+        messages = [
+            dict(message)
+            for message in list(existing.get("messages") or [])
+            if isinstance(message, dict)
+        ]
+        perspectives[player_name] = {
+            "rivalry_heat": heat,
+            "messages": messages,
+        }
+    return perspectives
+
+
+def _merged_perspective_rivalry_heat(player_perspectives: dict[str, dict[str, Any]]) -> dict[str, int]:
+    merged: dict[str, int] = {}
+    for perspective in player_perspectives.values():
+        for driver_name, stage in _rivalry_heat(perspective.get("rivalry_heat")).items():
+            merged[driver_name] = max(int(stage), int(merged.get(driver_name, 0) or 0))
+    return merged
+
+
+def _update_player_rivalry_perspectives(
+    state: dict[str, Any],
+    result_rows: list[dict[str, Any]],
+    player_names: list[str],
+) -> None:
+    normalized_players = _normalize_player_names(player_names, str(state.get("save_name", "")))
+    if not normalized_players:
+        return
+
+    perspectives = _normalize_player_perspectives(
+        state.get("player_perspectives"),
+        normalized_players,
+        state.get("rivalry_heat"),
+    )
+    include_humans_as_opponents = _career_mode(state.get("career_mode"), normalized_players) == "Rivals"
+    for player_name in normalized_players:
+        perspective = perspectives.setdefault(player_name, {"rivalry_heat": {}, "messages": []})
+        if include_humans_as_opponents:
+            perspective_result_rows = result_rows
+        else:
+            perspective_result_rows = [
+                row
+                for row in result_rows
+                if str(row.get("driver_name", "")).strip() == player_name
+                or str(row.get("driver_name", "")).strip() not in normalized_players
+            ]
+        perspective_state = {
+            **state,
+            "rivalry_heat": perspective.get("rivalry_heat", {}),
+            "messages": perspective.get("messages", []),
+        }
+        _update_rivalry_heat(perspective_state, perspective_result_rows, [player_name])
+        perspective["rivalry_heat"] = _rivalry_heat(perspective_state.get("rivalry_heat"))
+        perspective["messages"] = [
+            dict(message)
+            for message in list(perspective_state.get("messages") or [])
+            if isinstance(message, dict)
+        ]
+
+    state["player_perspectives"] = perspectives
+    state["rivalry_heat"] = _merged_perspective_rivalry_heat(perspectives)
+    state["active_player_name"] = _active_player_name(state.get("active_player_name"), normalized_players)
+
+
+def _rivalry_message_body(
+    rival_name: str,
+    player_name: str,
+    championship_name: str,
+    track_name: str,
+    rival_finished_ahead: bool,
+) -> str:
+    context = f" after {track_name}" if track_name else ""
+    championship_context = f" in {championship_name}" if championship_name else ""
+    templates = [
+        (
+            f"{player_name},",
+            "",
+            f"We keep finding each other on track{championship_context}, and I do not think that is a coincidence.",
+            "",
+            f"{'I had you covered' if rival_finished_ahead else 'You got the better of me'}{context}, but this is not finished. "
+            "Next time we are close, I am not leaving anything on the table.",
+            "",
+            rival_name,
+        ),
+        (
+            f"{player_name},",
+            "",
+            f"That was another tight one{context}. You have my attention now.",
+            "",
+            f"The rest of the field can talk about points. I know exactly where you are on the timing screen, "
+            f"and I expect we will be seeing plenty more of each other{championship_context}.",
+            "",
+            rival_name,
+        ),
+        (
+            f"{player_name},",
+            "",
+            "Consider this a friendly warning from the other side of the garage lane.",
+            "",
+            f"We are officially racing each other now. If you want position, you are going to have to earn every inch of it.",
+            "",
+            rival_name,
+        ),
+    ]
+    seed_value = sum(ord(char) for char in rival_name) + len(championship_name) + len(track_name)
+    return "\n".join(templates[seed_value % len(templates)])
+
+
+def _add_rivalry_message(
+    state: dict[str, Any],
+    rival_name: str,
+    player_name: str,
+    rival_finished_ahead: bool,
+) -> None:
+    if "messages" not in state:
+        return
+    messages = [dict(message) for message in list(state.get("messages") or []) if isinstance(message, dict)]
+    dedupe_key = f"rivalry-red:{rival_name.casefold()}"
+    if any(str(message.get("dedupe_key", "")).strip() == dedupe_key for message in messages):
+        return
+
+    championship = state.get("championship") or {}
+    championship_name = championship_pool_display_name(championship)
+    schedule = list(state.get("schedule") or [])
+    current_race = int(state.get("current_race", 0) or 0)
+    race = schedule[current_race] if 0 <= current_race < len(schedule) else {}
+    track_name = str(race.get("track", "")).strip()
+    messages.append(
+        {
+            "id": uuid4().hex,
+            "created_at": datetime.now().isoformat(timespec="seconds"),
+            "category": "Rivalry",
+            "sender": rival_name,
+            "title": f"Message from {rival_name}",
+            "body": _rivalry_message_body(
+                rival_name,
+                player_name,
+                championship_name,
+                track_name,
+                rival_finished_ahead,
+            ),
+            "read": False,
+            "dedupe_key": dedupe_key,
+        }
+    )
+    state["messages"] = messages
+
+
 def _update_rivalry_heat(
     state: dict[str, Any],
     result_rows: list[dict[str, Any]],
@@ -2192,7 +2452,7 @@ def _update_rivalry_heat(
         return
 
     heat = _rivalry_heat(state.get("rivalry_heat"))
-    player_positions: dict[str, list[int]] = {}
+    player_positions: dict[str, list[tuple[int, str]]] = {}
     class_opponents: dict[str, list[tuple[int, str]]] = {}
     race_opponents: set[str] = set()
     for row in result_rows:
@@ -2205,21 +2465,21 @@ def _update_rivalry_heat(
         if not driver_name or class_pos <= 0:
             continue
         if driver_name in player_set:
-            player_positions.setdefault(class_name, []).append(class_pos)
+            player_positions.setdefault(class_name, []).append((class_pos, driver_name))
         else:
             race_opponents.add(driver_name)
             class_opponents.setdefault(class_name, []).append((class_pos, driver_name))
 
     close_opponents: set[str] = set()
     adjacent_opponents: set[str] = set()
+    rival_context: dict[str, tuple[str, bool]] = {}
     for class_name, class_player_positions in player_positions.items():
         ordered_opponents = sorted(class_opponents.get(class_name, []))
-        for player_pos in class_player_positions:
-            adjacent_opponents.update(
-                driver_name
-                for class_pos, driver_name in ordered_opponents
-                if abs(class_pos - player_pos) == 1
-            )
+        for player_pos, player_name in class_player_positions:
+            for class_pos, driver_name in ordered_opponents:
+                if abs(class_pos - player_pos) == 1:
+                    adjacent_opponents.add(driver_name)
+                    rival_context[driver_name] = (player_name, class_pos < player_pos)
             ahead = [
                 (class_pos, driver_name)
                 for class_pos, driver_name in ordered_opponents
@@ -2253,6 +2513,9 @@ def _update_rivalry_heat(
             heat[driver_name] = 1
         elif current_stage in {1, 2} and driver_name in adjacent_opponents:
             heat[driver_name] = current_stage + 1
+            if current_stage == 2 and heat.get(driver_name) == 3:
+                player_name, rival_finished_ahead = rival_context.get(driver_name, (next(iter(player_set)), False))
+                _add_rivalry_message(state, driver_name, player_name, rival_finished_ahead)
 
     for driver_name in race_opponents - close_opponents:
         if heat.get(driver_name) == 2:
@@ -2298,6 +2561,15 @@ def migrate_loaded_rivalry_state(save_data: dict[str, Any] | None) -> dict[str, 
     save_name = str(migrated.get("save_name", "")).strip()
     if save_name:
         sync_human_drivers(save_name, player_names)
+    migrated["career_mode"] = _career_mode(migrated.get("career_mode"), player_names)
+    migrated["active_player_name"] = _active_player_name(migrated.get("active_player_name"), player_names)
+    migrated["player_perspectives"] = _normalize_player_perspectives(
+        migrated.get("player_perspectives"),
+        player_names,
+        migrated.get("rivalry_heat"),
+    )
+    migrated["rivalry_heat"] = _merged_perspective_rivalry_heat(migrated["player_perspectives"])
+    changed = True
     if "rivalry_heat" not in migrated or not _rivalry_heat(migrated.get("rivalry_heat")):
         rebuilt_state: dict[str, Any] = {"rivalry_heat": {}}
         for race in migrated.get("schedule") or []:
@@ -2306,7 +2578,14 @@ def migrate_loaded_rivalry_state(save_data: dict[str, Any] | None) -> dict[str, 
             result_rows = race.get("full_results")
             if isinstance(result_rows, list):
                 _update_rivalry_heat(rebuilt_state, result_rows, player_names)
-        migrated["rivalry_heat"] = _rivalry_heat(rebuilt_state.get("rivalry_heat"))
+        rebuilt_heat = _rivalry_heat(rebuilt_state.get("rivalry_heat"))
+        if rebuilt_heat:
+            migrated["player_perspectives"] = _normalize_player_perspectives(
+                migrated.get("player_perspectives"),
+                player_names,
+                rebuilt_heat,
+            )
+            migrated["rivalry_heat"] = _merged_perspective_rivalry_heat(migrated["player_perspectives"])
         changed = True
 
     messages = [dict(message) for message in migrated.get("messages") or [] if isinstance(message, dict)]
@@ -2321,6 +2600,9 @@ def migrate_loaded_rivalry_state(save_data: dict[str, Any] | None) -> dict[str, 
             save_name,
             {
                 "rivalry_heat": _rivalry_heat(migrated.get("rivalry_heat")),
+                "career_mode": migrated.get("career_mode"),
+                "active_player_name": migrated.get("active_player_name"),
+                "player_perspectives": migrated.get("player_perspectives", {}),
                 "messages": migrated.get("messages", []),
             },
         )
@@ -2421,14 +2703,16 @@ def set_manual_difficulty(save_name: str, difficulty: int) -> tuple[int, bool]:
 
     season_synced = False
     if game.strip().casefold() == "iracing":
-        season_path = str(save_data.get("season_path", "")).strip()
         championship = save_data.get("championship")
+        season_path = _iracing_season_path_for_sync(save_name, save_data, {}, championship)
         if season_path and isinstance(championship, dict):
             season_synced = update_exported_season_difficulty(
                 season_path,
                 championship,
                 clamped_difficulty,
             )
+            if season_synced:
+                update_save(save_name, {"season_path": season_path})
 
     return clamped_difficulty, season_synced
 
@@ -2468,17 +2752,23 @@ def create_new_save(
     starting_difficulty: int = 75,
     world_history_years: int = 5,
     game: str = "iRacing",
+    career_mode: str = "",
 ) -> tuple[bool, str]:
     normalized_players = _normalize_player_names(player_names, save_name)
     current_year = datetime.now().year
     normalized_history_years = max(5, min(20, int(world_history_years)))
     normalized_game = "AMS2" if str(game).strip().casefold() == "ams2" else "iRacing"
+    normalized_mode = _career_mode(career_mode, normalized_players)
     player_label = ", ".join(normalized_players) or "Driver"
+    player_perspectives = _normalize_player_perspectives({}, normalized_players, {})
     success, message = create_save(
         save_name,
         {
             "game": normalized_game,
+            "career_mode": normalized_mode,
             "players": normalized_players,
+            "active_player_name": _active_player_name("", normalized_players),
+            "player_perspectives": player_perspectives,
             "starting_difficulty": _clamp_difficulty(starting_difficulty),
             "world_history_years": normalized_history_years,
             "world_year": current_year,
@@ -2491,6 +2781,7 @@ def create_new_save(
             "schedule": [],
             "standings": [],
             "current_race": 0,
+            "rivalry_heat": _merged_perspective_rivalry_heat(player_perspectives),
             "messages": [_rivalry_explainer_message(player_label)],
         },
     )
@@ -2620,11 +2911,19 @@ def start_championship(
     storyline = championship_storyline_drivers(save_name, standings, game, tier, player_names)
     existing_save_data = load_save(save_name) or {}
     existing_messages = list(existing_save_data.get("messages") or [])
+    player_perspectives = _normalize_player_perspectives(
+        existing_save_data.get("player_perspectives"),
+        player_names,
+        existing_save_data.get("rivalry_heat"),
+    )
 
     state = {
         "save_name": save_name,
         "players": player_names,
         "game": game,
+        "career_mode": _career_mode(existing_save_data.get("career_mode"), player_names),
+        "active_player_name": _active_player_name(existing_save_data.get("active_player_name"), player_names),
+        "player_perspectives": player_perspectives,
         "starting_difficulty": _clamp_difficulty(starting_difficulty),
         "world_setup_complete": True,
         "tier": tier,
@@ -2636,7 +2935,7 @@ def start_championship(
         "player_liveries": player_liveries,
         "watch_drivers": storyline.get("watch_drivers", []),
         "rising_driver": storyline.get("rising_driver"),
-        "rivalry_heat": _rivalry_heat(existing_save_data.get("rivalry_heat")),
+        "rivalry_heat": _merged_perspective_rivalry_heat(player_perspectives),
         "messages": existing_messages,
         "roster_path": str(roster_path),
         "season_path": str(season_path),
@@ -2773,12 +3072,20 @@ def continue_or_initialize_season(
 ) -> dict[str, Any]:
     save_data = load_save(save_name) or {}
     current_game = str(save_data.get("game", "iRacing"))
+    normalized_players = _normalize_player_names(player_names, save_name)
+    career_mode = _career_mode(save_data.get("career_mode"), normalized_players)
+    active_player_name = _active_player_name(save_data.get("active_player_name"), normalized_players)
+    player_perspectives = _normalize_player_perspectives(
+        save_data.get("player_perspectives"),
+        normalized_players,
+        save_data.get("rivalry_heat"),
+    )
     player_liveries = save_data.get("player_liveries", [])
     player_team_offer = save_data.get("player_team_offer")
     watch_drivers = save_data.get("watch_drivers", [])
     rising_driver = save_data.get("rising_driver")
     messages = save_data.get("messages", [])
-    rivalry_heat = _rivalry_heat(save_data.get("rivalry_heat"))
+    rivalry_heat = _merged_perspective_rivalry_heat(player_perspectives)
     if schedule and standings:
         standings = assign_teams_to_standings(list(standings), championship, save_name)
         standings = _apply_player_team_offer(standings, _normalize_player_names(player_names, save_name), player_team_offer)
@@ -2791,7 +3098,10 @@ def continue_or_initialize_season(
         return {
             "save_name": save_name,
             "game": current_game,
-            "players": _normalize_player_names(player_names, save_name),
+            "career_mode": career_mode,
+            "players": normalized_players,
+            "active_player_name": active_player_name,
+            "player_perspectives": player_perspectives,
             "starting_difficulty": _clamp_difficulty(starting_difficulty),
             "world_setup_complete": bool(world_sim_progress is not None) or bool(championship.get("world_setup_complete", True)),
             "tier": int(championship.get("Tier", 1)),
@@ -2805,6 +3115,8 @@ def continue_or_initialize_season(
             "rising_driver": rising_driver,
             "rivalry_heat": rivalry_heat,
             "messages": messages,
+            "roster_path": save_data.get("roster_path", ""),
+            "season_path": save_data.get("season_path", ""),
             "schedule": schedule,
             "standings": standings,
             "current_race": current_race,
@@ -2825,7 +3137,17 @@ def _persist_active_state(state: dict[str, Any]) -> None:
         state["save_name"],
         {
             "game": str(state.get("game", "iRacing") or "iRacing"),
+            "career_mode": _career_mode(state.get("career_mode"), _normalize_player_names(state.get("players"), state["save_name"])),
             "players": _normalize_player_names(state.get("players"), state["save_name"]),
+            "active_player_name": _active_player_name(
+                state.get("active_player_name"),
+                _normalize_player_names(state.get("players"), state["save_name"]),
+            ),
+            "player_perspectives": _normalize_player_perspectives(
+                state.get("player_perspectives"),
+                _normalize_player_names(state.get("players"), state["save_name"]),
+                state.get("rivalry_heat"),
+            ),
             "starting_difficulty": state.get("starting_difficulty", 75),
             "world_setup_complete": state.get("world_setup_complete", True),
             "tier": state.get("tier", 1),
@@ -2840,7 +3162,13 @@ def _persist_active_state(state: dict[str, Any]) -> None:
             "player_liveries": state.get("player_liveries", []),
             "watch_drivers": state.get("watch_drivers", []),
             "rising_driver": state.get("rising_driver"),
-            "rivalry_heat": _rivalry_heat(state.get("rivalry_heat")),
+            "rivalry_heat": _merged_perspective_rivalry_heat(
+                _normalize_player_perspectives(
+                    state.get("player_perspectives"),
+                    _normalize_player_names(state.get("players"), state["save_name"]),
+                    state.get("rivalry_heat"),
+                )
+            ),
             "messages": state.get("messages", []),
             "schedule": state["schedule"],
             "standings": state["standings"],
@@ -2848,6 +3176,39 @@ def _persist_active_state(state: dict[str, Any]) -> None:
             "world_sim_progress": state.get("world_sim_progress"),
         },
     )
+
+
+def _expected_iracing_season_path(save_name: str, championship: dict[str, Any]) -> str:
+    championship_name = str(championship.get("Championship", "")).strip()
+    if not save_name or not championship_name:
+        return ""
+    try:
+        settings = load_settings()
+    except Exception:
+        return ""
+    iracing_directory = str(settings.get("iracing_directory", "")).strip()
+    if not iracing_directory:
+        return ""
+    return str(Path(iracing_directory) / "aiseasons" / f"CS-{championship_name}-{save_name}.json")
+
+
+def _iracing_season_path_for_sync(
+    save_name: str,
+    save_data: dict[str, Any],
+    state: dict[str, Any],
+    championship: dict[str, Any] | None,
+) -> str:
+    candidates = [
+        str(state.get("season_path", "")).strip(),
+        str(save_data.get("season_path", "")).strip(),
+    ]
+    if isinstance(championship, dict):
+        candidates.append(_expected_iracing_season_path(save_name, championship))
+
+    for candidate in candidates:
+        if candidate and Path(candidate).exists():
+            return candidate
+    return ""
 
 
 def _sync_iracing_season_difficulty(state: dict[str, Any]) -> None:
@@ -2859,16 +3220,18 @@ def _sync_iracing_season_difficulty(state: dict[str, Any]) -> None:
         return
 
     save_data = load_save(save_name) or {}
-    season_path = str(save_data.get("season_path", "")).strip()
     championship = state.get("championship")
+    season_path = _iracing_season_path_for_sync(save_name, save_data, state, championship)
     if not season_path or not isinstance(championship, dict):
         return
 
-    update_exported_season_difficulty(
+    synced = update_exported_season_difficulty(
         season_path,
         championship,
         int(state.get("starting_difficulty", 75) or 75),
     )
+    if synced and str(save_data.get("season_path", "")).strip() != season_path:
+        update_save(save_name, {"season_path": season_path})
 
 
 def simulate_race(state: dict[str, Any]) -> dict[str, Any]:
@@ -2888,7 +3251,7 @@ def simulate_race(state: dict[str, Any]) -> dict[str, Any]:
     _, result_rows = apply_points_by_class(standings, finish_order_names)
     update_ratings_after_race(state["save_name"], state["championship"], standings, result_rows)
     record_driver_race_results(state["save_name"], state["championship"], schedule[current_race], standings, result_rows)
-    _update_rivalry_heat(state, result_rows, player_names)
+    _update_player_rivalry_perspectives(state, result_rows, player_names)
     player_results = _player_class_results(result_rows, player_names)
     player_class_sizes = _player_class_sizes(result_rows, player_names)
     state["starting_difficulty"] = _adjust_difficulty_after_race(
@@ -2950,7 +3313,7 @@ def apply_manual_race_results(state: dict[str, Any], player_positions: dict[str,
     _, result_rows = apply_points_by_class(standings, finish_order_names)
     update_ratings_after_race(state["save_name"], state["championship"], standings, result_rows)
     record_driver_race_results(state["save_name"], state["championship"], schedule[current_race], standings, result_rows)
-    _update_rivalry_heat(
+    _update_player_rivalry_perspectives(
         state,
         result_rows,
         _normalize_player_names(state.get("players"), state["save_name"]),
@@ -2999,7 +3362,7 @@ def apply_finish_order(state: dict[str, Any], finish_order_names: list[str]) -> 
     _, result_rows = apply_points_by_class(standings, finish_order_names)
     update_ratings_after_race(state["save_name"], state["championship"], standings, result_rows)
     record_driver_race_results(state["save_name"], state["championship"], schedule[current_race], standings, result_rows)
-    _update_rivalry_heat(state, result_rows, player_names)
+    _update_player_rivalry_perspectives(state, result_rows, player_names)
     player_results = _player_class_results(result_rows, player_names)
     player_class_sizes = _player_class_sizes(result_rows, player_names)
     state["starting_difficulty"] = _adjust_difficulty_after_race(
@@ -3251,7 +3614,14 @@ def finalize_season(state: dict[str, Any]) -> tuple[dict[str, Any], dict[str, An
     new_state = {
         "save_name": state["save_name"],
         "game": str(state.get("game", "iRacing") or "iRacing"),
+        "career_mode": _career_mode(state.get("career_mode"), player_names),
         "players": player_names,
+        "active_player_name": _active_player_name(state.get("active_player_name"), player_names),
+        "player_perspectives": _normalize_player_perspectives(
+            state.get("player_perspectives"),
+            player_names,
+            state.get("rivalry_heat"),
+        ),
         "starting_difficulty": state.get("starting_difficulty", 75),
         "world_setup_complete": True,
         "tier": new_tier,
@@ -3261,7 +3631,13 @@ def finalize_season(state: dict[str, Any]) -> tuple[dict[str, Any], dict[str, An
         "player_car": None,
         "watch_drivers": [],
         "rising_driver": None,
-        "rivalry_heat": _rivalry_heat(state.get("rivalry_heat")),
+        "rivalry_heat": _merged_perspective_rivalry_heat(
+            _normalize_player_perspectives(
+                state.get("player_perspectives"),
+                player_names,
+                state.get("rivalry_heat"),
+            )
+        ),
         "messages": state.get("messages", []),
         "schedule": [],
         "standings": [],
@@ -3271,6 +3647,13 @@ def finalize_season(state: dict[str, Any]) -> tuple[dict[str, Any], dict[str, An
     summary = {
         "average_position": average_position,
         "player_positions": player_positions,
+        "career_mode": _career_mode(state.get("career_mode"), player_names),
+        "active_player_name": _active_player_name(state.get("active_player_name"), player_names),
+        "player_perspectives": _normalize_player_perspectives(
+            state.get("player_perspectives"),
+            player_names,
+            state.get("rivalry_heat"),
+        ),
         "old_tier": current_tier,
         "new_tier": new_tier,
         "old_unlocked_tier": unlocked_tier,

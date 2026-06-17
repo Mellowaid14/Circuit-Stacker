@@ -237,14 +237,26 @@ class DriverPoolScreen(ctk.CTkFrame):
 
         current_world_year = get_world_year(save_name)
         save_data = load_save(save_name) or {}
+        active_player_name = str(getattr(self.gameplay_screen, "active_player_name", "") or save_data.get("active_player_name", "")).strip()
+        saved_perspectives = save_data.get("player_perspectives") if isinstance(save_data.get("player_perspectives"), dict) else {}
+        active_saved_perspective = (
+            saved_perspectives.get(active_player_name)
+            if active_player_name and isinstance(saved_perspectives.get(active_player_name), dict)
+            else {}
+        )
+        saved_heat_source = active_saved_perspective.get("rivalry_heat") if active_saved_perspective else save_data.get("rivalry_heat")
         saved_heat = {
             str(name).strip(): int(stage)
-            for name, stage in dict(save_data.get("rivalry_heat") or {}).items()
+            for name, stage in dict(saved_heat_source or {}).items()
             if str(name).strip() and str(stage).strip() in {"1", "2", "3"}
         }
+        if hasattr(self.gameplay_screen, "_active_rivalry_heat"):
+            active_heat_source = self.gameplay_screen._active_rivalry_heat()
+        else:
+            active_heat_source = getattr(self.gameplay_screen, "rivalry_heat", {})
         active_heat = {
             str(name).strip(): int(stage)
-            for name, stage in dict(getattr(self.gameplay_screen, "rivalry_heat", {}) or {}).items()
+            for name, stage in dict(active_heat_source or {}).items()
             if str(name).strip() and str(stage).strip() in {"1", "2", "3"}
         }
         self.rivalry_heat = dict(saved_heat)

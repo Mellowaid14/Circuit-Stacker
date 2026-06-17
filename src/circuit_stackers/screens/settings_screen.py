@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from tkinter import filedialog
+import webbrowser
 
 import customtkinter as ctk
 
@@ -196,6 +197,61 @@ class SettingsScreen(ctk.CTkFrame):
             hover_color="gray40",
             font=ctk.CTkFont(size=12, weight="bold"),
         ).pack(side="left", padx=(10, 0))
+
+        credits_box = ctk.CTkFrame(body, fg_color=("gray90", "gray15"), corner_radius=12)
+        credits_box.pack(fill="x", padx=120, pady=(0, 16))
+        ctk.CTkLabel(
+            credits_box,
+            text="Credits",
+            font=ctk.CTkFont(size=16, weight="bold"),
+        ).pack(anchor="w", padx=18, pady=(16, 6))
+        credits_text = ctk.CTkFrame(credits_box, fg_color="transparent")
+        credits_text.pack(fill="x", padx=18, pady=(0, 16))
+        credits_text.grid_columnconfigure(0, weight=1)
+        credit_line_1 = ctk.CTkFrame(credits_text, fg_color="transparent")
+        credit_line_1.grid(row=0, column=0, sticky="w")
+        ctk.CTkLabel(
+            credit_line_1,
+            text="Big credit to ",
+            font=ctk.CTkFont(size=14),
+            text_color="gray",
+        ).pack(side="left")
+        ctk.CTkLabel(
+            credit_line_1,
+            text="EverlastingApex",
+            font=ctk.CTkFont(size=14, weight="bold"),
+            text_color=("gray20", "gray85"),
+        ).pack(side="left")
+        ctk.CTkLabel(
+            credit_line_1,
+            text=" and the app ",
+            font=ctk.CTkFont(size=14),
+            text_color="gray",
+        ).pack(side="left")
+        ctk.CTkLabel(
+            credit_line_1,
+            text="Apex Rivals",
+            font=ctk.CTkFont(size=14, weight="bold"),
+            text_color=("gray20", "gray85"),
+        ).pack(side="left")
+
+        credit_line_2 = ctk.CTkFrame(credits_text, fg_color="transparent")
+        credit_line_2.grid(row=1, column=0, sticky="w", pady=(4, 0))
+        ctk.CTkLabel(
+            credit_line_2,
+            text="for inspiring me to work on a project and for getting the great AMS2 car images! Please support them over at",
+            font=ctk.CTkFont(size=14),
+            text_color="gray",
+        ).pack(side="left")
+        apex_link = ctk.CTkLabel(
+            credit_line_2,
+            text=' "ApexRivals"',
+            font=ctk.CTkFont(size=14, weight="bold", underline=True),
+            text_color=("#15507d", "#7dbdff"),
+            cursor="hand2",
+        )
+        apex_link.pack(side="left")
+        apex_link.bind("<Button-1>", lambda _event: self.open_apex_rivals_credit())
 
         updates_box = ctk.CTkFrame(body, fg_color=("gray90", "gray15"), corner_radius=12)
         updates_box.pack(fill="x", padx=120, pady=(0, 16))
@@ -402,6 +458,9 @@ class SettingsScreen(ctk.CTkFrame):
         if not (root / "UserData").is_dir():
             return "Folder does not seem to be correct. Please verify before moving forward."
         return ""
+
+    def open_apex_rivals_credit(self) -> None:
+        webbrowser.open("https://www.patreon.com/c/ProceduralCareer/home?vanity=ProceduralCareer")
 
     def open_ownership(self, game: str) -> None:
         ownership_screen = self.parent.screens["OwnershipScreen"]

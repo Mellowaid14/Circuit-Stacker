@@ -3,13 +3,13 @@ id,Car class,Car,Car_Class_ID,image file,Game,Style,DLC,Owned,FILEPATH,Iracing_I
 2,[Legacy] Nascar Truck,[Legacy] NASCAR Truck Chevrolet Silverado - 2008,,NASCAR Truck Chevrolet Silverado - 2008,Iracing,Oval,,Yes,trucks\silverado,N/A,
 3,BMW M2,BMW M2 CSR,4073,BMW M2 CSR,Iracing,Sports Car,,Yes,bmwm2csr,195,
 4,Cadillac CTS-V Racecar,Cadillac CTS-V Racecar,45,Cadillac CTS-V,Iracing,Sports Car,,Yes,cadillacctsvr,41,
-5,Formula Vee,Formula Vee,3002,Formula Vee,Iracing,Open Wheel,,Yes,formulavee,142,
+5,Formula Vee,Formula Vee - Classic,4107,Formula Vee- Classic,Iracing,Open Wheel,,Yes,formulavee,142,
 6,Kia Optima,Kia Optima,48,Kia Optima,Iracing,Sports Car,,Yes,kiaoptima,44,
 7,Legends Ford,Legends Ford '34 Coupe,5,Legends Ford '34 Coupe,Iracing,Oval,,Yes,legends\ford34c,5,
 8,Mini Stock,Mini Stock,4069,Mini Stock,Iracing,Oval,,Yes,ministock,191,
 9,Global Mazda MX-5 Cup,Global Mazda MX-5 Cup,74,Global Mazda MX-5 Cup,Iracing,Sports Car,,Yes,mx5\mx52016,67,
 10,Renault Clio,Renault Clio,4015,Renault Clio,Iracing,Sports Car,,No,renaultcliocup,162,
-11,Radical SR8,Radical SR8,,Radical SR8 V8,Iracing,Sports Car,,Yes,radical\sr8,N/A,
+11,Radical SR8,Radical SR8,15,Radical SR8 V8,Iracing,Sports Car,,Yes,radical\sr8,13,
 12,Ray FF1600,Ray FF1600,4016,Ray FF1600,Iracing,Open Wheel,,Yes,raygr22,163,
 13,SCCA Spec Racer Ford,SCCA Spec Racer Ford,20,SCCA Spec Racer Ford,Iracing,Sports Car,,Yes,specracer,23,
 14,SRX,SRX,4050,SRX,Iracing,Oval,,No,srx,179,
@@ -78,7 +78,7 @@ id,Car class,Car,Car_Class_ID,image file,Game,Style,DLC,Owned,FILEPATH,Iracing_I
 77,,Dirt Sprint Car - 410,,,Iracing,,,No,dirtsprint\winged\410,N/A,
 78,,Dirt Sprint Car Non-Winged - 360,,,Iracing,,,No,dirtsprint\nonwinged\360,N/A,
 79,,Dirt Sprint Car Non-Winged - 410,,,Iracing,,,No,dirtsprint\nonwinged\410,N/A,
-80,,Dirt Street Stock,,,Iracing,,,Yes,dirtstreetstock,N/A,
+80,Dirt Street Stock,Dirt Street Stock,86,,Iracing,Dirt Oval,,Yes,dirtstreetstock,79,
 81,,Dirt UMP Modified,,,Iracing,,,No,dirtumpmod,N/A,
 82,Ferrari 296 Challenge,Ferrari 296 Challenge,4082,,Iracing,,,No,ferrari296challenge,203,
 83,IMSA 23,Ferrari 296 GT3,4091,Ferrari 296 GT3,Iracing,Sports Car,,No,ferrari296gt3,173,
@@ -103,339 +103,349 @@ id,Car class,Car,Car_Class_ID,image file,Game,Style,DLC,Owned,FILEPATH,Iracing_I
 102,Indy Pro 2000 PM-18,Indy Pro 2000 PM-18,2265,,Iracing,,,No,indypropm18,120,
 103,IMSA 23,Lamborghini Huracán GT3 EVO,4091,Lamborghini Huracán GT3 EVO,Iracing,Sports Car,,No,lamborghinievogt3,133,
 104,Late Model Stock,Late Model Stock,4017,Late Model Stock,Iracing,Oval,,No,latemodel2023,164,
-106,Ligier JS P320,Ligier JS P320,4018,Ligier JS P320,Iracing,Sports Car,,No,ligierjsp320,165,
-107,,Limited Dirt Late Model,,,Iracing,,,No,dirtlatemodel\350,N/A,
-108,Lotus 49,Lotus 49,46,,Iracing,,,No,lotus49,42,
-109,Lotus 79,Lotus 79,22,,Iracing,,,No,lotus79,25,
-110,,Lucas Oil Off Road Pro 2 Lite,,,Iracing,,,Yes,protrucks\pro2lite,N/A,
-111,,Lucas Oil Off Road Pro 2 Truck,,,Iracing,,,No,protrucks\pro2truck,N/A,
-112,,Lucas Oil Off Road Pro 4 Truck,,,Iracing,,,No,protrucks\pro4truck,N/A,
-113,GT4 Class,McLaren 570S GT4,2268,McLaren 570S GT4,Iracing,Sports Car,,No,mclaren570sgt4,135,
-114,IMSA 23,McLaren 720S GT3 EVO,4091,McLaren 720S GT3 EVO,Iracing,Sports Car,,No,mclaren720sgt3,188,
-115,,McLaren MP4-12C GT3,,,Iracing,,,No,mclarenmp4,N/A,
-116,,McLaren MP4-30,,,Iracing,,,No,mclarenmp430,N/A,
-117,IMSA 23,Mercedes-AMG GT3 2020,4091,Mercedes-AMG GT3 2020,Iracing,,,No,mercedesamgevogt3,156,
-118,GT4 Class,Mercedes-AMG GT4,2268,Mercedes-AMG GT4,Iracing,Sports Car,,No,mercedesamggt4,157,
-119,F1 W12,Mercedes-AMG W12 E Performance,3185,,Iracing,,,No,mercedesw12,145,
-120,F1,Mercedes-AMG W13 E Performance,4013,Mercedes-AMG W13 E Performance,Iracing,Open Wheel,,No,mercedesw13,161,
-121,Modified - SK,Modified - SK,2,Modified - SK,Iracing,Oval,,No,skmodified,2,
-122,NASCAR CUP,NASCAR Cup Series Chevrolet Camaro ZL1,50,,Iracing,,,No,stockcars\camarozl12018,103,
-123,NASCAR CUP,NASCAR Cup Series Ford Mustang,50,,Iracing,,,No,stockcars\fordmustang2019,110,
-124,Nascar Cup Series,NASCAR Cup Series Next Gen Chevrolet Camaro ZL1,2978,NASCAR Cup Series Next Gen Chevrolet Camaro ZL1,Iracing,Oval,,No,stockcars\camarozl12022,139,
-125,Nascar Cup Series,NASCAR Cup Series Next Gen Ford Mustang,2978,NASCAR Cup Series Next Gen Ford Mustang,Iracing,Oval,,No,stockcars\fordmustang2022,140,
-126,Nascar Cup Series,NASCAR Cup Series Next Gen Toyota Camry,2978,NASCAR Cup Series Next Gen Toyota Camry,Iracing,Oval,,No,stockcars\toyotacamry2022,141,
-127,NASCAR CUP,NASCAR Cup Series Toyota Camry,50,,Iracing,,,No,stockcars\toyotacamry,56,
-128,Nascar Gen 4,NASCAR Gen 4 Chevrolet Monte Carlo - 2003,4087,NASCAR Gen 4 Chevrolet Monte Carlo - 2003,Iracing,Oval,,No,stockcars\chevymontecarlo03,201,
-129,Nascar Gen 4,NASCAR Gen 4 Ford Taurus - 2003,4087,NASCAR Gen 4 Ford Taurus - 2003,Iracing,Oval,,No,stockcars\fordtaurus03,202,
-130,NASCAR Legends,NASCAR Legends Buick LeSabre - 1987,2269,,Iracing,,,No,stockcars\buicklesabre87,154,
-131,NASCAR Legends,NASCAR Legends Chevrolet Monte Carlo - 1987,2269,,Iracing,,,No,stockcars\chevymontecarlo87,124,
-132,NASCAR Legends,NASCAR Legends Ford Thunderbird - 1987,2269,,Iracing,,,No,stockcars\fordthunderbird87,125,
-133,NASCAR Legends,NASCAR Legends Pontiac Grand Prix - 1987,2269,,Iracing,,,No,stockcars\pontiacgrandprix87,175,
-134,NASCAR Truck,NASCAR Truck Chevrolet Silverado,71,NASCAR Truck Chevrolet Silverado,Iracing,Oval,,No,trucks\silverado2019,111,
-135,NASCAR Truck,NASCAR Truck Ford F150,71,NASCAR Truck Ford F150,Iracing,Oval,,No,trucks\fordf150,123,
-136,NASCAR Truck,NASCAR Truck Toyota Tundra TRD Pro,71,NASCAR Truck Toyota Tundra TRD Pro,Iracing,Oval,,No,trucks\toyotatundra2022,155,
-137,NASCAR Whelen Tour Modified,NASCAR Whelen Tour Modified,2,,Iracing,,,No,skmodified\tour,31,
-138,Nascar O'reilly Auto Parts,NASCAR O'reilly Chevrolet Camaro,1455,NASCAR O'reilly Chevrolet Camaro,Iracing,Oval,,No,stockcars2\camaro2019,114,
-139,Nascar O'reilly Auto Parts,NASCAR O'reilly Ford Mustang,1455,NASCAR O'reilly Ford Mustang,Iracing,Oval,,No,stockcars2\mustang2019,115,
-140,Nascar O'reilly Auto Parts,NASCAR O'reilly Toyota Supra,1455,NASCAR O'reilly Toyota Supra,Iracing,Oval,,No,stockcars2\supra2019,116,
-141,Nissan GTP ZXT,Nissan GTP ZXT,84,,Iracing,,,No,nissangtpzxt,77,
-142,,Pontiac Solstice,,,Iracing,,,No,solstice,N/A,
-143,,Pontiac Solstice - Rookie,,,Iracing,,,No,solstice\rookie,N/A,
-144,GT4 Class,Porsche 718 Cayman GT4 Clubsport MR,2268,Porsche 718 Cayman GT4,Iracing,Sports Car,,No,porsche718gt4,119,
-145,Porsche 911 Cup (992.2),Porsche 911 Cup (992.2),4093,Porsche 911 Cup (992.2),Iracing,Sports Car,,No,porsche9922cup,208,
-146,IMSA 23,Porsche 911 GT3 R (992),4091,Porsche 911 GT3 R (992),Iracing,Sports Car,,No,porsche992rgt3,169,
-147,GTE,Porsche 911 RSR,100,,Iracing,,,No,porsche991rsr,102,
-148,Porsche 919,Porsche 919,115,,Iracing,,,No,porsche919,100,
-149,GTP,Porsche 963 GTP,4029,Porsche 963 GTP,Iracing,Sports Car,,No,porsche963gtp,174,
-150,,Porsche Mission R,,,Iracing,,,No,porschemissionr,N/A,
-151,,Pro Dirt Late Model,,,Iracing,,,No,dirtlatemodel\358,N/A,
-152,Radical SR10,Radical SR10,3283,,Iracing,,,No,radical\sr10,149,
-153,,Ruf RT 12R AWD,,,Iracing,,,No,rufrt12r\awd,N/A,
-154,,Ruf RT 12R C-Spec,,,Iracing,,,No,rufrt12r\track\cspec,N/A,
-155,,Ruf RT 12R RWD,,,Iracing,,,No,rufrt12r\rwd,N/A,
-156,,Ruf RT 12R Track,,,Iracing,,,No,rufrt12r\track,N/A,
-157,Silver Crown,Silver Crown,16,,Iracing,,,No,silvercrown,18,
-158,Skip Barber Formula 2000,Skip Barber Formula 2000,1,Skip Barber Formula 2000,Iracing,Sports Car,,No,rt2000,1,
-159,,Sprint Car,,,Iracing,,,No,sprint,N/A,
-160,Stock Car Brasil,Stock Car Pro Series Chevrolet Cruze,3245,,Iracing,,,No,stockcarbrasil\cruze,151,
-161,Stock Car Brasil,Stock Car Pro Series Toyota Corolla,3245,,Iracing,,,No,stockcarbrasil\corolla,152,
-162,Street Stock,Street Stock - Casino,4064,Street Stock - Casino,Iracing,Oval,,No,streetstock\streetstock2,186,
-163,Street Stock,Street Stock - Eagle,4064,Street Stock - Eagle,Iracing,Oval,,No,streetstock\streetstock3,187,
-164,,Subaru WRX STI,,,Iracing,,,No,subaruwrxsti,N/A,
-165,,Super Dirt Late Model,,,Iracing,,,No,dirtlatemodel\438,N/A,
-166,Super Formula Lights,Super Formula Lights,4049,Super Formula Lights,Iracing,Open Wheel,,No,superformulalights324,178,
-167,SF23,Super Formula SF23 - Honda,4033,Super Formula SF23 - Honda,Iracing,Open Wheel,,No,superformulasf23\honda,172,
-168,SF23,Super Formula SF23 - Toyota,4033,Super Formula SF23 - Toyota,Iracing,Open Wheel,,No,superformulasf23\toyota,171,
-169,Super Late Model,Super Late Model,60,Super Late Model,Iracing,Oval,,No,superlatemodel,54,
-170,Super Car Gen 3,Supercars Ford Mustang Gen 3,4076,,Iracing,,,No,supercars\fordmustanggen3,190,
-171,Super Car Gen 3,Supercars Chevrolet Camaro Gen 3,4076,,Iracing,,,No,supercars\chevycamarogen3,192,
-172,Supercar 2019,Supercars Ford Mustang GT,1615,,Iracing,,,No,v8supercars\fordmustanggt,118,
-173,Supercar 2019,Supercars Holden ZB Commodore,1615,,Iracing,,,No,v8supercars\holden2019,117,
-174,USF 2000,USF 2000,2266,,Iracing,,,No,usf2000usf17,121,
-175,,VW Beetle,,,Iracing,,,No,vwbeetlegrc,N/A,
-176,,VW Beetle Lite,,,Iracing,,,No,vwbeetlegrc\lite,N/A,
-177,VW Jetta TDI Cup,VW Jetta TDI Cup,24,,Iracing,,,No,jettatdi,27,
-178,Williams FW31,Williams FW31,30,,Iracing,,,No,williamsfw31,33,
-179,NASCAR Truck,NASCAR Truck Ram,71,NASCAR Truck Ram,Iracing,Oval,,No,trucks\ram2026,211,
-180,Carrera Cup,Porsche 911 GT3 Cup 3.8,9016,Carrera Cup 3.8,AMS2,Sports Car,,Yes,,,porsche_991_gt3
-181,Carrera Cup,Porsche 911 GT3 Cup 4.0,9016,Carrera Cup 4.0,AMS2,Sports Car,,Yes,,,porsche_991_gt3_2
-182,Caterham 620R,Caterham 620R,,Cat620R,AMS2,Sports Car,,Yes,,,caterham_620r
-183,Caterham Academy,Caterham Academy,9002,Cat_Academy,AMS2,Sports Car,,Yes,,,caterham_academy
-184,Caterham Superlight,Caterham Superlight,,Cat_Superlight,AMS2,Sports Car,,Yes,,,caterham_superlight
-185,Caterham Supersport,Caterham Supersport,9006,Cat_Supersport,AMS2,Sports Car,,Yes,,,caterham_supersport
-186,Copa Classic B,Chevrolet Chevette,,Copa Classic B Chvrolet Chvette,AMS2,Sports Car,,Yes,,,chevette
-187,Copa Classic B,Fiat Uno Classic B,,Copa Classic B Uno Classic,AMS2,Sports Car,,Yes,,,uno_classicb
-188,Copa Classic B,MINI Cooper S 1965 B,,Copa Classic B Mini Cooper S,AMS2,Sports Car,,Yes,,,mini_coopers_1965b
-189,Copa Classic B,Puma GTE,,Copa Classic B Puma GTE,AMS2,Sports Car,,Yes,,,puma_gte
-190,Copa Classic B,Volkswagen Gol Classic B,,Copa Classic B Gol Classic B,AMS2,Sports Car,,Yes,,,gol_classicb
-191,Copa Classic B,Volkswagen Passat Classic B,,Copa Classic B Passat Classic B,AMS2,Sports Car,,Yes,,,pas_classicb
-192,Copa Classic FL,Puma GTB,,Copa Classic FL Puma GTB,AMS2,Sports Car,,Yes,,,puma_gtb
-193,Copa Classic FL,Volkswagen Fusca Classic FL,,Copa Classic FL Fusca Classic,AMS2,Sports Car,,Yes,,,fusca_classica
-194,Copa Classic FL,Volkswagen Gol Classic FL,,Copa Classic FL Gol Classic,AMS2,Sports Car,,Yes,,,gol_classica
-195,Copa Classic FL,Volkswagen Passat Classic FL,,Copa Classic FL Passat Classic,AMS2,Sports Car,,Yes,,,pas_classica
-196,Copa Fusca,Volkswagen Fusca,,CopaFusca,AMS2,Sports Car,,Yes,,,fusca_copa
-197,Copa Montana,Chevrolet Montana,9028,Montana,AMS2,Oval,,Yes,,,montana
-198,Copa Truck,IVECO Stralis,,CopaTruck,AMS2,Sports Car,,Yes,,,ftruck_iveco
-199,Copa Truck,MAN TGX,,CopaTruck,AMS2,Sports Car,,Yes,,,ftruck_man
-200,Copa Truck,Mercedes-Benz Actros-2651,,CopaTruck,AMS2,Sports Car,,Yes,,,ftruck_merc
-201,Copa Truck,Vulkan Truck,,CopaTruck,AMS2,Sports Car,,Yes,,,ftruck_vulkan
-202,Copa Truck,Volkswagen Constellation,,CopaTruck,AMS2,Sports Car,,Yes,,,ftruck_vw
-203,Copa Uno,Fiat Uno,,CopaUno,AMS2,Sports Car,,Yes,,,uno
-204,DPi,Cadillac DPi-V.R,,DPi,AMS2,Sports Car,Racin' USA 1,No,,,cadillac_dpi-vr
-205,Formula USA Gen 1,Lola T95/00 Ford-Cosworth,,F-USA-Gen1 t9500 Ford Cosworth,AMS2,Open Wheel,Racin' USA 2,No,,,cart_lola_t95_ford
-206,Formula USA Gen 1,Lola T95/00 Mercedes-Benz,,F-USA-Gen1 Merc Benz t9500,AMS2,Open Wheel,Racin' USA 2,No,,,cart_lola_t95_mercedes
-207,Formula USA Gen 1,Reynard 95i Ford-Cosworth,,F-USA-Gen1 Reynard 95i Ford Cosworth,AMS2,Open Wheel,Racin' USA 2,No,,,cart_reynard_95i_ford
-208,Formula USA Gen 1,Reynard 95i Honda,,F-USA-Gen1 Reynard 95 I Honda,AMS2,Open Wheel,Racin' USA 2,No,,,cart_reynard_95i_honda
-209,Formula USA Gen 1,Reynard 95i Mercedes-Benz,,F-USA-Gen1 Reynard 95 I Merc Benz,AMS2,Open Wheel,Racin' USA 2,No,,,cart_reynard_95i_mercedes
-210,Formula USA Gen 2,Lola T98/00 Ford-Cosworth,,F-USA-Gen2 Lola T9800 Ford Cosworth,AMS2,Open Wheel,Racin' USA 2,No,,,cart_lola_t98
-211,Formula USA Gen 2,Reynard 98i Ford-Cosworth,,F-USA-Gen2 Reynard 98i Ford Cosworth,AMS2,Open Wheel,Racin' USA 2,No,,,cart_reynard_98i_ford
-212,Formula USA Gen 2,Reynard 98i Honda,,F-USA-Gen2 Reynard 98i Honda,AMS2,Open Wheel,Racin' USA 2,No,,,cart_reynard_98i_honda
-213,Formula USA Gen 2,Reynard 98i Mercedes-Benz,,F-USA-Gen2 Reynard 98i Mercedes Benz,AMS2,Open Wheel,Racin' USA 2,No,,,cart_reynard_98i_mercedes
-214,Formula USA Gen 2,Reynard 98i Toyota,,F-USA-Gen2 Reynard 98i Toyota,AMS2,Open Wheel,Racin' USA 2,No,,,cart_reynard_98i_toyota
-215,Formula USA Gen 2,Swift 009c Ford-Cosworth,,F-USA-Gen2 Swift 009c Ford Cosworth,AMS2,Open Wheel,Racin' USA 2,No,,,cart_swift_009c
-216,Formula USA Gen 3,Lola B2K/00 Ford-Cosworth,,F-USA-Gen3 B2K Ford Cosworth,AMS2,Open Wheel,Racin' USA 2,No,,,cart_lola_b2k00_ford
-217,Formula USA Gen 3,Lola B2K/00 Mercedes-Benz,,F-USA-Gen3 B2K Mercedes Benz,AMS2,Open Wheel,Racin' USA 2,No,,,cart_lola_b2k00_mercedes
-218,Formula USA Gen 3,Lola B2K/00 Toyota,,F-USA-Gen3 B2K Toyota,AMS2,Open Wheel,Racin' USA 2,No,,,cart_lola_b2k00_toyota
-219,Formula USA Gen 3,Reynard 2Ki Ford-Cosworth,,F-USA-Gen3 2Ki Ford Cosworth,AMS2,Open Wheel,Racin' USA 2,No,,,cart_reynard_2ki_ford
-220,Formula USA Gen 3,Reynard 2Ki Honda,,F-USA-Gen3 2Ki Honda,AMS2,Open Wheel,Racin' USA 2,No,,,cart_reynard_2ki_honda
-221,Formula USA Gen 3,Reynard 2Ki Mercedes-Benz,,F-USA-Gen3 2Ki Mercedes Benz,AMS2,Open Wheel,Racin' USA 2,No,,,cart_reynard_2ki_mercedes
-222,Formula USA Gen 3,Reynard 2Ki Toyota,,F-USA-Gen3 2Ki Toyota,AMS2,Open Wheel,Racin' USA 2,No,,,cart_reynard_2ki_toyota
-223,Dallara F301,F301,,F-3-301,AMS2,Open Wheel,,Yes,,,f301
-224,Dallara F309,F309,9022,F-3-309,AMS2,Open Wheel,,Yes,,,f309
-225,Formula Classic Gen 1,Formula Classic Gen1 Model1,,F-Classic-Gen1 Model 1,AMS2,Open Wheel,,Yes,,,formula_classic_g1m1
-226,Formula Classic Gen 1,Formula Classic Gen1 Model2,,F-Classic-Gen1 Model 2,AMS2,Open Wheel,,Yes,,,formula_classic_g1m2
-227,Formula Classic Gen 1,Lotus 98T,,F-Classic-Gen1 Lotus 98T,AMS2,Open Wheel,Brazilian Racing Legends,No,,,lotus_98T
-228,Formula Classic Gen 2,Formula Classic Gen2 Model1,,F-Classic-Gen2 Model 1,AMS2,Open Wheel,,Yes,,,formula_classic_g2m1
-229,Formula Classic Gen 2,Formula Classic Gen2 Model2,,F-Classic-Gen2 Model 2,AMS2,Open Wheel,,Yes,,,formula_classic_g2m2
-230,Formula Classic Gen 2,Formula Classic Gen2 Model3,,F-Classic-Gen2 Model 3,AMS2,Open Wheel,,Yes,,,formula_classic_g2m3
-231,Formula Classic Gen 2,McLaren MP4/4,,F-Classic-Gen2 McLaren MP44,AMS2,Open Wheel,Brazilian Racing Legends,No,,,mclaren_mp44
-232,Formula Classic Gen 3,Formula Classic Gen3 Model1,,F-Classic-Gen3 Model 1,AMS2,Open Wheel,,Yes,,,formula_classic_g3m1
-233,Formula Classic Gen 3,Formula Classic Gen3 Model2,,F-Classic-Gen3 Model 2,AMS2,Open Wheel,,Yes,,,formula_classic_g3m2
-234,Formula Classic Gen 3,Formula Classic Gen3 Model3,,F-Classic-Gen3 Model 3,AMS2,Open Wheel,,Yes,,,formula_classic_g3m3
-235,Formula Classic Gen 3,Formula Classic Gen3 Model4,,F-Classic-Gen3 Model 4,AMS2,Open Wheel,,Yes,,,formula_classic_g3m4
-236,Formula Classic Gen 3,McLaren MP4/5B,,F-Classic-Gen3 McLaren MP45B,AMS2,Open Wheel,Brazilian Racing Legends,No,,,mclaren_mp45b
-237,Formula Classic Gen 4,Formula Classic Gen4 Model1,,F-Classic-Gen4 Model 1,AMS2,Open Wheel,,Yes,,,formula_classic_g4m1
-238,Formula Classic Gen 4,Formula Classic Gen4 Model2,,F-Classic-Gen4 Model 2,AMS2,Open Wheel,,Yes,,,formula_classic_g4m2
-239,Formula Classic Gen 4,Formula Classic Gen4 Model3,,F-Classic-Gen4 Model 3,AMS2,Open Wheel,,Yes,,,formula_classic_g4m3
-240,Formula Classic Gen 4,McLaren MP4/6,,F-Classic-Gen4 McLaren MP46,AMS2,Open Wheel,Brazilian Racing Legends,No,,,mclaren_mp46
-241,Formula HiTech Gen 1,Formula HiTech Gen1 Model1,,F-HiTech Gen1 Model 1,AMS2,Open Wheel,Formula HiTech,No,,,formula_hitech_g1m1
-242,Formula HiTech Gen 1,Formula HiTech Gen1 Model2,,F-HiTech Gen1 Model 2,AMS2,Open Wheel,Formula HiTech,No,,,formula_hitech_g1m2
-243,Formula HiTech Gen 1,Formula HiTech Gen1 Model3,,F-HiTech Gen1 Model 3,AMS2,Open Wheel,Formula HiTech,No,,,formula_hitech_g1m3
-244,Formula HiTech Gen 1,Formula HiTech Gen1 Model4,,F-HiTech Gen1 Model 4,AMS2,Open Wheel,Formula HiTech,No,,,formula_hitech_g1m4
-245,Formula HiTech Gen 2,Formula HiTech Gen2 Model1,9023,F-HiTech Gen2 Model 1,AMS2,Open Wheel,Formula HiTech,No,,,formula_hitech_g2m1
-246,Formula HiTech Gen 2,Formula HiTech Gen2 Model2,9023,F-HiTech Gen2 Model 2,AMS2,Open Wheel,Formula HiTech,No,,,formula_hitech_g2m2
-247,Formula HiTech Gen 2,Formula HiTech Gen2 Model3,9023,F-HiTech Gen2 Model 3,AMS2,Open Wheel,Formula HiTech,No,,,formula_hitech_g2m3
-248,Formula HiTech Gen 1,McLaren MP4/7A,,F-HiTech Gen1 McLaren MP47A,AMS2,Open Wheel,Formula HiTech,No,,,mclaren_mp47
-249,Formula HiTech Gen 2,McLaren MP4/8,9023,F-HiTech Gen2 McLaren MP48,AMS2,Open Wheel,Formula HiTech,No,,,mclaren_mp48
-250,Formula Dirt,Formula Dirt,9032,F-Dirt,AMS2,Rallycross,Adrenaline 1,No,,,formula_dirt
-251,Formula Junior,Formula Junior,,F-Junior,AMS2,Open Wheel,,Yes,,,formula_junior
-252,Formula V8 Gen 3,Formula V8 Gen3,9024,F-Reiza,AMS2,Open Wheel,,Yes,,,formula_reiza
-253,Formula Retro Gen 1,Brabham BT44,,F-Retro Gen 1 Brabham BT44,AMS2,Open Wheel,,Yes,,,
-254,Formula Retro Gen 1,Formula Retro V12,,F-Retro Gen 1 V12,AMS2,Open Wheel,,Yes,,,formula_retro_v12
-255,Formula Retro Gen 1,Formula Retro V8,,F-Retro Gen 1 V8,AMS2,Open Wheel,,Yes,,,formula_retro_v8
-256,Formula Retro Gen 1,Lotus Type 72E,,F-Retro Gen 1 Lotus Type 72E,AMS2,Open Wheel,,Yes,,,lotus_72e
-257,Formula Retro Gen 1,McLaren M23,,F-Retro Gen 1 McLaren M23,AMS2,Open Wheel,,Yes,,,mclaren_m23
-258,Formula Retro Gen 2,Brabham BT46B,,F-Retro Gen 2 Brabham BT46B,AMS2,Open Wheel,,Yes,,,brabham_bt46
-259,Formula Retro Gen 2,Brabham BT49,,F-Retro Gen 2 Brabham BT49,AMS2,Open Wheel,Brazilian Racing Legends,No,,,brabham_bt49
-260,Formula Retro Gen 2,Formula Retro Gen2,,F-Retro Gen 2 Formula Retro Gen2,AMS2,Open Wheel,,Yes,,,formula_retro_g2
-261,Formula Retro Gen 2,Lotus 79,,F-Retro Gen 2 Lotus 79,AMS2,Open Wheel,,Yes,,,lotus_79
-262,Formula Retro Gen 3,Brabham BT52,,F-Retro Gen 3 Brabham BT52,AMS2,Open Wheel,Brazilian Racing Legends,No,,,brabham_bt52
-263,Formula Retro Gen 3,Formula Retro Gen3 DFY,,F-Retro Gen 3 DFY,AMS2,Open Wheel,,Yes,,,formula_retro_g3
-264,Formula Retro Gen 3,Formula Retro Gen3 Turbo,,F-Retro Gen 3 Turbo,AMS2,Open Wheel,,Yes,,,formula_retro
-265,Formula Retro Gen 3,McLaren MP4/1C,,F-Retro Gen 3 McLaren MP4/1C,AMS2,Open Wheel,,Yes,,,mclaren_mp4_1c
-266,Formula Hybrid Gen 2,Formula Ultimate Hybrid Gen2,,F-Ultimate,AMS2,Open Wheel,,Yes,,,formula_ultimate_2022
-267,Formula Hybrid Gen 3,Formula Ultimate Hybrid Gen3,9026,F-Ultimate_Gen2,AMS2,Open Wheel,,Yes,,,formula_ultimate_2024
-268,Formula USA 2023,Formula USA 2023,9025,F-USA_2023,AMS2,Open Wheel,Racin´ USA 3,No,,,formula_usa_2023
-269,Formula V10 Gen 1,Formula V10 Gen1,,F-V10 Gen 1 V10,AMS2,Open Wheel,,Yes,,,formula_v10_g1
-270,Formula V10 Gen 1,McLaren MP4/12,,F-V10 McLaren MP4/12,AMS2,Open Wheel,,Yes,,,mclaren_mp4_12
-271,Formula V10 Gen 2,Formula V10 Gen2,,F-V10_Gen2,AMS2,Open Wheel,,Yes,,,formula_v10
-272,Formula V12,Formula V12,,F-V12,AMS2,Open Wheel,,Yes,,,formula_v12
-273,Formula Vintage Gen 1,Formula Vintage Gen1 Model1,,F-Vintage Gen1 Model 1,AMS2,Open Wheel,,Yes,,,formula_vintage_g1m1
-274,Formula Vintage Gen 1,Formula Vintage Gen1 Model2,,F-Vintage Gen1 Model 2,AMS2,Open Wheel,,Yes,,,formula_vintage_g1m2
-275,Formula Vintage Gen 2,Brabham BT26A,,F-Vintage Gen2 Brabham BT26A,AMS2,Open Wheel,,Yes,,,brabham_bt26
-276,Formula Vintage Gen 2,Formula Vintage Gen2 Model1,,F-Vintage Gen2 Model 1,AMS2,Open Wheel,,Yes,,,formula_vintage_g2m1
-277,Formula Vintage Gen 2,Formula Vintage Gen2 Model2,,F-Vintage Gen2 Model 2,AMS2,Open Wheel,,Yes,,,formula_vintage_g2m2
-278,Formula Vintage Gen 2,Lotus Type 49C,,F-Vintage Gen2 Lotus Type 49C,AMS2,Open Wheel,,Yes,,,lotus_49c
-279,Formula Inter,Fórmula Inter MG15,9021,F-Inter,AMS2,Open Wheel,,Yes,,,formula_inter
-280,Formula Vee Brazil Gen 1,Formula Vee Gen1,9018,F-Vee,AMS2,Open Wheel,,Yes,,,formula_vee
-281,Formula Vee Brazil Gen 1,Formula Vee Gen1 Fin,9018,F-Vee,AMS2,Open Wheel,,Yes,,,formula_vee_fin
-282,Formula Vee Brazil Gen 2,Formula Vee Gen2,9019,F-Vee_Gen2,AMS2,Open Wheel,,Yes,,,formula_vee_gen2
-283,Formula Trainer,Formula Trainer,9036,F-Trainer,AMS2,Open Wheel,,Yes,,,formula_trainer
-284,Formula Trainer Advanced,Formula Trainer Advanced,9020,F-Trainer_A,AMS2,Open Wheel,,Yes,,,formula_trainer_d
-285,Ginetta G40 Cup,Ginetta G40,9001,G40Cup,AMS2,Sports Car,,Yes,,,ginetta_g40_cup
-286,Ginetta G55 Supercup,Ginetta G55,,G55Supercup,AMS2,Sports Car,,Yes,,,ginetta_g55_gt4_2
-287,Group A,Audi V8 quattro DTM,,Group A Audi V8 quattro DTM,AMS2,Sports Car,,Yes,,,audi_v8_dtm
-288,Group A,BMW M3 Sport Evo GrA,,Group A BMW M3 Sport Evo GrA,AMS2,Sports Car,,Yes,,,bmw_m3_e30_a
-289,Group A,Mercedes-Benz 190E EVO 2 DTM,,Group A Mercedes-Benz 190E EVO 2 DTM,AMS2,Sports Car,,Yes,,,mercedes_evo2_dtm
-290,Group C,Chevrolet Corvette GTP,,Group C Chevrolet Corvette GTP,AMS2,Sports Car,,Yes,,,corvette_gtp
-291,Group C,Nissan R89C,,Group C Nissan R89C,AMS2,Sports Car,,Yes,,,nissan_r89c
-292,Group C,Porsche 962C,,Group C Porsche 962C,AMS2,Sports Car,,Yes,,,porsche_962c
-293,Group C,Sauber Mercedes C9,,Group C Sauber Mercedes C9,AMS2,Sports Car,,Yes,,,sauber_c9
-294,GT Classic,Chevrolet Corvette C3.R,,GT Classic Chevrolet Corvette C3.R,AMS2,Sports Car,,Yes,,,chevrolet_corvette_c3_rc
-295,GT Classic,Chevrolet Corvette C3.R Convertible,,GT Classic Chevrolet Corvette C3.R Convertible,AMS2,Sports Car,,Yes,,,chevrolet_corvette_c3_rcc
-296,GT Classic,Porsche 911 RSR,,GT Classic Porsche 911 RSR,AMS2,Sports Car,,Yes,,,porsche_911_rsr_74
-297,GT Open,Ginetta G55 GT3,,GT Open Ginetta G55 GT3,AMS2,Sports Car,,Yes,,,ginetta_g55_gt3
-298,GT Open,Ultima GTR Race,,GT Open Ultima GTR Race,AMS2,Sports Car,,Yes,,,ultima_race
-299,GT1,McLaren F1 GTR,,GT1 McLaren F1 GTR,AMS2,Sports Car,,Yes,,,mclaren_f1_gtr
-300,GT1,Mercedes-Benz CLK LM,,GT1 Mercedes-Benz CLK LM,AMS2,Sports Car,,Yes,,,mercedes_clk-lm
-301,GT1,Nissan R390 GT1,,GT1 Nissan R390 GT1,AMS2,Sports Car,,Yes,,,nissan_r390_gt1
-302,GT1,Porsche 911 GT1-98,,GT1 Porsche 911 GT1-98,AMS2,Sports Car,,Yes,,,porsche_911_gt1_98
-303,GT1 2005,Aston Martin DBR9,,GT105 Aston Martin DBR9,AMS2,Sports Car,Historical Endurance 1,No,,,aston_martin_dbr9_gt1
-304,GT1 2005,Chevrolet Corvette C5-R,,GT105 Chevrolet Corvette C5-R,AMS2,Sports Car,Historical Endurance 1,No,,,corvette_c5r
-305,GT1 2005,Dodge Viper GTS-R,,GT105 Dodge Viper GTS-R,AMS2,Sports Car,Historical Endurance 1,No,,,dodge_viper_gts_r
-306,GT1 2005,Lamborghini Murcielago R-GT,,GT105 Lamborghini Murcielago R-GT,AMS2,Sports Car,Lamborghini 2,No,,,lamborghini_murcielago_r_gt
-307,GT1 2005,Maserati MC12 GT1,,GT105 Maserati MC12 GT1,AMS2,Sports Car,Historical Endurance 1,No,,,maserati_mc12_gt1
-308,GT2 2005,Milano GT36,,GT205 Milano GT36,AMS2,Sports Car,Historical Endurance 1,No,,,milano_gt36
-309,GT2 2005,Porsche 996 GT3 RSR,,GT205 Porsche 996 GT3 RSR,AMS2,Sports Car,Historical Endurance 1,No,,,porsche_996_gt3rsr
-310,GT3,Audi R8 LMS GT3,9013,GT3G1 Audi R8 LMS GT3,AMS2,Sports Car,,Yes,,,audi_r8_lms_gt3
-311,GT3,BMW M6 GT3,9013,GT3G1 BMW M6 GT3,AMS2,Sports Car,,Yes,,,bmw_m6_gt3
-312,GT3,McLaren 720S,9013,GT3G1 McLaren 720S,AMS2,Sports Car,,Yes,,,mclaren_720s_gt3
-313,GT3,Mercedes-AMG GT3,9013,GT3G1 Mercedes-AMG GT3,AMS2,Sports Car,,Yes,,,mercedes_amg_gt3
-314,GT3,Nissan GT-R Nismo GT3,9013,GT3G1 Nissan GT-R Nismo GT3,AMS2,Sports Car,,Yes,,,nissan_gt-r_gt3
-315,GT3,Porsche 911 GT3 R,9013,GT3G1 Porsche 911 GT3 R,AMS2,Sports Car,,Yes,,,porsche_991_gt3r
-316,GT3 Gen 2,Aston Martin Vantage GT3 EVO,9014,GT3G2 AM,AMS2,Sports Car,Endurance 3,No,,,aston_martin_vantage_gt3_evo
-317,GT3 Gen 2,Audi R8 LMS GT3 evo II,9014,GT3G2 Audi R8,AMS2,Sports Car,Endurance 2,No,,,audi_r8_lms_gt3_evo2
-318,GT3 Gen 2,BMW M4 GT3,9014,GT3G2 BMW,AMS2,Sports Car,Endurance 1,No,,,bmw_m4_gt3
-319,GT3 Gen 2,Chevrolet Corvette Z06 GT3.R,9014,GT3G2 Corvette,AMS2,Sports Car,Endurance 2,No,,,corvette_z06_gt3r
-320,GT3 Gen 2,Lamborghini Huracan GT3 EVO2,9014,GT3G2 Lambo,AMS2,Sports Car,Lamborghini 1,No,,,lamborghini_huracan_gt3_evo2
-321,GT3 Gen 2,McLaren 720S GT3 EVO,9014,GT3G2 McLaren,AMS2,Sports Car,Endurance 1,No,,,mclaren_720s_gt3_evo
-322,GT3 Gen 2,Mercedes-AMG GT3 EVO,9014,GT3G2 Merc,AMS2,Sports Car,Endurance 1,No,,,mercedes_amg_gt3_evo
-323,GT3 Gen 2,Porsche 992 GT3-R,9014,GT3G2 Porsche,AMS2,Sports Car,Endurance 1,No,,,porsche_992_gt3r
-324,GT4,Alpine A110 GT4 EVO,9009,GT4Alpine,AMS2,Sports Car,Endurance 3,No,,,alpine_a110_gt4_evo
-325,GT4,Aston Martin Vantage GT4 EVO,9009,GT4Aston Martin,AMS2,Sports Car,Endurance 3,No,,,aston_martin_vantage_gt4_evo
-326,GT4,Audi R8 LMS GT4,9009,GT4Audi R8,AMS2,Sports Car,,Yes,,,audi_r8_lms_gt4
-327,GT4,BMW M4 GT4,9009,GT4Bmw M4,AMS2,Sports Car,,Yes,,,bmw_m4_gt4
-328,GT4,Chevrolet Camaro GT4.R,9009,GT4 Chevrolet Camaro,AMS2,Sports Car,,Yes,,,camaro_gt4r
-329,GT4,Ginetta G55 GT4,9009,GT4 Ginetta,AMS2,Sports Car,,Yes,,,ginetta_g55_gt4
-330,GT4,McLaren 570S,9009,GT4 McLaren,AMS2,Sports Car,,Yes,,,mclaren_570s_gt4
-331,GT4,Mercedes-AMG GT4,9009,GT4 Mercedes,AMS2,Sports Car,,Yes,,,mercedes_amg_gt4
-332,GT4,Porsche Cayman GT4 Clubsport MR,9009,GT4 Porsche,AMS2,Sports Car,,Yes,,,porsche_cayman_gt4cs
-333,GT5,Ginetta G40,9005,GT5G40,AMS2,Sports Car,,Yes,,,ginetta_g40
-334,GT5,Puma P052,9005,GT5Puma,AMS2,Sports Car,,Yes,,,puma_p052
-335,GTE,Aston Martin Vantage GTE,,GTE Aston Martin Vantage,AMS2,Sports Car,Endurance 3,No,,,aston_martin_vantage_gte
-336,GTE,BMW M8 GTE,,GTE BMW M8,AMS2,Sports Car,Racin' USA 1,No,,,bmw_m8_gte
-337,GTE,Chevrolet Corvette C8.R,,GTE Chevrolet Corvette C8.R,AMS2,Sports Car,Racin' USA 1,No,,,corvette_c8r
-338,GTE,Porsche 911 RSR-19,,GTE Porsche 911 RSR-19,AMS2,Sports Car,Racin' USA 1,No,,,porsche_911_gte
-339,GTR 2004,BMW M3 E46 GTR,,GTR_04,AMS2,Sports Car,Historical Endurance 1,No,,,bmw_m3_gtr
-340,Hot Cars,Volkswagen Fusca 1 Hot Cars,,Volkswagen Fusca 1 Hot Cars,AMS2,Sports Car,,Yes,,,fusca_hotcars_m1
-341,Hot Cars,Volkswagen Fusca 2 Hot Cars,,Volkswagen Fusca 2 Hot Cars,AMS2,Sports Car,,Yes,,,fusca_hotcars_m2
-342,Hot Cars,Volkswagen Gol Hot Cars,,Volkswagen Gol Hot Cars,AMS2,Sports Car,,Yes,,,gol_hotcars
-343,Hot Cars,Volkswagen Passat Hot Cars,,Volkswagen Passat Hot Cars,AMS2,Sports Car,,Yes,,,pas_hotcars
-344,Hypercars,Aston Martin Valkyrie,,HC Aston Martin Valkyrie,AMS2,Sports Car,,Yes,,,aston_martin_valkyrie
-345,Hypercars,Brabham BT62,,HC Brabham BT62,AMS2,Sports Car,Supercars 1,No,,,brabham_bt62
-346,Hypercars,Lamborghini Veneno Roadster,,HC Lamborghini Veneno Roadster,AMS2,Sports Car,Lamborghini 1,No,,,lamborghini_veneno
-347,Hypercars,Lamborghini Revuelto,,HC Lamborghini Revuelto,AMS2,Sports Car,Lamborghini 2,No,,,lamborghini_revuelto
-348,Hypercars,McLaren Senna,,HC McLaren Senna,AMS2,Sports Car,Supercars 1,No,,,mclaren_senna
-349,JCW,MINI Cooper,9007,MiniChallenge,AMS2,Sports Car,,Yes,,,mini_cooper
-350,Kartcross,Kartcross,9033,Kartcross,AMS2,Rallycross,Adrenaline 1,No,,,rally_kart
-351,Karting 2T 125cc,Kart 2-Stroke 125cc Direct,,Kart125cc,AMS2,Kart,,Yes,,,kart_01
-352,Karting 4T Race,Kart 4-Stroke Race,,KartGX390,AMS2,Kart,,Yes,,,kart_gx390
-353,Karting 4T Rental,Kart 4-Stroke Rental,9037,KartRental,AMS2,Kart,,Yes,,,kart_gx390_rental
-354,Karting 2T Shifter,Kart 2-Stroke 125cc Shifter,,KartShifter,AMS2,Kart,,Yes,,,kart_shifter
-355,Lancer Cup,Mitsubishi Lancer R,,Mitsubishi Lancer R,AMS2,Sports Car,,Yes,,,mitsubishi_lancerr
-356,Lancer Cup,Mitsubishi Lancer RS,,Mitsubishi Lancer RS,AMS2,Sports Car,,Yes,,,mitsubishi_lancerrs
-357,LES Ligier JS2 R,Ligier JS2 R,9011,LES Ligier JS2 R,AMS2,Sports Car,Endurance 3,No,,,ligier_js2r
-358,LES Ligier JS P4,Ligier JS P4,9012,LES Ligier JS P4,AMS2,Sports Car,Endurance 3,No,,,ligier_js_p4
-359,LMDh/GTP,Alpine A424,9015,LMDh Alpine,AMS2,Sports Car,Endurance 2,No,,,alpine_a424
-360,LMDh/GTP,Aston Martin Valkyrie Hypercar,9015,LMDh AM,AMS2,Sports Car,Endurance 3,No,,,aston_martin_valkyrie
-361,LMDh/GTP,BMW M Hybrid V8,9015,LMDh BMW,AMS2,Sports Car,Endurance 1,No,,,bmw_m_hybrid_v8
-362,LMDh/GTP,Cadillac V-Series.R,9015,LMDh Cadillac,AMS2,Sports Car,Endurance 1,No,,,cadillac_v-series_r
-363,LMDh/GTP,Lamborghini SC63,9015,LMDh Lambo,AMS2,Sports Car,Lamborghini 1,No,,,lamborghini_sc63
-364,LMDh/GTP,Porsche 963,9015,LMDh Porsche,AMS2,Sports Car,Endurance 1,No,,,porsche_963_gtp
-365,LMP1 2005,Audi R8 LMP1,,LMP12005 Audi R8 LMP1,AMS2,Sports Car,Historical Endurance 1,No,,,audi_r8_lmp
-366,LMP1 2005,Courage C60 Hybrid,,LMP12005 Courage C60 Hybrid,AMS2,Sports Car,Historical Endurance 1,No,,,courage_c60
-367,LMP1 2005,Dallara SP1,,LMP12005 Dallara SP1,AMS2,Sports Car,Historical Endurance 1,No,,,dallara_sp1
-368,LMP2 2005,Lola B05/40 Turbo,,LMP22005 Lola Turbo,AMS2,Sports Car,Historical Endurance 1,No,,,lola_b0540_lmp2
-369,LMP2 2005,Lola B05/40 V8,,LMP22005 Lola V8,AMS2,Sports Car,Historical Endurance 1,No,,,lola_b0540_lmp2
-370,LMP2 Gen 2,Ligier JS P217,9010,LMP2G2 Ligier JS P217,AMS2,Sports Car,Endurance 2,No,,,ligier_js_p217
-371,LMP2 Gen 2,Oreca 07,9010,LMP2G2 Oreca 07,AMS2,Sports Car,Endurance 2,No,,,oreca_07
-372,M1 Procar,BMW M1 Procar,,Procar,AMS2,Sports Car,,Yes,,,bmw_m1_procar
-373,Old Stock Race,Chevrolet Opala,9027,OldStock,AMS2,Oval,,Yes,,,opala_oldstock
-374,P1 Gen 1,Ginetta G58,,P1 Gen 1 Ginetta G58,AMS2,Sports Car,,Yes,,,ginetta_g58
-375,P1 Gen 1,Metalmoro AJR Judd,,P1 Gen 1 Judd,AMS2,Sports Car,,Yes,,,metalmoro_ajr_judd
-376,P1 Gen 1,Metalmoro AJR Nissan,,P1 Gen 1 Nissan,AMS2,Sports Car,,Yes,,,metalmoro_ajr_powertec
-377,P1 Gen 1,Metalmoro AJR Honda,,P1 Gen 1 Honda,AMS2,Sports Car,,Yes,,,metalmoro_ajr_honda
-378,P1 Gen 1,Metalmoro AJR Chevrolet,,P1 Gen 1 Chevrolet,AMS2,Sports Car,,Yes,,,metalmoro_ajr_chevy
-379,P1 Gen 2,Ligier JS P320,,P1 Gen 2 Ligier JS P320,AMS2,Sports Car,,Yes,,,ligier_js_p320
-380,P1 Gen 2,Metalmoro AJR Gen2 Chevrolet,,P1 Gen 2 Metalmoro AJR Gen2 Chevrolet,AMS2,Sports Car,,Yes,,,metalmoro_ajr_gen2
-381,P1 Gen 2,Metalmoro AJR Gen2 Honda,,P1 Gen 2 Metalmoro AJR Gen2 Honda,AMS2,Sports Car,,Yes,,,metalmoro_ajr_gen2
-382,P1 Gen 2,Metalmoro AJR Gen2 Nissan,,P1 Gen 2 Metalmoro AJR Gen2 Nissan,AMS2,Sports Car,,Yes,,,metalmoro_ajr_gen2
-383,P1 Gen 2,Ginetta G58 Gen2,,P1 Gen 2 Ginetta G58 Gen2,AMS2,Sports Car,,Yes,,,ginetta_g58_gen2
-384,P1 Gen 2,Sigma P1 G5,,P1 Gen 2 Sigma P1 G5,AMS2,Sports Car,,Yes,,,sigma_p1_g5
-385,P2,Metalmoro MRX Duratec P2,9017,P2 Metalmoro MRX Duratec P2,AMS2,Sports Car,,Yes,,,metalmoro_mrx_sharkfin
-386,P2,Sigma P1,9017,P2 Sigma P1,AMS2,Sports Car,,Yes,,,sigma_p1
-387,P3,Metalmoro MRX Honda P3,,P3 Metalmoro MRX Honda,AMS2,Sports Car,,Yes,,,metalmoro_mrx_honda
-388,P3,Metalmoro MRX Duratec P3,,P3 Metalmoro MRX Duratec,AMS2,Sports Car,,Yes,,,metalmoro_mrx_p3
-389,P3,Roco 001,,P3 Roco 001,AMS2,Sports Car,,Yes,,,roco
-390,P4,MCR S2000,9008,P4 MCR S2000,AMS2,Sports Car,,Yes,,,mcr2000
-391,P4,Metalmoro MRX Duratec P4,9008,P4 Metalmoro MRX Duratec,AMS2,Sports Car,,Yes,,,metalmoro_mrx
-392,Rallycross,Citroen DS3RX,9034,Citroen DS3RX,AMS2,Rallycross,Adrenaline 1,No,,,citroen_ds3_rx
-393,Rallycross,Mini Countryman R60 RX,9034,Mini Countryman R60 RX,AMS2,Rallycross,Adrenaline 1,No,,,mini_rx
-394,Rallycross,Mitsubishi Lancer Evo10 RX,9034,Mitsubishi Lancer Evo10 RX,AMS2,Rallycross,Adrenaline 1,No,,,mitsubishi_lancer_rc
-395,Rallycross,Volkswagen Polo RX,9034,Volkswagen Polo RX,AMS2,Rallycross,Adrenaline 1,No,,,vw_polo_rx
-396,Sprint Race,Sprint Race,,SprintRace,AMS2,Sports Car,,Yes,,,sprintrace
-397,Stock Car Brasil 1979,Chevrolet Opala Stock Cars 1979,,,AMS2,Sports Car,,Yes,,,opala_79
-398,Stock Car Brasil 1986,Chevrolet Opala Stock Cars 1986,,,AMS2,Sports Car,,Yes,,,opala_86
-399,Stock Car Brasil 1999,Chevrolet Omega Stock Car 1999,,StockCar99,AMS2,Sports Car,,Yes,,,stock_omega
-400,Stock Car Brasil 2019,Chevrolet Cruze Stock Car 2019,,StockCarV8,AMS2,Sports Car,,Yes,,,stock_cruze
-401,Stock Car Brasil 2020,Chevrolet Cruze Stock Car 2020,,StockCarV8_2020 Chevrolet,AMS2,Sports Car,,Yes,,,stock_cruze_20
-402,Stock Car Brasil 2020,Toyota Corolla Stock Car 2020,,StockCarV8_2020 Toyota,AMS2,Sports Car,,Yes,,,stock_corolla
-403,Stock Car Brasil 2021,Chevrolet Cruze Stock Car 2021,,Chevrolet Cruze Stock Car 2021,AMS2,Sports Car,,Yes,,,stock_cruze_21
-404,Stock Car Brasil 2021,Toyota Corolla Stock Car 2021,,Toyota Corolla Stock Car 2021,AMS2,Sports Car,,Yes,,,stock_corolla_21
-405,Stock Car Pro Series 2022,Chevrolet Cruze Stock Car 2022,,Chevrolet Cruze Stock Car 2022,AMS2,Sports Car,,Yes,,,stock_cruze_22
-406,Stock Car Pro Series 2022,Toyota Corolla Stock Car 2022,,Toyota Corolla Stock Car 2022,AMS2,Sports Car,,Yes,,,stock_corolla_22
-407,Stock Car Pro Series 2023,Chevrolet Cruze Stock Car 2023,,Chevrolet Cruze Stock Car 2023,AMS2,Sports Car,,Yes,,,stock_cruze_23
-408,Stock Car Pro Series 2023,Toyota Corolla Stock Car 2023,,Toyota Corolla Stock Car 2023,AMS2,Sports Car,,Yes,,,stock_corolla_23
-409,Stock Car Pro Series 2024,Chevrolet Cruze Stock Car 2024,,Chevrolet Cruze Stock Car 2024,AMS2,Sports Car,,Yes,,,stock_cruze_24
-410,Stock Car Pro Series 2024,Toyota Corolla Stock Car 2024,,Toyota Corolla Stock Car 2024,AMS2,Sports Car,,Yes,,,stock_corolla_24
-411,Stock USA Gen 1,Stock USA Gen1,9029,Stock_USA_Gen1,AMS2,Oval,,Yes,,,stock_usa_g1
-412,Stock USA Gen 2,Stock USA Gen2,9030,Stock_USA_Gen2,AMS2,Oval,,Yes,,,stock_usa_g2
-413,Stock USA Gen 3,Stock USA Gen3,9031,Stock_USA_Gen3,AMS2,Oval,,Yes,,,stock_usa_g3
-414,Stock USA Gen 3 LM,Stock USA Gen3 LM,,,AMS2,Sports Car,,Yes,,,stock_usa_g3_lm
-415,Street Cars,Chevrolet Camaro SS,,Chevrolet Camaro SS,AMS2,Sports Car,,Yes,,,camaro_ss
-416,Super Trofeo,Lamborghini Huracan Super Trofeo EVO2,,Super Trofeo,AMS2,Sports Car,Lamborghini 1,No,,,lamborghini_huracan_supertrofeo_evo2
-417,Diablo Super Trofeo,Lamborghini Diablo SV-R Super Trofeo,,ST96,AMS2,Sports Car,Lamborghini 2,No,,,lamborghini_diablo_svr
-418,Supercars,Audi R8 V10 GT,,SC Audi R8 V10 GT,AMS2,Sports Car,,Yes,,,audi_r8_v10_gt
-419,Supercars,Chevrolet Corvette C8 Z06,,SC Chevrolet Corvette C8 Z06,AMS2,Sports Car,Supercars 1,No,,,
-420,Supercars,Dodge Viper ACR,,SC Dodge Viper ACR,AMS2,Sports Car,,Yes,,,dodge_viper_acr
-421,Supercars,Maserati GT2 Stradale,,SC Maserati GT2 Stradale,AMS2,Sports Car,,Yes,,,maserati_gt2_stradale
-422,Supercars,McLaren F1 LM,,SC McLaren F1 LM,AMS2,Sports Car,,Yes,,,mclaren_f1_lm
-423,Supercars,Ultima GTR (640),,SC Ultima GTR (640),AMS2,Sports Car,,Yes,,,ultima
-424,Super Kart,Super Kart 250cc,,SuperKart,AMS2,Kart,,Yes,,,superkart
-425,Super Trophy Trucks,Super Trophy Truck,9035,STT,AMS2,Rallycross,Adrenaline 2,No,,,super_trophy_truck
-426,Super V8,Super V8 (Gen2 ZB),,SuperV8,AMS2,Sports Car,,Yes,,,super_v8
-427,TSI Cup,Volkswagen Polo,9004,TSI Polo,AMS2,Sports Car,,Yes,,,vw_polo
-428,TSI Cup,Volkswagen Polo GTS,9004,TSI Polo GTS,AMS2,Sports Car,,Yes,,,vw_polo_gts
-429,TSI Cup,Volkswagen Virtus,9004,TSI Virtus,AMS2,Sports Car,,Yes,,,vw_virtus
-430,TSI Cup,Volkswagen Virtus GTS,9004,TSI Virtus GTS,AMS2,Sports Car,,Yes,,,vw_virtus_gts
-431,Vintage Touring Cars Tier 1,BMW 2002 Turbo,,VTC 1 BMW 2002 Turbo,AMS2,Sports Car,,Yes,,,bmw_2002_turbo
-432,Vintage Touring Cars Tier 1,Chevrolet Corvette C3,,VTC 1 Chevrolet Corvette C3,AMS2,Sports Car,,Yes,,,corvette_73
-433,Vintage Touring Cars Tier 1,Lamborghini Miura SV,,VTC 1 Lamborghini Miura SV,AMS2,Sports Car,Lamborghini 2,No,,,lamborghini_miura_sv
-434,Vintage Touring Cars Tier 2,Lotus 23,,VTC 2 Lotus 23,AMS2,Sports Car,,Yes,,,lotus_23
-435,Vintage Touring Cars Tier 2,MINI Cooper S,,VTC 2 MINI Cooper S,AMS2,Sports Car,,Yes,,,mini_coopers_1965
-436,LMP2 Gen 1,Ligier JS P217,,LMP2 Gen1 Ligier JS P217,AMS2,Sports Car,,Yes,,,ligier_js_p217
-437,LMP2 Gen 1,Oreca 07,,LMP2 Gen1 Oreca 07,AMS2,Sports Car,,Yes,,,oreca_07
-438,ARC,Aussie Racing Camaro,,ARC_Cam,AMS2,Sports Car,,Yes,,,arc_camaro
-439,Formula Edge,Formula Edge Model1,,,AMS2,Sports Car,,Yes,,,formula_edge_g1m1
-440,Formula Edge,Formula Edge Model2,,,AMS2,Sports Car,,Yes,,,formula_edge_g1m2
-441,Formula Edge,Formula Edge Model3,,,AMS2,Sports Car,,Yes,,,formula_edge_g1m3
+105,Ligier JS P320,Ligier JS P320,4018,Ligier JS P320,Iracing,Sports Car,,No,ligierjsp320,165,
+106,,Limited Dirt Late Model,,,Iracing,,,No,dirtlatemodel\350,N/A,
+107,Lotus 49,Lotus 49,46,,Iracing,,,No,lotus49,42,
+108,Lotus 79,Lotus 79,22,,Iracing,,,No,lotus79,25,
+109,,Lucas Oil Off Road Pro 2 Lite,,,Iracing,,,Yes,protrucks\pro2lite,N/A,
+110,,Lucas Oil Off Road Pro 2 Truck,,,Iracing,,,No,protrucks\pro2truck,N/A,
+111,,Lucas Oil Off Road Pro 4 Truck,,,Iracing,,,No,protrucks\pro4truck,N/A,
+112,GT4 Class,McLaren 570S GT4,2268,McLaren 570S GT4,Iracing,Sports Car,,No,mclaren570sgt4,135,
+113,IMSA 23,McLaren 720S GT3 EVO,4091,McLaren 720S GT3 EVO,Iracing,Sports Car,,No,mclaren720sgt3,188,
+114,,McLaren MP4-12C GT3,,,Iracing,,,No,mclarenmp4,N/A,
+115,,McLaren MP4-30,,,Iracing,,,No,mclarenmp430,N/A,
+116,IMSA 23,Mercedes-AMG GT3 2020,4091,Mercedes-AMG GT3 2020,Iracing,,,No,mercedesamgevogt3,156,
+117,GT4 Class,Mercedes-AMG GT4,2268,Mercedes-AMG GT4,Iracing,Sports Car,,No,mercedesamggt4,157,
+118,F1 W12,Mercedes-AMG W12 E Performance,3185,,Iracing,,,No,mercedesw12,145,
+119,F1,Mercedes-AMG W13 E Performance,4013,Mercedes-AMG W13 E Performance,Iracing,Open Wheel,,No,mercedesw13,161,
+120,Modified - SK,Modified - SK,2,Modified - SK,Iracing,Oval,,No,skmodified,2,
+121,NASCAR CUP,NASCAR Cup Series Chevrolet Camaro ZL1,50,,Iracing,,,No,stockcars\camarozl12018,103,
+122,NASCAR CUP,NASCAR Cup Series Ford Mustang,50,,Iracing,,,No,stockcars\fordmustang2019,110,
+123,Nascar Cup Series,NASCAR Cup Series Next Gen Chevrolet Camaro ZL1,2978,NASCAR Cup Series Next Gen Chevrolet Camaro ZL1,Iracing,Oval,,No,stockcars\camarozl12022,139,
+124,Nascar Cup Series,NASCAR Cup Series Next Gen Ford Mustang,2978,NASCAR Cup Series Next Gen Ford Mustang,Iracing,Oval,,No,stockcars\fordmustang2022,140,
+125,Nascar Cup Series,NASCAR Cup Series Next Gen Toyota Camry,2978,NASCAR Cup Series Next Gen Toyota Camry,Iracing,Oval,,No,stockcars\toyotacamry2022,141,
+126,NASCAR CUP,NASCAR Cup Series Toyota Camry,50,,Iracing,,,No,stockcars\toyotacamry,56,
+127,Nascar Gen 4,NASCAR Gen 4 Chevrolet Monte Carlo - 2003,4087,NASCAR Gen 4 Chevrolet Monte Carlo - 2003,Iracing,Oval,,No,stockcars\chevymontecarlo03,201,
+128,Nascar Gen 4,NASCAR Gen 4 Ford Taurus - 2003,4087,NASCAR Gen 4 Ford Taurus - 2003,Iracing,Oval,,No,stockcars\fordtaurus03,202,
+129,NASCAR Legends,NASCAR Legends Buick LeSabre - 1987,2269,,Iracing,,,No,stockcars\buicklesabre87,154,
+130,NASCAR Legends,NASCAR Legends Chevrolet Monte Carlo - 1987,2269,,Iracing,,,No,stockcars\chevymontecarlo87,124,
+131,NASCAR Legends,NASCAR Legends Ford Thunderbird - 1987,2269,,Iracing,,,No,stockcars\fordthunderbird87,125,
+132,NASCAR Legends,NASCAR Legends Pontiac Grand Prix - 1987,2269,,Iracing,,,No,stockcars\pontiacgrandprix87,175,
+133,NASCAR Truck,NASCAR Truck Chevrolet Silverado,71,NASCAR Truck Chevrolet Silverado,Iracing,Oval,,No,trucks\silverado2019,111,
+134,NASCAR Truck,NASCAR Truck Ford F150,71,NASCAR Truck Ford F150,Iracing,Oval,,No,trucks\fordf150,123,
+135,NASCAR Truck,NASCAR Truck Toyota Tundra TRD Pro,71,NASCAR Truck Toyota Tundra TRD Pro,Iracing,Oval,,No,trucks\toyotatundra2022,155,
+136,NASCAR Whelen Tour Modified,NASCAR Whelen Tour Modified,2,,Iracing,,,No,skmodified\tour,31,
+137,Nascar O'reilly Auto Parts,NASCAR O'reilly Chevrolet Camaro,1455,NASCAR O'reilly Chevrolet Camaro,Iracing,Oval,,No,stockcars2\camaro2019,114,
+138,Nascar O'reilly Auto Parts,NASCAR O'reilly Ford Mustang,1455,NASCAR O'reilly Ford Mustang,Iracing,Oval,,No,stockcars2\mustang2019,115,
+139,Nascar O'reilly Auto Parts,NASCAR O'reilly Toyota Supra,1455,NASCAR O'reilly Toyota Supra,Iracing,Oval,,No,stockcars2\supra2019,116,
+140,Nissan GTP ZXT,Nissan GTP ZXT,84,,Iracing,,,No,nissangtpzxt,77,
+141,Pontiac Solstice,Pontiac Solstice,3,Solstice,Iracing,Sports Car,,Yes,solstice,3,
+142,Pontiac Solstice - Rookie,Pontiac Solstice - Rookie,13,,Iracing,Sports Car,,Yes,solstice\rookie,10,
+143,GT4 Class,Porsche 718 Cayman GT4 Clubsport MR,2268,Porsche 718 Cayman GT4,Iracing,Sports Car,,No,porsche718gt4,119,
+144,Porsche 911 Cup (992.2),Porsche 911 Cup (992.2),4093,Porsche 911 Cup (992.2),Iracing,Sports Car,,No,porsche9922cup,208,
+145,IMSA 23,Porsche 911 GT3 R (992),4091,Porsche 911 GT3 R (992),Iracing,Sports Car,,No,porsche992rgt3,169,
+146,GTE,Porsche 911 RSR,100,,Iracing,,,No,porsche991rsr,102,
+147,Porsche 919,Porsche 919,115,,Iracing,,,No,porsche919,100,
+148,GTP,Porsche 963 GTP,4029,Porsche 963 GTP,Iracing,Sports Car,,No,porsche963gtp,174,
+149,,Porsche Mission R,,,Iracing,,,No,porschemissionr,N/A,
+150,,Pro Dirt Late Model,,,Iracing,,,No,dirtlatemodel\358,N/A,
+151,Radical SR10,Radical SR10,3283,,Iracing,,,No,radical\sr10,149,
+152,,Ruf RT 12R AWD,,,Iracing,,,No,rufrt12r\awd,N/A,
+153,,Ruf RT 12R C-Spec,,,Iracing,,,No,rufrt12r\track\cspec,N/A,
+154,,Ruf RT 12R RWD,,,Iracing,,,No,rufrt12r\rwd,N/A,
+155,,Ruf RT 12R Track,,,Iracing,,,No,rufrt12r\track,N/A,
+156,Silver Crown,Silver Crown,16,,Iracing,,,No,silvercrown,18,
+157,Skip Barber Formula 2000,Skip Barber Formula 2000,1,Skip Barber Formula 2000,Iracing,Sports Car,,No,rt2000,1,
+158,,Sprint Car,,,Iracing,,,No,sprint,N/A,
+159,Stock Car Brasil,Stock Car Pro Series Chevrolet Cruze,3245,,Iracing,,,No,stockcarbrasil\cruze,151,
+160,Stock Car Brasil,Stock Car Pro Series Toyota Corolla,3245,,Iracing,,,No,stockcarbrasil\corolla,152,
+161,Street Stock,Street Stock - Casino,4064,Street Stock - Casino,Iracing,Oval,,No,streetstock\streetstock2,186,
+162,Street Stock,Street Stock - Eagle,4064,Street Stock - Eagle,Iracing,Oval,,No,streetstock\streetstock3,187,
+163,,Subaru WRX STI,,,Iracing,,,No,subaruwrxsti,N/A,
+164,,Super Dirt Late Model,,,Iracing,,,No,dirtlatemodel\438,N/A,
+165,Super Formula Lights,Super Formula Lights,4049,Super Formula Lights,Iracing,Open Wheel,,No,superformulalights324,178,
+166,SF23,Super Formula SF23 - Honda,4033,Super Formula SF23 - Honda,Iracing,Open Wheel,,No,superformulasf23\honda,172,
+167,SF23,Super Formula SF23 - Toyota,4033,Super Formula SF23 - Toyota,Iracing,Open Wheel,,No,superformulasf23\toyota,171,
+168,Super Late Model,Super Late Model,60,Super Late Model,Iracing,Oval,,No,superlatemodel,54,
+169,Super Car Gen 3,Supercars Ford Mustang Gen 3,4076,,Iracing,,,No,supercars\fordmustanggen3,190,
+170,Super Car Gen 3,Supercars Chevrolet Camaro Gen 3,4076,,Iracing,,,No,supercars\chevycamarogen3,192,
+171,Supercar 2019,Supercars Ford Mustang GT,1615,,Iracing,,,No,v8supercars\fordmustanggt,118,
+172,Supercar 2019,Supercars Holden ZB Commodore,1615,,Iracing,,,No,v8supercars\holden2019,117,
+173,USF 2000,USF 2000,2266,,Iracing,,,No,usf2000usf17,121,
+174,,VW Beetle,,,Iracing,,,No,vwbeetlegrc,N/A,
+175,,VW Beetle Lite,,,Iracing,,,No,vwbeetlegrc\lite,N/A,
+176,VW Jetta TDI Cup,VW Jetta TDI Cup,24,,Iracing,,,No,jettatdi,27,
+177,Williams FW31,Williams FW31,30,,Iracing,,,No,williamsfw31,33,
+178,NASCAR Truck,NASCAR Truck Ram,71,NASCAR Truck Ram,Iracing,Oval,,No,trucks\ram2026,211,
+179,BMW M2 Racing (G87),BMW M2 Racing ,4102,BMW M2 Racing,Iracing,Sports Car,,Yes,bmwm2g87,216,
+180,Euro Nascar V8GP,Euro Nascar V8GP,4104,Euro_Nascar,Iracing,Sports Car,,No,euronascar,213,
+181,Formula Vee,Formula Vee - Cutlass,4107,Formula Vee- Cutlass,Iracing,Open Wheel,,Yes,formulavee\formulavee2,214,
+182,Formula Vee,Formula Vee - Conqueror,4107,Formula Vee- Conqueror,Iracing,Open Wheel,,Yes,formulavee\formulavee3,215,
+183,Dirt Legends Ford,Dirt Legends Ford '34 Coupe,89,Legends Ford '34 Coupe,Iracing,Dirt Oval,,Yes,legends\dirtford34c,82,
+9001,Carrera Cup,Porsche 911 GT3 Cup 3.8,9016,Carrera Cup 3.8,AMS2,Sports Car,,Yes,,,porsche_991_gt3
+9002,Carrera Cup,Porsche 911 GT3 Cup 4.0,9016,Carrera Cup 4.0,AMS2,Sports Car,,Yes,,,porsche_991_gt3_2
+9003,Caterham 620R,Caterham 620R,9040,Cat620R,AMS2,Sports Car,,Yes,,,caterham_620r
+9004,Caterham Academy,Caterham Academy,9002,Cat_Academy,AMS2,Sports Car,,Yes,,,caterham_academy
+9005,Caterham Superlight,Caterham Superlight,9041,Cat_Superlight,AMS2,Sports Car,,Yes,,,caterham_superlight
+9006,Caterham Supersport,Caterham Supersport,9006,Cat_Supersport,AMS2,Sports Car,,Yes,,,caterham_supersport
+9007,Copa Classic B,Chevrolet Chevette,9042,Copa Classic B Chvrolet Chvette,AMS2,Sports Car,,Yes,,,chevette
+9008,Copa Classic B,Fiat Uno Classic B,9042,Copa Classic B Uno Classic,AMS2,Sports Car,,Yes,,,uno_classicb
+9009,Copa Classic B,MINI Cooper S 1965 B,9042,Copa Classic B Mini Cooper S,AMS2,Sports Car,,Yes,,,mini_coopers_1965b
+9010,Copa Classic B,Puma GTE,9042,Copa Classic B Puma GTE,AMS2,Sports Car,,Yes,,,puma_gte
+9011,Copa Classic B,Volkswagen Gol Classic B,9042,Copa Classic B Gol Classic B,AMS2,Sports Car,,Yes,,,gol_classicb
+9012,Copa Classic B,Volkswagen Passat Classic B,9042,Copa Classic B Passat Classic B,AMS2,Sports Car,,Yes,,,pas_classicb
+9013,Copa Classic FL,Puma GTB,9043,Copa Classic FL Puma GTB,AMS2,Sports Car,,Yes,,,puma_gtb
+9014,Copa Classic FL,Volkswagen Fusca Classic FL,9043,Copa Classic FL Fusca Classic,AMS2,Sports Car,,Yes,,,fusca_classica
+9015,Copa Classic FL,Volkswagen Gol Classic FL,9043,Copa Classic FL Gol Classic,AMS2,Sports Car,,Yes,,,gol_classica
+9016,Copa Classic FL,Volkswagen Passat Classic FL,9043,Copa Classic FL Passat Classic,AMS2,Sports Car,,Yes,,,pas_classica
+9017,Copa Fusca,Volkswagen Fusca,9044,CopaFusca,AMS2,Sports Car,,Yes,,,fusca_copa
+9018,Copa Montana,Chevrolet Montana,9028,Montana,AMS2,Oval,,Yes,,,montana
+9019,Copa Truck,IVECO Stralis,9045,CopaTruck,AMS2,Sports Car,,Yes,,,ftruck_iveco
+9020,Copa Truck,MAN TGX,9045,CopaTruck,AMS2,Sports Car,,Yes,,,ftruck_man
+9021,Copa Truck,Mercedes-Benz Actros-2651,9045,CopaTruck,AMS2,Sports Car,,Yes,,,ftruck_merc
+9022,Copa Truck,Vulkan Truck,9045,CopaTruck,AMS2,Sports Car,,Yes,,,ftruck_vulkan
+9023,Copa Truck,Volkswagen Constellation,9045,CopaTruck,AMS2,Sports Car,,Yes,,,ftruck_vw
+9024,Copa Uno,Fiat Uno,9046,CopaUno,AMS2,Sports Car,,Yes,,,uno
+9025,DPi,Cadillac DPi-V.R,9047,DPi,AMS2,Sports Car,Racin' USA 1,No,,,cadillac_dpi-vr
+9026,Formula USA Gen 1,Lola T95/00 Ford-Cosworth,9048,F-USA-Gen1 t9500 Ford Cosworth,AMS2,Open Wheel,Racin' USA 2,No,,,cart_lola_t95_ford
+9027,Formula USA Gen 1,Lola T95/00 Mercedes-Benz,9048,F-USA-Gen1 Merc Benz t9500,AMS2,Open Wheel,Racin' USA 2,No,,,cart_lola_t95_mercedes
+9028,Formula USA Gen 1,Reynard 95i Ford-Cosworth,9048,F-USA-Gen1 Reynard 95i Ford Cosworth,AMS2,Open Wheel,Racin' USA 2,No,,,cart_reynard_95i_ford
+9029,Formula USA Gen 1,Reynard 95i Honda,9048,F-USA-Gen1 Reynard 95 I Honda,AMS2,Open Wheel,Racin' USA 2,No,,,cart_reynard_95i_honda
+9030,Formula USA Gen 1,Reynard 95i Mercedes-Benz,9048,F-USA-Gen1 Reynard 95 I Merc Benz,AMS2,Open Wheel,Racin' USA 2,No,,,cart_reynard_95i_mercedes
+9031,Formula USA Gen 2,Lola T98/00 Ford-Cosworth,9049,F-USA-Gen2 Lola T9800 Ford Cosworth,AMS2,Open Wheel,Racin' USA 2,No,,,cart_lola_t98
+9032,Formula USA Gen 2,Reynard 98i Ford-Cosworth,9049,F-USA-Gen2 Reynard 98i Ford Cosworth,AMS2,Open Wheel,Racin' USA 2,No,,,cart_reynard_98i_ford
+9033,Formula USA Gen 2,Reynard 98i Honda,9049,F-USA-Gen2 Reynard 98i Honda,AMS2,Open Wheel,Racin' USA 2,No,,,cart_reynard_98i_honda
+9034,Formula USA Gen 2,Reynard 98i Mercedes-Benz,9049,F-USA-Gen2 Reynard 98i Mercedes Benz,AMS2,Open Wheel,Racin' USA 2,No,,,cart_reynard_98i_mercedes
+9035,Formula USA Gen 2,Reynard 98i Toyota,9049,F-USA-Gen2 Reynard 98i Toyota,AMS2,Open Wheel,Racin' USA 2,No,,,cart_reynard_98i_toyota
+9036,Formula USA Gen 2,Swift 009c Ford-Cosworth,9049,F-USA-Gen2 Swift 009c Ford Cosworth,AMS2,Open Wheel,Racin' USA 2,No,,,cart_swift_009c
+9037,Formula USA Gen 3,Lola B2K/00 Ford-Cosworth,9050,F-USA-Gen3 B2K Ford Cosworth,AMS2,Open Wheel,Racin' USA 2,No,,,cart_lola_b2k00_ford
+9038,Formula USA Gen 3,Lola B2K/00 Mercedes-Benz,9050,F-USA-Gen3 B2K Mercedes Benz,AMS2,Open Wheel,Racin' USA 2,No,,,cart_lola_b2k00_mercedes
+9039,Formula USA Gen 3,Lola B2K/00 Toyota,9050,F-USA-Gen3 B2K Toyota,AMS2,Open Wheel,Racin' USA 2,No,,,cart_lola_b2k00_toyota
+9040,Formula USA Gen 3,Reynard 2Ki Ford-Cosworth,9050,F-USA-Gen3 2Ki Ford Cosworth,AMS2,Open Wheel,Racin' USA 2,No,,,cart_reynard_2ki_ford
+9041,Formula USA Gen 3,Reynard 2Ki Honda,9050,F-USA-Gen3 2Ki Honda,AMS2,Open Wheel,Racin' USA 2,No,,,cart_reynard_2ki_honda
+9042,Formula USA Gen 3,Reynard 2Ki Mercedes-Benz,9050,F-USA-Gen3 2Ki Mercedes Benz,AMS2,Open Wheel,Racin' USA 2,No,,,cart_reynard_2ki_mercedes
+9043,Formula USA Gen 3,Reynard 2Ki Toyota,9050,F-USA-Gen3 2Ki Toyota,AMS2,Open Wheel,Racin' USA 2,No,,,cart_reynard_2ki_toyota
+9044,Dallara F301,F301,9051,F-3-301,AMS2,Open Wheel,,Yes,,,f301
+9045,Dallara F309,F309,9022,F-3-309,AMS2,Open Wheel,,Yes,,,f309
+9046,Formula Classic Gen 1,Formula Classic Gen1 Model1,9052,F-Classic-Gen1 Model 1,AMS2,Open Wheel,,Yes,,,formula_classic_g1m1
+9047,Formula Classic Gen 1,Formula Classic Gen1 Model2,9052,F-Classic-Gen1 Model 2,AMS2,Open Wheel,,Yes,,,formula_classic_g1m2
+9048,Formula Classic Gen 1,Lotus 98T,9052,F-Classic-Gen1 Lotus 98T,AMS2,Open Wheel,Brazilian Racing Legends,No,,,lotus_98T
+9049,Formula Classic Gen 2,Formula Classic Gen2 Model1,9053,F-Classic-Gen2 Model 1,AMS2,Open Wheel,,Yes,,,formula_classic_g2m1
+9050,Formula Classic Gen 2,Formula Classic Gen2 Model2,9053,F-Classic-Gen2 Model 2,AMS2,Open Wheel,,Yes,,,formula_classic_g2m2
+9051,Formula Classic Gen 2,Formula Classic Gen2 Model3,9053,F-Classic-Gen2 Model 3,AMS2,Open Wheel,,Yes,,,formula_classic_g2m3
+9052,Formula Classic Gen 2,McLaren MP4/4,9053,F-Classic-Gen2 McLaren MP44,AMS2,Open Wheel,Brazilian Racing Legends,No,,,mclaren_mp44
+9053,Formula Classic Gen 3,Formula Classic Gen3 Model1,9054,F-Classic-Gen3 Model 1,AMS2,Open Wheel,,Yes,,,formula_classic_g3m1
+9054,Formula Classic Gen 3,Formula Classic Gen3 Model2,9054,F-Classic-Gen3 Model 2,AMS2,Open Wheel,,Yes,,,formula_classic_g3m2
+9055,Formula Classic Gen 3,Formula Classic Gen3 Model3,9054,F-Classic-Gen3 Model 3,AMS2,Open Wheel,,Yes,,,formula_classic_g3m3
+9056,Formula Classic Gen 3,Formula Classic Gen3 Model4,9054,F-Classic-Gen3 Model 4,AMS2,Open Wheel,,Yes,,,formula_classic_g3m4
+9057,Formula Classic Gen 3,McLaren MP4/5B,9054,F-Classic-Gen3 McLaren MP45B,AMS2,Open Wheel,Brazilian Racing Legends,No,,,mclaren_mp45b
+9058,Formula Classic Gen 4,Formula Classic Gen4 Model1,9055,F-Classic-Gen4 Model 1,AMS2,Open Wheel,,Yes,,,formula_classic_g4m1
+9059,Formula Classic Gen 4,Formula Classic Gen4 Model2,9055,F-Classic-Gen4 Model 2,AMS2,Open Wheel,,Yes,,,formula_classic_g4m2
+9060,Formula Classic Gen 4,Formula Classic Gen4 Model3,9055,F-Classic-Gen4 Model 3,AMS2,Open Wheel,,Yes,,,formula_classic_g4m3
+9061,Formula Classic Gen 4,McLaren MP4/6,9055,F-Classic-Gen4 McLaren MP46,AMS2,Open Wheel,Brazilian Racing Legends,No,,,mclaren_mp46
+9062,Formula HiTech Gen 1,Formula HiTech Gen1 Model1,9056,F-HiTech Gen1 Model 1,AMS2,Open Wheel,Formula HiTech,No,,,formula_hitech_g1m1
+9063,Formula HiTech Gen 1,Formula HiTech Gen1 Model2,9056,F-HiTech Gen1 Model 2,AMS2,Open Wheel,Formula HiTech,No,,,formula_hitech_g1m2
+9064,Formula HiTech Gen 1,Formula HiTech Gen1 Model3,9056,F-HiTech Gen1 Model 3,AMS2,Open Wheel,Formula HiTech,No,,,formula_hitech_g1m3
+9065,Formula HiTech Gen 1,Formula HiTech Gen1 Model4,9056,F-HiTech Gen1 Model 4,AMS2,Open Wheel,Formula HiTech,No,,,formula_hitech_g1m4
+9066,Formula HiTech Gen 2,Formula HiTech Gen2 Model1,9023,F-HiTech Gen2 Model 1,AMS2,Open Wheel,Formula HiTech,No,,,formula_hitech_g2m1
+9067,Formula HiTech Gen 2,Formula HiTech Gen2 Model2,9023,F-HiTech Gen2 Model 2,AMS2,Open Wheel,Formula HiTech,No,,,formula_hitech_g2m2
+9068,Formula HiTech Gen 2,Formula HiTech Gen2 Model3,9023,F-HiTech Gen2 Model 3,AMS2,Open Wheel,Formula HiTech,No,,,formula_hitech_g2m3
+9069,Formula HiTech Gen 1,McLaren MP4/7A,9056,F-HiTech Gen1 McLaren MP47A,AMS2,Open Wheel,Formula HiTech,No,,,mclaren_mp47
+9070,Formula HiTech Gen 2,McLaren MP4/8,9023,F-HiTech Gen2 McLaren MP48,AMS2,Open Wheel,Formula HiTech,No,,,mclaren_mp48
+9071,Formula Dirt,Formula Dirt,9032,F-Dirt,AMS2,Rallycross,Adrenaline 1,No,,,formula_dirt
+9072,Formula Junior,Formula Junior,9057,F-Junior,AMS2,Open Wheel,,Yes,,,formula_junior
+9073,Formula V8 Gen 3,Formula V8 Gen3,9024,F-Reiza,AMS2,Open Wheel,,Yes,,,formula_reiza
+9074,Formula Retro Gen 1,Brabham BT44,9058,F-Retro Gen 1 Brabham BT44,AMS2,Open Wheel,,Yes,,,
+9075,Formula Retro Gen 1,Formula Retro V12,9058,F-Retro Gen 1 V12,AMS2,Open Wheel,,Yes,,,formula_retro_v12
+9076,Formula Retro Gen 1,Formula Retro V8,9058,F-Retro Gen 1 V8,AMS2,Open Wheel,,Yes,,,formula_retro_v8
+9077,Formula Retro Gen 1,Lotus Type 72E,9058,F-Retro Gen 1 Lotus Type 72E,AMS2,Open Wheel,,Yes,,,lotus_72e
+9078,Formula Retro Gen 1,McLaren M23,9058,F-Retro Gen 1 McLaren M23,AMS2,Open Wheel,,Yes,,,mclaren_m23
+9079,Formula Retro Gen 2,Brabham BT46B,9059,F-Retro Gen 2 Brabham BT46B,AMS2,Open Wheel,,Yes,,,brabham_bt46
+9080,Formula Retro Gen 2,Brabham BT49,9059,F-Retro Gen 2 Brabham BT49,AMS2,Open Wheel,Brazilian Racing Legends,No,,,brabham_bt49
+9081,Formula Retro Gen 2,Formula Retro Gen2,9059,F-Retro Gen 2 Formula Retro Gen2,AMS2,Open Wheel,,Yes,,,formula_retro_g2
+9082,Formula Retro Gen 2,Lotus 79,9059,F-Retro Gen 2 Lotus 79,AMS2,Open Wheel,,Yes,,,lotus_79
+9083,Formula Retro Gen 3,Brabham BT52,,F-Retro Gen 3 Brabham BT52,AMS2,Open Wheel,Brazilian Racing Legends,No,,,brabham_bt52
+9084,Formula Retro Gen 3,Formula Retro Gen3 DFY,,F-Retro Gen 3 DFY,AMS2,Open Wheel,,Yes,,,formula_retro_g3
+9085,Formula Retro Gen 3,Formula Retro Gen3 Turbo,,F-Retro Gen 3 Turbo,AMS2,Open Wheel,,Yes,,,formula_retro
+9086,Formula Retro Gen 3,McLaren MP4/1C,,F-Retro Gen 3 McLaren MP4/1C,AMS2,Open Wheel,,Yes,,,mclaren_mp4_1c
+9087,Formula Hybrid Gen 2,Formula Ultimate Hybrid Gen2,,F-Ultimate,AMS2,Open Wheel,,Yes,,,formula_ultimate_2022
+9088,Formula Hybrid Gen 3,Formula Ultimate Hybrid Gen3,9026,F-Ultimate_Gen2,AMS2,Open Wheel,,Yes,,,formula_ultimate_2024
+9089,Formula USA 2023,Formula USA 2023,9025,F-USA_2023,AMS2,Open Wheel,Racin´ USA 3,No,,,formula_usa_2023
+9090,Formula V10 Gen 1,Formula V10 Gen1,,F-V10 Gen 1 V10,AMS2,Open Wheel,,Yes,,,formula_v10_g1
+9091,Formula V10 Gen 1,McLaren MP4/12,,F-V10 McLaren MP4/12,AMS2,Open Wheel,,Yes,,,mclaren_mp4_12
+9092,Formula V10 Gen 2,Formula V10 Gen2,,F-V10_Gen2,AMS2,Open Wheel,,Yes,,,formula_v10
+9093,Formula V12,Formula V12,,F-V12,AMS2,Open Wheel,,Yes,,,formula_v12
+9094,Formula Vintage Gen 1,Formula Vintage Gen1 Model1,,F-Vintage Gen1 Model 1,AMS2,Open Wheel,,Yes,,,formula_vintage_g1m1
+9095,Formula Vintage Gen 1,Formula Vintage Gen1 Model2,,F-Vintage Gen1 Model 2,AMS2,Open Wheel,,Yes,,,formula_vintage_g1m2
+9096,Formula Vintage Gen 2,Brabham BT26A,,F-Vintage Gen2 Brabham BT26A,AMS2,Open Wheel,,Yes,,,brabham_bt26
+9097,Formula Vintage Gen 2,Formula Vintage Gen2 Model1,,F-Vintage Gen2 Model 1,AMS2,Open Wheel,,Yes,,,formula_vintage_g2m1
+9098,Formula Vintage Gen 2,Formula Vintage Gen2 Model2,,F-Vintage Gen2 Model 2,AMS2,Open Wheel,,Yes,,,formula_vintage_g2m2
+9099,Formula Vintage Gen 2,Lotus Type 49C,,F-Vintage Gen2 Lotus Type 49C,AMS2,Open Wheel,,Yes,,,lotus_49c
+9100,Formula Inter,Fórmula Inter MG15,9021,F-Inter,AMS2,Open Wheel,,Yes,,,formula_inter
+9101,Formula Vee Brazil Gen 1,Formula Vee Gen1,9018,F-Vee,AMS2,Open Wheel,,Yes,,,formula_vee
+9102,Formula Vee Brazil Gen 1,Formula Vee Gen1 Fin,9018,F-Vee,AMS2,Open Wheel,,Yes,,,formula_vee_fin
+9103,Formula Vee Brazil Gen 2,Formula Vee Gen2,9019,F-Vee_Gen2,AMS2,Open Wheel,,Yes,,,formula_vee_gen2
+9104,Formula Trainer,Formula Trainer,9036,F-Trainer,AMS2,Open Wheel,,Yes,,,formula_trainer
+9105,Formula Trainer Advanced,Formula Trainer Advanced,9020,F-Trainer_A,AMS2,Open Wheel,,Yes,,,formula_trainer_d
+9106,Ginetta G40 Cup,Ginetta G40,9001,G40Cup,AMS2,Sports Car,,Yes,,,ginetta_g40_cup
+9107,Ginetta G55 Supercup,Ginetta G55,,G55Supercup,AMS2,Sports Car,,Yes,,,ginetta_g55_gt4_2
+9108,Group A,Audi V8 quattro DTM,9038,Group A Audi V8 quattro DTM,AMS2,Sports Car,,Yes,,,audi_v8_dtm
+9109,Group A,BMW M3 Sport Evo GrA,9038,Group A BMW M3 Sport Evo GrA,AMS2,Sports Car,,Yes,,,bmw_m3_e30_a
+9110,Group A,Mercedes-Benz 190E EVO 2 DTM,9038,Group A Mercedes-Benz 190E EVO 2 DTM,AMS2,Sports Car,,Yes,,,mercedes_evo2_dtm
+9111,Group C,Chevrolet Corvette GTP,9039,Group C Chevrolet Corvette GTP,AMS2,Sports Car,,Yes,,,corvette_gtp
+9112,Group C,Nissan R89C,9039,Group C Nissan R89C,AMS2,Sports Car,,Yes,,,nissan_r89c
+9113,Group C,Porsche 962C,9039,Group C Porsche 962C,AMS2,Sports Car,,Yes,,,porsche_962c
+9114,Group C,Sauber Mercedes C9,9039,Group C Sauber Mercedes C9,AMS2,Sports Car,,Yes,,,sauber_c9
+9115,GT Classic,Chevrolet Corvette C3.R,,GT Classic Chevrolet Corvette C3.R,AMS2,Sports Car,,Yes,,,chevrolet_corvette_c3_rc
+9116,GT Classic,Chevrolet Corvette C3.R Convertible,,GT Classic Chevrolet Corvette C3.R Convertible,AMS2,Sports Car,,Yes,,,chevrolet_corvette_c3_rcc
+9117,GT Classic,Porsche 911 RSR,,GT Classic Porsche 911 RSR,AMS2,Sports Car,,Yes,,,porsche_911_rsr_74
+9118,GT Open,Ginetta G55 GT3,,GT Open Ginetta G55 GT3,AMS2,Sports Car,,Yes,,,ginetta_g55_gt3
+9119,GT Open,Ultima GTR Race,,GT Open Ultima GTR Race,AMS2,Sports Car,,Yes,,,ultima_race
+9120,GT1,McLaren F1 GTR,,GT1 McLaren F1 GTR,AMS2,Sports Car,,Yes,,,mclaren_f1_gtr
+9121,GT1,Mercedes-Benz CLK LM,,GT1 Mercedes-Benz CLK LM,AMS2,Sports Car,,Yes,,,mercedes_clk-lm
+9122,GT1,Nissan R390 GT1,,GT1 Nissan R390 GT1,AMS2,Sports Car,,Yes,,,nissan_r390_gt1
+9123,GT1,Porsche 911 GT1-98,,GT1 Porsche 911 GT1-98,AMS2,Sports Car,,Yes,,,porsche_911_gt1_98
+9124,GT1 2005,Aston Martin DBR9,,GT105 Aston Martin DBR9,AMS2,Sports Car,Historical Endurance 1,No,,,aston_martin_dbr9_gt1
+9125,GT1 2005,Chevrolet Corvette C5-R,,GT105 Chevrolet Corvette C5-R,AMS2,Sports Car,Historical Endurance 1,No,,,corvette_c5r
+9126,GT1 2005,Dodge Viper GTS-R,,GT105 Dodge Viper GTS-R,AMS2,Sports Car,Historical Endurance 1,No,,,dodge_viper_gts_r
+9127,GT1 2005,Lamborghini Murcielago R-GT,,GT105 Lamborghini Murcielago R-GT,AMS2,Sports Car,Lamborghini 2,No,,,lamborghini_murcielago_r_gt
+9128,GT1 2005,Maserati MC12 GT1,,GT105 Maserati MC12 GT1,AMS2,Sports Car,Historical Endurance 1,No,,,maserati_mc12_gt1
+9129,GT2 2005,Milano GT36,,GT205 Milano GT36,AMS2,Sports Car,Historical Endurance 1,No,,,milano_gt36
+9130,GT2 2005,Porsche 996 GT3 RSR,,GT205 Porsche 996 GT3 RSR,AMS2,Sports Car,Historical Endurance 1,No,,,porsche_996_gt3rsr
+9131,GT3,Audi R8 LMS GT3,9013,GT3G1 Audi R8 LMS GT3,AMS2,Sports Car,,Yes,,,audi_r8_lms_gt3
+9132,GT3,BMW M6 GT3,9013,GT3G1 BMW M6 GT3,AMS2,Sports Car,,Yes,,,bmw_m6_gt3
+9133,GT3,McLaren 720S,9013,GT3G1 McLaren 720S,AMS2,Sports Car,,Yes,,,mclaren_720s_gt3
+9134,GT3,Mercedes-AMG GT3,9013,GT3G1 Mercedes-AMG GT3,AMS2,Sports Car,,Yes,,,mercedes_amg_gt3
+9135,GT3,Nissan GT-R Nismo GT3,9013,GT3G1 Nissan GT-R Nismo GT3,AMS2,Sports Car,,Yes,,,nissan_gt-r_gt3
+9136,GT3,Porsche 911 GT3 R,9013,GT3G1 Porsche 911 GT3 R,AMS2,Sports Car,,Yes,,,porsche_991_gt3r
+9137,GT3 Gen 2,Aston Martin Vantage GT3 EVO,9014,GT3G2 AM,AMS2,Sports Car,Endurance 3,No,,,aston_martin_vantage_gt3_evo
+9138,GT3 Gen 2,Audi R8 LMS GT3 evo II,9014,GT3G2 Audi R8,AMS2,Sports Car,Endurance 2,No,,,audi_r8_lms_gt3_evo2
+9139,GT3 Gen 2,BMW M4 GT3,9014,GT3G2 BMW,AMS2,Sports Car,Endurance 1,No,,,bmw_m4_gt3
+9140,GT3 Gen 2,Chevrolet Corvette Z06 GT3.R,9014,GT3G2 Corvette,AMS2,Sports Car,Endurance 2,No,,,corvette_z06_gt3r
+9141,GT3 Gen 2,Lamborghini Huracan GT3 EVO2,9014,GT3G2 Lambo,AMS2,Sports Car,Lamborghini 1,No,,,lamborghini_huracan_gt3_evo2
+9142,GT3 Gen 2,McLaren 720S GT3 EVO,9014,GT3G2 McLaren,AMS2,Sports Car,Endurance 1,No,,,mclaren_720s_gt3_evo
+9143,GT3 Gen 2,Mercedes-AMG GT3 EVO,9014,GT3G2 Merc,AMS2,Sports Car,Endurance 1,No,,,mercedes_amg_gt3_evo
+9144,GT3 Gen 2,Porsche 992 GT3-R,9014,GT3G2 Porsche,AMS2,Sports Car,Endurance 1,No,,,porsche_992_gt3r
+9145,GT4,Alpine A110 GT4 EVO,9009,GT4Alpine,AMS2,Sports Car,Endurance 3,No,,,alpine_a110_gt4_evo
+9146,GT4,Aston Martin Vantage GT4 EVO,9009,GT4Aston Martin,AMS2,Sports Car,Endurance 3,No,,,aston_martin_vantage_gt4_evo
+9147,GT4,Audi R8 LMS GT4,9009,GT4Audi R8,AMS2,Sports Car,,Yes,,,audi_r8_lms_gt4
+9148,GT4,BMW M4 GT4,9009,GT4Bmw M4,AMS2,Sports Car,,Yes,,,bmw_m4_gt4
+9149,GT4,Chevrolet Camaro GT4.R,9009,GT4 Chevrolet Camaro,AMS2,Sports Car,,Yes,,,camaro_gt4r
+9150,GT4,Ginetta G55 GT4,9009,GT4 Ginetta,AMS2,Sports Car,,Yes,,,ginetta_g55_gt4
+9151,GT4,McLaren 570S,9009,GT4 McLaren,AMS2,Sports Car,,Yes,,,mclaren_570s_gt4
+9152,GT4,Mercedes-AMG GT4,9009,GT4 Mercedes,AMS2,Sports Car,,Yes,,,mercedes_amg_gt4
+9153,GT4,Porsche Cayman GT4 Clubsport MR,9009,GT4 Porsche,AMS2,Sports Car,,Yes,,,porsche_cayman_gt4cs
+9154,GT5,Ginetta G40,9005,GT5G40,AMS2,Sports Car,,Yes,,,ginetta_g40
+9155,GT5,Puma P052,9005,GT5Puma,AMS2,Sports Car,,Yes,,,puma_p052
+9156,GTE,Aston Martin Vantage GTE,,GTE Aston Martin Vantage,AMS2,Sports Car,Endurance 3,No,,,aston_martin_vantage_gte
+9157,GTE,BMW M8 GTE,,GTE BMW M8,AMS2,Sports Car,Racin' USA 1,No,,,bmw_m8_gte
+9158,GTE,Chevrolet Corvette C8.R,,GTE Chevrolet Corvette C8.R,AMS2,Sports Car,Racin' USA 1,No,,,corvette_c8r
+9159,GTE,Porsche 911 RSR-19,,GTE Porsche 911 RSR-19,AMS2,Sports Car,Racin' USA 1,No,,,porsche_911_gte
+9160,GTR 2004,BMW M3 E46 GTR,,GTR_04,AMS2,Sports Car,Historical Endurance 1,No,,,bmw_m3_gtr
+9161,Hot Cars,Volkswagen Fusca 1 Hot Cars,,Volkswagen Fusca 1 Hot Cars,AMS2,Sports Car,,Yes,,,fusca_hotcars_m1
+9162,Hot Cars,Volkswagen Fusca 2 Hot Cars,,Volkswagen Fusca 2 Hot Cars,AMS2,Sports Car,,Yes,,,fusca_hotcars_m2
+9163,Hot Cars,Volkswagen Gol Hot Cars,,Volkswagen Gol Hot Cars,AMS2,Sports Car,,Yes,,,gol_hotcars
+9164,Hot Cars,Volkswagen Passat Hot Cars,,Volkswagen Passat Hot Cars,AMS2,Sports Car,,Yes,,,pas_hotcars
+9165,Hypercars,Aston Martin Valkyrie,,HC Aston Martin Valkyrie,AMS2,Sports Car,,Yes,,,aston_martin_valkyrie
+9166,Hypercars,Brabham BT62,,HC Brabham BT62,AMS2,Sports Car,Supercars 1,No,,,brabham_bt62
+9167,Hypercars,Lamborghini Veneno Roadster,,HC Lamborghini Veneno Roadster,AMS2,Sports Car,Lamborghini 1,No,,,lamborghini_veneno
+9168,Hypercars,Lamborghini Revuelto,,HC Lamborghini Revuelto,AMS2,Sports Car,Lamborghini 2,No,,,lamborghini_revuelto
+9169,Hypercars,McLaren Senna,,HC McLaren Senna,AMS2,Sports Car,Supercars 1,No,,,mclaren_senna
+9170,JCW,MINI Cooper,9007,MiniChallenge,AMS2,Sports Car,,Yes,,,mini_cooper
+9171,Kartcross,Kartcross,9033,Kartcross,AMS2,Rallycross,Adrenaline 1,No,,,rally_kart
+9172,Karting 2T 125cc,Kart 2-Stroke 125cc Direct,,Kart125cc,AMS2,Kart,,Yes,,,kart_01
+9173,Karting 4T Race,Kart 4-Stroke Race,,KartGX390,AMS2,Kart,,Yes,,,kart_gx390
+9174,Karting 4T Rental,Kart 4-Stroke Rental,9037,KartRental,AMS2,Kart,,Yes,,,kart_gx390_rental
+9175,Karting 2T Shifter,Kart 2-Stroke 125cc Shifter,,KartShifter,AMS2,Kart,,Yes,,,kart_shifter
+9176,Lancer Cup,Mitsubishi Lancer R,,Mitsubishi Lancer R,AMS2,Sports Car,,Yes,,,mitsubishi_lancerr
+9177,Lancer Cup,Mitsubishi Lancer RS,,Mitsubishi Lancer RS,AMS2,Sports Car,,Yes,,,mitsubishi_lancerrs
+9178,LES Ligier JS2 R,Ligier JS2 R,9011,LES Ligier JS2 R,AMS2,Sports Car,Endurance 3,No,,,ligier_js2r
+9179,LES Ligier JS P4,Ligier JS P4,9012,LES Ligier JS P4,AMS2,Sports Car,Endurance 3,No,,,ligier_js_p4
+9180,LMDh/GTP,Alpine A424,9015,LMDh Alpine,AMS2,Sports Car,Endurance 2,No,,,alpine_a424
+9181,LMDh/GTP,Aston Martin Valkyrie Hypercar,9015,LMDh AM,AMS2,Sports Car,Endurance 3,No,,,aston_martin_valkyrie
+9182,LMDh/GTP,BMW M Hybrid V8,9015,LMDh BMW,AMS2,Sports Car,Endurance 1,No,,,bmw_m_hybrid_v8
+9183,LMDh/GTP,Cadillac V-Series.R,9015,LMDh Cadillac,AMS2,Sports Car,Endurance 1,No,,,cadillac_v-series_r
+9184,LMDh/GTP,Lamborghini SC63,9015,LMDh Lambo,AMS2,Sports Car,Lamborghini 1,No,,,lamborghini_sc63
+9185,LMDh/GTP,Porsche 963,9015,LMDh Porsche,AMS2,Sports Car,Endurance 1,No,,,porsche_963_gtp
+9186,LMP1 2005,Audi R8 LMP1,,LMP12005 Audi R8 LMP1,AMS2,Sports Car,Historical Endurance 1,No,,,audi_r8_lmp
+9187,LMP1 2005,Courage C60 Hybrid,,LMP12005 Courage C60 Hybrid,AMS2,Sports Car,Historical Endurance 1,No,,,courage_c60
+9188,LMP1 2005,Dallara SP1,,LMP12005 Dallara SP1,AMS2,Sports Car,Historical Endurance 1,No,,,dallara_sp1
+9189,LMP2 2005,Lola B05/40 Turbo,,LMP22005 Lola Turbo,AMS2,Sports Car,Historical Endurance 1,No,,,lola_b0540_lmp2
+9190,LMP2 2005,Lola B05/40 V8,,LMP22005 Lola V8,AMS2,Sports Car,Historical Endurance 1,No,,,lola_b0540_lmp2
+9191,LMP2 Gen 2,Ligier JS P217,9010,LMP2G2 Ligier JS P217,AMS2,Sports Car,Endurance 2,No,,,ligier_js_p217
+9192,LMP2 Gen 2,Oreca 07,9010,LMP2G2 Oreca 07,AMS2,Sports Car,Endurance 2,No,,,oreca_07
+9193,M1 Procar,BMW M1 Procar,,Procar,AMS2,Sports Car,,Yes,,,bmw_m1_procar
+9194,Old Stock Race,Chevrolet Opala,9027,OldStock,AMS2,Oval,,Yes,,,opala_oldstock
+9195,P1 Gen 1,Ginetta G58,,P1 Gen 1 Ginetta G58,AMS2,Sports Car,,Yes,,,ginetta_g58
+9196,P1 Gen 1,Metalmoro AJR Judd,,P1 Gen 1 Judd,AMS2,Sports Car,,Yes,,,metalmoro_ajr_judd
+9197,P1 Gen 1,Metalmoro AJR Nissan,,P1 Gen 1 Nissan,AMS2,Sports Car,,Yes,,,metalmoro_ajr_powertec
+9198,P1 Gen 1,Metalmoro AJR Honda,,P1 Gen 1 Honda,AMS2,Sports Car,,Yes,,,metalmoro_ajr_honda
+9199,P1 Gen 1,Metalmoro AJR Chevrolet,,P1 Gen 1 Chevrolet,AMS2,Sports Car,,Yes,,,metalmoro_ajr_chevy
+9200,P1 Gen 2,Ligier JS P320,,P1 Gen 2 Ligier JS P320,AMS2,Sports Car,,Yes,,,ligier_js_p320
+9201,P1 Gen 2,Metalmoro AJR Gen2 Chevrolet,,P1 Gen 2 Metalmoro AJR Gen2 Chevrolet,AMS2,Sports Car,,Yes,,,metalmoro_ajr_gen2
+9202,P1 Gen 2,Metalmoro AJR Gen2 Honda,,P1 Gen 2 Metalmoro AJR Gen2 Honda,AMS2,Sports Car,,Yes,,,metalmoro_ajr_gen2
+9203,P1 Gen 2,Metalmoro AJR Gen2 Nissan,,P1 Gen 2 Metalmoro AJR Gen2 Nissan,AMS2,Sports Car,,Yes,,,metalmoro_ajr_gen2
+9204,P1 Gen 2,Ginetta G58 Gen2,,P1 Gen 2 Ginetta G58 Gen2,AMS2,Sports Car,,Yes,,,ginetta_g58_gen2
+9205,P1 Gen 2,Sigma P1 G5,,P1 Gen 2 Sigma P1 G5,AMS2,Sports Car,,Yes,,,sigma_p1_g5
+9206,P2,Metalmoro MRX Duratec P2,9017,P2 Metalmoro MRX Duratec P2,AMS2,Sports Car,,Yes,,,metalmoro_mrx_sharkfin
+9207,P2,Sigma P1,9017,P2 Sigma P1,AMS2,Sports Car,,Yes,,,sigma_p1
+9208,P3,Metalmoro MRX Honda P3,,P3 Metalmoro MRX Honda,AMS2,Sports Car,,Yes,,,metalmoro_mrx_honda
+9209,P3,Metalmoro MRX Duratec P3,,P3 Metalmoro MRX Duratec,AMS2,Sports Car,,Yes,,,metalmoro_mrx_p3
+9210,P3,Roco 001,,P3 Roco 001,AMS2,Sports Car,,Yes,,,roco
+9211,P4,MCR S2000,9008,P4 MCR S2000,AMS2,Sports Car,,Yes,,,mcr2000
+9212,P4,Metalmoro MRX Duratec P4,9008,P4 Metalmoro MRX Duratec,AMS2,Sports Car,,Yes,,,metalmoro_mrx
+9213,Rallycross,Citroen DS3RX,9034,Citroen DS3RX,AMS2,Rallycross,Adrenaline 1,No,,,citroen_ds3_rx
+9214,Rallycross,Mini Countryman R60 RX,9034,Mini Countryman R60 RX,AMS2,Rallycross,Adrenaline 1,No,,,mini_rx
+9215,Rallycross,Mitsubishi Lancer Evo10 RX,9034,Mitsubishi Lancer Evo10 RX,AMS2,Rallycross,Adrenaline 1,No,,,mitsubishi_lancer_rc
+9216,Rallycross,Volkswagen Polo RX,9034,Volkswagen Polo RX,AMS2,Rallycross,Adrenaline 1,No,,,vw_polo_rx
+9217,Sprint Race,Sprint Race,,SprintRace,AMS2,Sports Car,,Yes,,,sprintrace
+9218,Stock Car Brasil 1979,Chevrolet Opala Stock Cars 1979,,,AMS2,Sports Car,,Yes,,,opala_79
+9219,Stock Car Brasil 1986,Chevrolet Opala Stock Cars 1986,,,AMS2,Sports Car,,Yes,,,opala_86
+9220,Stock Car Brasil 1999,Chevrolet Omega Stock Car 1999,,StockCar99,AMS2,Sports Car,,Yes,,,stock_omega
+9221,Stock Car Brasil 2019,Chevrolet Cruze Stock Car 2019,,StockCarV8,AMS2,Sports Car,,Yes,,,stock_cruze
+9222,Stock Car Brasil 2020,Chevrolet Cruze Stock Car 2020,,StockCarV8_2020 Chevrolet,AMS2,Sports Car,,Yes,,,stock_cruze_20
+9223,Stock Car Brasil 2020,Toyota Corolla Stock Car 2020,,StockCarV8_2020 Toyota,AMS2,Sports Car,,Yes,,,stock_corolla
+9224,Stock Car Brasil 2021,Chevrolet Cruze Stock Car 2021,,Chevrolet Cruze Stock Car 2021,AMS2,Sports Car,,Yes,,,stock_cruze_21
+9225,Stock Car Brasil 2021,Toyota Corolla Stock Car 2021,,Toyota Corolla Stock Car 2021,AMS2,Sports Car,,Yes,,,stock_corolla_21
+9226,Stock Car Pro Series 2022,Chevrolet Cruze Stock Car 2022,,Chevrolet Cruze Stock Car 2022,AMS2,Sports Car,,Yes,,,stock_cruze_22
+9227,Stock Car Pro Series 2022,Toyota Corolla Stock Car 2022,,Toyota Corolla Stock Car 2022,AMS2,Sports Car,,Yes,,,stock_corolla_22
+9228,Stock Car Pro Series 2023,Chevrolet Cruze Stock Car 2023,,Chevrolet Cruze Stock Car 2023,AMS2,Sports Car,,Yes,,,stock_cruze_23
+9229,Stock Car Pro Series 2023,Toyota Corolla Stock Car 2023,,Toyota Corolla Stock Car 2023,AMS2,Sports Car,,Yes,,,stock_corolla_23
+9230,Stock Car Pro Series 2024,Chevrolet Cruze Stock Car 2024,,Chevrolet Cruze Stock Car 2024,AMS2,Sports Car,,Yes,,,stock_cruze_24
+9231,Stock Car Pro Series 2024,Toyota Corolla Stock Car 2024,,Toyota Corolla Stock Car 2024,AMS2,Sports Car,,Yes,,,stock_corolla_24
+9232,Stock USA Gen 1,Stock USA Gen1,9029,Stock_USA_Gen1,AMS2,Oval,,Yes,,,stock_usa_g1
+9233,Stock USA Gen 2,Stock USA Gen2,9030,Stock_USA_Gen2,AMS2,Oval,,Yes,,,stock_usa_g2
+9234,Stock USA Gen 3,Stock USA Gen3,9031,Stock_USA_Gen3,AMS2,Oval,,Yes,,,stock_usa_g3
+9235,Stock USA Gen 3 LM,Stock USA Gen3 LM,,,AMS2,Sports Car,,Yes,,,stock_usa_g3_lm
+9236,Street Cars,Chevrolet Camaro SS,,Chevrolet Camaro SS,AMS2,Sports Car,,Yes,,,camaro_ss
+9237,Super Trofeo,Lamborghini Huracan Super Trofeo EVO2,,Super Trofeo,AMS2,Sports Car,Lamborghini 1,No,,,lamborghini_huracan_supertrofeo_evo2
+9238,Diablo Super Trofeo,Lamborghini Diablo SV-R Super Trofeo,,ST96,AMS2,Sports Car,Lamborghini 2,No,,,lamborghini_diablo_svr
+9239,Supercars,Audi R8 V10 GT,,SC Audi R8 V10 GT,AMS2,Sports Car,,Yes,,,audi_r8_v10_gt
+9240,Supercars,Chevrolet Corvette C8 Z06,,SC Chevrolet Corvette C8 Z06,AMS2,Sports Car,Supercars 1,No,,,
+9241,Supercars,Dodge Viper ACR,,SC Dodge Viper ACR,AMS2,Sports Car,,Yes,,,dodge_viper_acr
+9242,Supercars,Maserati GT2 Stradale,,SC Maserati GT2 Stradale,AMS2,Sports Car,,Yes,,,maserati_gt2_stradale
+9243,Supercars,McLaren F1 LM,,SC McLaren F1 LM,AMS2,Sports Car,,Yes,,,mclaren_f1_lm
+9244,Supercars,Ultima GTR (640),,SC Ultima GTR (640),AMS2,Sports Car,,Yes,,,ultima
+9245,Super Kart,Super Kart 250cc,,SuperKart,AMS2,Kart,,Yes,,,superkart
+9246,Super Trophy Trucks,Super Trophy Truck,9035,STT,AMS2,Rallycross,Adrenaline 2,No,,,super_trophy_truck
+9247,Super V8,Super V8 (Gen2 ZB),,SuperV8,AMS2,Sports Car,,Yes,,,super_v8
+9248,TSI Cup,Volkswagen Polo,9004,TSI Polo,AMS2,Sports Car,,Yes,,,vw_polo
+9249,TSI Cup,Volkswagen Polo GTS,9004,TSI Polo GTS,AMS2,Sports Car,,Yes,,,vw_polo_gts
+9250,TSI Cup,Volkswagen Virtus,9004,TSI Virtus,AMS2,Sports Car,,Yes,,,vw_virtus
+9251,TSI Cup,Volkswagen Virtus GTS,9004,TSI Virtus GTS,AMS2,Sports Car,,Yes,,,vw_virtus_gts
+9252,Vintage Touring Cars Tier 1,BMW 2002 Turbo,,VTC 1 BMW 2002 Turbo,AMS2,Sports Car,,Yes,,,bmw_2002_turbo
+9253,Vintage Touring Cars Tier 1,Chevrolet Corvette C3,,VTC 1 Chevrolet Corvette C3,AMS2,Sports Car,,Yes,,,corvette_73
+9254,Vintage Touring Cars Tier 1,Lamborghini Miura SV,,VTC 1 Lamborghini Miura SV,AMS2,Sports Car,Lamborghini 2,No,,,lamborghini_miura_sv
+9255,Vintage Touring Cars Tier 2,Lotus 23,,VTC 2 Lotus 23,AMS2,Sports Car,,Yes,,,lotus_23
+9256,Vintage Touring Cars Tier 2,MINI Cooper S,,VTC 2 MINI Cooper S,AMS2,Sports Car,,Yes,,,mini_coopers_1965
+9257,LMP2 Gen 1,Ligier JS P217,,LMP2 Gen1 Ligier JS P217,AMS2,Sports Car,,Yes,,,ligier_js_p217
+9258,LMP2 Gen 1,Oreca 07,,LMP2 Gen1 Oreca 07,AMS2,Sports Car,,Yes,,,oreca_07
+9259,ARC,Aussie Racing Camaro,,ARC_Cam,AMS2,Sports Car,,Yes,,,arc_camaro
+9260,Formula Edge,Formula Edge Model1,,FE-G1 M1,AMS2,Sports Car,,Yes,,,formula_edge_g1m1
+9261,Formula Edge,Formula Edge Model2,,FE-G1 M2,AMS2,Sports Car,,Yes,,,formula_edge_g1m2
+9262,Formula Edge,Formula Edge Model3,,FE-G1 M3,AMS2,Sports Car,,Yes,,,formula_edge_g1m3
+9263,F-V8 Gen 1,F-V8 Gen 1 B,,F-V8_Gen1 B,AMS2,Open Wheel,,Yes,,,F-V8_Gen1 B
+9264,F-V8 Gen 1,F-V8 Gen 1 M,,F-V8_Gen1 M,AMS2,Open Wheel,,Yes,,,F-V8_Gen1 M
+9265,F-V8 Gen 1,F-V8 Gen 1 R26,,F-V8_Gen1 R26,AMS2,Open Wheel,,Yes,,,F-V8_Gen1 R26
+9266,F-V8 Gen 2,F-V8 Gen 2,,F-V8 Gen2,AMS2,Open Wheel,,Yes,,,F-V8_Gen2
+9267,F-V8 Gen 2,F-V8 Gen 2 R28,,F-V8 Gen2 r28,AMS2,Open Wheel,,Yes,,,F-V8_Gen2 r28

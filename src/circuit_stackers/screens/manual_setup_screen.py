@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 
 import customtkinter as ctk
 
+from ..ams2_exporter import validate_ams2_roster_files
 from ..game_logic import difficulty_range_for_game, set_manual_difficulty
 from ..season_exporter import iracing_skill_spread_for_prestige
 from ..weather import parse_weather_slots, weather_timeline_text
@@ -199,6 +200,11 @@ class ManualSetupBuilder:
         practice_weather_slots = self._weather_slots(race, "practice_weather")
         qualifying_weather_slots = self._weather_slots(race, "qualifying_weather")
         race_weather_slots = self._weather_slots(race, "weather")
+        roster_validation = validate_ams2_roster_files(
+            championship,
+            list(getattr(gameplay, "standings", []) or []),
+            list(getattr(gameplay, "player_names", []) or []),
+        )
 
         self._section(
             "Player Car",
@@ -206,6 +212,11 @@ class ManualSetupBuilder:
                 ("Car", str(player_car.get("Car", "Unassigned"))),
                 ("Livery", player_livery),
             ],
+        )
+        self._status_section(
+            "Driver Roster Check",
+            roster_validation.message,
+            "#6bbd6b" if roster_validation.ok else "#ff7777",
         )
         self._section(
             "Session Settings",
@@ -260,6 +271,26 @@ class ManualSetupBuilder:
                 side="left", fill="x", expand=True
             )
         ctk.CTkLabel(box, text="", height=4).pack()
+
+    def _status_section(self, title: str, message: str, color: str) -> None:
+        box = ctk.CTkFrame(self.content, fg_color=("gray88", "gray17"), corner_radius=10)
+        box.pack(fill="x", padx=4, pady=6)
+        ctk.CTkLabel(
+            box,
+            text=title,
+            font=ctk.CTkFont(size=14, weight="bold"),
+            text_color=("#1a6fc4", "#4da6ff"),
+            anchor="w",
+        ).pack(fill="x", padx=12, pady=(10, 4))
+        ctk.CTkLabel(
+            box,
+            text=message,
+            font=ctk.CTkFont(size=12, weight="bold"),
+            text_color=color,
+            anchor="w",
+            justify="left",
+            wraplength=720,
+        ).pack(fill="x", padx=12, pady=(0, 10))
 
     @staticmethod
     def _weather_slots(race: dict, key: str = "weather") -> list[str]:

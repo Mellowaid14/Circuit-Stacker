@@ -2965,6 +2965,56 @@ def _team_row_colors(row: dict[str, Any]) -> str:
     return ",".join(colors[:3])
 
 
+TEAM_PERSONALITIES = (
+    "Professional",
+    "Aggressive",
+    "Development",
+    "Data-Driven",
+    "Underdog",
+    "Prestige",
+    "Family",
+)
+
+
+def _team_row_personality_value(row: dict[str, Any]) -> str:
+    for key in ("Personality", "Team Personality", "team_personality", "personality"):
+        value = str(row.get(key, "")).strip()
+        if value:
+            return value
+    return ""
+
+
+def _team_row_personality(row: dict[str, Any]) -> str:
+    value = _team_row_personality_value(row)
+    if value:
+        return value
+    return _team_personality_for_identity(_team_row_id(row), _team_row_name(row), _team_game(row))
+
+
+def _team_personality_for_identity(team_id: str, team_name: str, game: str = "") -> str:
+    target_id = str(team_id).strip()
+    target_name = str(team_name).strip().casefold()
+    target_game = str(game).strip().casefold()
+    for row in _load_team_rows():
+        row_id = _team_row_id(row)
+        row_name = _team_row_name(row)
+        row_game = _team_game(row).strip().casefold()
+        if target_game and row_game not in {target_game, "any"}:
+            continue
+        if (target_id and row_id == target_id) or (target_name and row_name.casefold() == target_name):
+            value = _team_row_personality_value(row)
+            if value:
+                return value
+            break
+
+    seed_value = _stable_seed(target_id, target_name, target_game, "team-personality")
+    return TEAM_PERSONALITIES[seed_value % len(TEAM_PERSONALITIES)]
+
+
+def team_personality_for_identity(team_id: str, team_name: str, game: str = "") -> str:
+    return _team_personality_for_identity(team_id, team_name, game)
+
+
 def _team_colors_for_identity(team_id: str, team_name: str, game: str = "") -> str:
     target_id = str(team_id).strip()
     target_name = str(team_name).strip().casefold()
@@ -3243,6 +3293,7 @@ def _build_team_seat_plan(field_size: int, championship: dict[str, Any]) -> list
                     "team_seat": 1 if team_occurrences[team_id] % 2 == 1 else 2,
                     "team_prestige": _safe_int(team.get("Prestige"), 50),
                     "team_colors": _team_row_colors(team),
+                    "team_personality": _team_row_personality(team),
                 }
             )
     return seat_plan
@@ -3966,6 +4017,8 @@ def _team_seat_offers_for_championship(
                 "offer_note": "Offer",
                 "team_colors": str(seat.get("team_colors", "")).strip()
                 or _team_colors_for_identity(team_id, team_name, game),
+                "team_personality": str(seat.get("team_personality", "")).strip()
+                or _team_personality_for_identity(team_id, team_name, game),
             }
         )
     if not offers:
@@ -4170,6 +4223,7 @@ def team_offers_for_player(
                 "team_prestige": _safe_int(team.get("Prestige"), 50),
                 "team_reputation": team_reputation,
                 "team_colors": _team_row_colors(team),
+                "team_personality": _team_row_personality(team),
             }
         )
 
@@ -4212,6 +4266,7 @@ def current_team_offer_for_championship(
             "team_reputation": team_reputation,
             "offer_note": "Current",
             "team_colors": _team_row_colors(team),
+            "team_personality": _team_row_personality(team),
         }
     return None
 
@@ -5167,6 +5222,85 @@ def latest_tier_champions(save_name: str, season_year: int, tier: int = 5) -> li
             (int(season_year), int(tier)),
         ).fetchall()
     return [dict(row) for row in rows]
+
+
+def latest_close_title_battles(save_name: str, season_year: int, max_gap: int = 10, limit: int = 5) -> list[dict[str, Any]]:
+    initialize_driver_pool(save_name)
+    with _connect(save_name) as connection:
+        rows = connection.execute(
+            """
+            SELECT
+                dsr.championship_id,
+                dsr.championship_name,
+                dsr.season_year,
+                dsr.style,
+                dsr.tier,
+                COALESCE(NULLIF(dsr.class_name, ''), 'Overall') AS class_label,
+                dsr.finishing_place,
+                dsr.driver_id,
+                d.name AS driver_name,
+                COALESCE(SUM(drr.points_awarded), 0) AS points
+            FROM driver_season_results dsr
+            JOIN drivers d
+              ON d.id = dsr.driver_id
+            LEFT JOIN driver_race_results drr
+              ON drr.driver_id = dsr.driver_id
+             AND drr.championship_id = dsr.championship_id
+             AND drr.season_year = dsr.season_year
+             AND COALESCE(NULLIF(drr.class_name, ''), 'Overall') = COALESCE(NULLIF(dsr.class_name, ''), 'Overall')
+            WHERE dsr.season_year = ?
+            GROUP BY
+                dsr.championship_id,
+                dsr.championship_name,
+                dsr.season_year,
+                dsr.style,
+                dsr.tier,
+                COALESCE(NULLIF(dsr.class_name, ''), 'Overall'),
+                dsr.finishing_place,
+                dsr.driver_id,
+                d.name
+            ORDER BY dsr.championship_name ASC, class_label ASC, dsr.finishing_place ASC
+            """,
+            (int(season_year),),
+        ).fetchall()
+
+    grouped: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
+    for row in rows:
+        item = dict(row)
+        grouped[(str(item.get("championship_id", "")), str(item.get("class_label", "Overall")))].append(item)
+
+    battles: list[dict[str, Any]] = []
+    for group_rows in grouped.values():
+        sorted_rows = sorted(group_rows, key=lambda item: _safe_int(item.get("finishing_place"), 9999))
+        if len(sorted_rows) < 2:
+            continue
+        champion = sorted_rows[0]
+        runner_up = sorted_rows[1]
+        champion_points = _safe_int(champion.get("points"), 0)
+        runner_up_points = _safe_int(runner_up.get("points"), 0)
+        if champion_points <= 0 or runner_up_points <= 0:
+            continue
+        gap = champion_points - runner_up_points
+        if gap < 0 or gap > int(max_gap):
+            continue
+        battles.append(
+            {
+                "championship_id": champion.get("championship_id", ""),
+                "championship_name": champion.get("championship_name", ""),
+                "season_year": champion.get("season_year", season_year),
+                "style": champion.get("style", ""),
+                "tier": champion.get("tier", 0),
+                "class_name": champion.get("class_label", "Overall"),
+                "champion_name": champion.get("driver_name", "Unknown"),
+                "runner_up_name": runner_up.get("driver_name", "Unknown"),
+                "champion_points": champion_points,
+                "runner_up_points": runner_up_points,
+                "gap": gap,
+            }
+        )
+
+    battles.sort(key=lambda item: (_safe_int(item.get("gap"), 9999), -_safe_int(item.get("tier"), 0)))
+    return battles[: max(0, int(limit))]
 
 
 def _effective_style_mmr(mmr: int, primary_style: str, target_style: str) -> int:

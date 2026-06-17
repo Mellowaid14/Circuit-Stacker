@@ -16,6 +16,8 @@ class SeasonRecapScreen(ctk.CTkFrame):
         self.championship_name = ""
         self.summary: dict = {}
         self.final_standings: list[dict] = []
+        self.career_mode = "Solo"
+        self.player_perspectives: dict[str, dict] = {}
         self.next_tier = 1
         self.starting_difficulty = 75
 
@@ -114,6 +116,12 @@ class SeasonRecapScreen(ctk.CTkFrame):
         self.championship_name = championship_name
         self.summary = dict(summary)
         self.final_standings = [dict(row) for row in final_standings]
+        self.career_mode = str(self.summary.get("career_mode") or ("Co-op" if len(self.player_names) > 1 else "Solo"))
+        self.player_perspectives = {
+            str(name): dict(value)
+            for name, value in dict(self.summary.get("player_perspectives") or {}).items()
+            if isinstance(value, dict)
+        }
         self.next_tier = int(next_tier)
         self.starting_difficulty = int(starting_difficulty)
 
@@ -147,13 +155,16 @@ class SeasonRecapScreen(ctk.CTkFrame):
         )
         headline.pack(anchor="w", pady=(2, 8))
 
-        self._section_label(self.summary_frame, "Player Result")
+        self._section_label(self.summary_frame, "Co-op Driver Results" if len(self.player_names) > 1 else "Player Result")
         average_position = summary.get("average_position")
         average_text = f"{average_position:.1f}" if isinstance(average_position, (int, float)) else "-"
         self._info_row(self.summary_frame, "Average Finish:", average_text)
         positions = summary.get("player_positions") or []
-        for player_name, position in zip(self.player_names, positions):
-            self._info_row(self.summary_frame, f"{player_name}:", f"P{position}")
+        for index, player_name in enumerate(self.player_names):
+            fallback_position = positions[index] if index < len(positions) else None
+            self._info_row(self.summary_frame, f"{player_name}:", self._player_result_text(player_name, fallback_position))
+            if len(self.player_names) > 1:
+                self._info_row(self.summary_frame, "Rivalries:", self._player_rivalry_text(player_name))
 
         self._section_label(self.summary_frame, "World Update")
         self._info_row(self.summary_frame, "World Year:", str(driver_pool.get("next_world_year", "-")))
@@ -263,6 +274,64 @@ class SeasonRecapScreen(ctk.CTkFrame):
 
         headline_champions.sort(key=lambda champion: str(champion.get("championship_name", "")))
         return headline_champions
+
+    def _player_result_text(self, player_name: str, fallback_position) -> str:
+        row, overall_position, class_position = self._player_final_position(player_name)
+        if not row:
+            return f"P{fallback_position}" if fallback_position else "-"
+
+        class_name = str(row.get("class_name", "")).strip()
+        position_text = f"P{overall_position}" if overall_position else (f"P{fallback_position}" if fallback_position else "-")
+        if class_name and class_name.casefold() != "overall" and class_position:
+            position_text = f"{class_name} P{class_position}"
+
+        return (
+            f"{position_text} | Points {row.get('points', 0)} | Wins {row.get('wins', 0)} | "
+            f"Podiums {row.get('podiums', 0)}"
+        )
+
+    def _player_final_position(self, player_name: str) -> tuple[dict | None, int | None, int | None]:
+        sorted_overall = sorted(self.final_standings, key=lambda driver: (driver.get("points", 0), driver.get("wins", 0)), reverse=True)
+        target = None
+        overall_position = None
+        for position, driver in enumerate(sorted_overall, 1):
+            if str(driver.get("name", "")) == player_name:
+                target = driver
+                overall_position = position
+                break
+        if not target:
+            return None, None, None
+
+        class_name = str(target.get("class_name", "")).strip() or "Overall"
+        class_rows = [
+            driver
+            for driver in self.final_standings
+            if (str(driver.get("class_name", "")).strip() or "Overall").casefold() == class_name.casefold()
+        ]
+        sorted_class = sorted(class_rows, key=lambda driver: (driver.get("points", 0), driver.get("wins", 0)), reverse=True)
+        class_position = None
+        for position, driver in enumerate(sorted_class, 1):
+            if str(driver.get("name", "")) == player_name:
+                class_position = position
+                break
+        return target, overall_position, class_position
+
+    def _player_rivalry_text(self, player_name: str) -> str:
+        perspective = self.player_perspectives.get(player_name, {}) if isinstance(self.player_perspectives, dict) else {}
+        heat = {
+            str(name).strip(): int(stage)
+            for name, stage in dict(perspective.get("rivalry_heat") or {}).items()
+            if str(name).strip() and str(stage).strip() in {"1", "2", "3"}
+        }
+        if not heat:
+            return "No active rivalries"
+
+        full_rivals = [name for name, stage in heat.items() if int(stage) >= 3]
+        hot_name, hot_stage = max(heat.items(), key=lambda item: int(item[1]))
+        if full_rivals:
+            return f"{len(full_rivals)} full rival{'s' if len(full_rivals) != 1 else ''} | Hottest: {hot_name}"
+        stage_text = "orange" if int(hot_stage) == 2 else "yellow"
+        return f"{len(heat)} active | Hottest: {hot_name} ({stage_text})"
 
     def _refresh_standings(self) -> None:
         for widget in self.standings_frame.winfo_children():

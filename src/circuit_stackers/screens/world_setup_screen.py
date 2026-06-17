@@ -4,7 +4,7 @@ import customtkinter as ctk
 from datetime import datetime
 from uuid import uuid4
 
-from ..driver_pool import add_human_drivers
+from ..driver_pool import add_human_drivers, team_personality_for_identity
 from ..game_logic import prepare_offseason_championship_select, save_needs_world_setup, simulate_world_history_year, start_championship
 from ..save_manager import load_save, update_save
 
@@ -148,64 +148,53 @@ class WorldSetupScreen(ctk.CTkFrame):
         messages: list[dict] = []
         championship = state.get("championship") or {}
         championship_name = str(championship.get("Championship", "")).strip() or "your new championship"
-        team_name = str((state.get("player_team_offer") or {}).get("team_name", "")).strip()
+        player_team_offer = state.get("player_team_offer") or {}
+        team_name = str(player_team_offer.get("team_name", "")).strip()
         player_car = str((state.get("player_car") or {}).get("Car", "")).strip()
         player_label = ", ".join(str(name).strip() for name in state.get("players", []) if str(name).strip()) or "Driver"
         sender = team_name or "Team Management"
-        intro_lines = [
-            f"{player_label},",
-            "",
-            f"Welcome to {team_name or 'the team'}. We are pleased to confirm your seat for the upcoming {championship_name} season.",
-            "",
-            "This is a serious opportunity and the expectations are clear: prepare well, keep the car clean, and build momentum every weekend. The team believes your current form has earned this chance, and now the focus shifts to turning that potential into results.",
-        ]
+        personality = self._team_personality(player_team_offer, str(state.get("game", "")).strip())
+        intro_lines = self._team_welcome_lines(
+            player_label=player_label,
+            team_name=team_name,
+            championship_name=championship_name,
+            personality=personality,
+        )
         if player_car:
             intro_lines.append("")
             intro_lines.append(f"You will be assigned to the {player_car}.")
-        intro_lines.extend(
-            [
-                "",
-                "The first objective is consistency. If we can leave each round with strong points and steady progress, the bigger results will come.",
-                "",
-                "Welcome aboard. Let's get to work.",
-                "",
-                f"{sender}",
-            ]
-        )
-        messages.append(self._message(f"Welcome to {team_name or championship_name}", "\n".join(intro_lines), sender=sender))
+
+        expectation = str(player_team_offer.get("team_expectation", "")).strip()
+        if expectation:
+            intro_lines.extend(
+                [
+                    "",
+                    "Season expectation:",
+                    expectation,
+                ]
+            )
 
         team_colors = self._team_color_codes(state.get("player_team_offer") or {})
         if str(state.get("game", "iRacing")).strip().casefold() == "iracing" and team_colors:
-            color_lines = [
-                f"{player_label},",
-                "",
-                "If you would like to run the team's colors on your personal iRacing paint, use the following hex codes:",
-                "",
-            ]
-            color_lines.extend(
-                f"Color {index}: #{color}"
-                for index, color in enumerate(team_colors, start=1)
-            )
-            color_lines.extend(
+            intro_lines.extend(
                 [
                     "",
-                    "These match the colors shown on your championship offer card and are pulled from the same color set used for generated iRacing AI paints.",
+                    "Team colors for your iRacing paint:",
                     "",
-                    f"{sender}",
                 ]
             )
-            message = self._message("Team Paint Colors", "\n".join(color_lines), sender=sender)
-            message["team_colors"] = ",".join(team_colors)
-            message["colors"] = team_colors
-            messages.append(message)
-
-        watch_drivers = [str(name).strip() for name in (state.get("watch_drivers") or []) if str(name).strip()]
-        rising_driver = str(state.get("rising_driver", "")).strip()
-        if watch_drivers or rising_driver:
-            lines = [f"Driver to watch: {name}" for name in watch_drivers[:2]]
-            if rising_driver:
-                lines.append(f"On their way up: {rising_driver}")
-            messages.append(self._message("Drivers To Watch", "\n".join(lines), sender="Race Control"))
+            intro_lines.extend(f"Color {index}: #{color}" for index, color in enumerate(team_colors, start=1))
+        intro_lines.extend(self._team_welcome_closing(personality, sender))
+        welcome_message = self._message(
+            f"Welcome to {team_name or championship_name}",
+            "\n".join(intro_lines),
+            sender=sender,
+            category="Team Message",
+        )
+        if team_colors:
+            welcome_message["team_colors"] = ",".join(team_colors)
+            welcome_message["colors"] = team_colors
+        messages.append(welcome_message)
 
         if str(state.get("game", "iRacing")).strip().casefold() == "ams2":
             restart_lines = [
@@ -236,16 +225,96 @@ class WorldSetupScreen(ctk.CTkFrame):
         return messages
 
     @staticmethod
-    def _message(title: str, body: str, sender: str = "Race Control") -> dict:
+    def _message(title: str, body: str, sender: str = "Race Control", category: str = "Race Control") -> dict:
         return {
             "id": uuid4().hex,
             "created_at": datetime.now().isoformat(timespec="seconds"),
-            "category": "Race Control",
+            "category": category,
             "sender": sender,
             "title": title,
             "body": body,
             "read": False,
         }
+
+    @staticmethod
+    def _team_personality(player_team_offer: dict, game: str) -> str:
+        personality = str(player_team_offer.get("team_personality", "")).strip()
+        if personality:
+            return personality
+        return team_personality_for_identity(
+            str(player_team_offer.get("team_id", "")).strip(),
+            str(player_team_offer.get("team_name", "")).strip(),
+            game,
+        )
+
+    @staticmethod
+    def _team_welcome_lines(
+        *,
+        player_label: str,
+        team_name: str,
+        championship_name: str,
+        personality: str,
+    ) -> list[str]:
+        team_label = team_name or "the team"
+        normalized = personality.strip().casefold()
+        openings = {
+            "aggressive": (
+                f"Welcome to {team_label}. We did not offer this seat to cruise around and collect polite finishes.",
+                f"The target in {championship_name} is simple: attack the weekends, take the space that is there, and make the paddock notice us early.",
+            ),
+            "development": (
+                f"Welcome to {team_label}. We see this {championship_name} seat as the start of a proper build.",
+                "The focus is clean feedback, steady progression, and turning every session into something useful for the next round.",
+            ),
+            "data-driven": (
+                f"Welcome to {team_label}. Your seat for {championship_name} is confirmed, and the work now moves into execution.",
+                "We will be watching consistency, race pace, avoidable mistakes, and how well each weekend plan turns into points.",
+            ),
+            "underdog": (
+                f"Welcome to {team_label}. Not everyone outside this garage will expect much from us in {championship_name}.",
+                "That is fine. We like it that way. Keep the car pointed forward, steal every point available, and we can make this season uncomfortable for bigger teams.",
+            ),
+            "prestige": (
+                f"Welcome to {team_label}. This seat in {championship_name} carries standards, and we expect you to meet them.",
+                "Preparation, discipline, and composure matter here. Results are important, but so is how you represent the badge every weekend.",
+            ),
+            "family": (
+                f"Welcome to {team_label}. This is a close group, and we are glad to have you with us for {championship_name}.",
+                "Trust the people around you, keep communication honest, and we will give you everything we can from the pit wall.",
+            ),
+        }
+        opening, focus = openings.get(
+            normalized,
+            (
+                f"Welcome to {team_label}. We are pleased to confirm your seat for the upcoming {championship_name} season.",
+                "This is a serious opportunity: prepare well, keep the car clean, and build momentum every weekend.",
+            ),
+        )
+        return [
+            f"{player_label},",
+            "",
+            opening,
+            "",
+            focus,
+        ]
+
+    @staticmethod
+    def _team_welcome_closing(personality: str, sender: str) -> list[str]:
+        normalized = personality.strip().casefold()
+        closing = {
+            "aggressive": "Bring the fight from round one.",
+            "development": "Progress first, results next, and the bigger picture will take care of itself.",
+            "data-driven": "Hit the marks, trust the process, and the results should follow.",
+            "underdog": "Let them underestimate us. We will do the work.",
+            "prestige": "Welcome aboard. Carry the standard.",
+            "family": "Welcome aboard. We look after our own, and now that includes you.",
+        }.get(normalized, "Welcome aboard. Let's get to work.")
+        return [
+            "",
+            closing,
+            "",
+            f"{sender}",
+        ]
 
     @staticmethod
     def _team_color_codes(player_team_offer: dict) -> list[str]:

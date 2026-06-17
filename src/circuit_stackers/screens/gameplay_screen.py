@@ -4,12 +4,14 @@ import customtkinter as ctk
 import re
 from datetime import datetime
 from pathlib import Path
+from uuid import uuid4
 
 from PIL import Image, ImageOps
 
 from ..driver_pool import get_world_year, list_drivers, team_reputation_map
 from ..game_logic import build_world_news_items, continue_or_initialize_season, finalize_season, reexport_championship_assets
 from ..paths import resource_path
+from ..save_manager import update_save
 from ..season_exporter import iracing_skill_spread_for_prestige
 from ..weather import display_weather
 from .manual_setup_screen import RaceSetupPopup
@@ -43,7 +45,10 @@ class GameplayScreen(ctk.CTkFrame):
 
         self.save_name: str | None = None
         self.game = "iRacing"
+        self.career_mode = "Solo"
         self.player_names: list[str] = []
+        self.active_player_name = ""
+        self.player_perspectives: dict[str, dict] = {}
         self.championship: dict | None = None
         self.player_car: dict | None = None
         self.player_team_offer: dict | None = None
@@ -82,6 +87,12 @@ class GameplayScreen(ctk.CTkFrame):
         self.save_name = state.get("save_name")
         self.game = str(state.get("game", "iRacing"))
         self.player_names = state.get("players", [self.save_name] if self.save_name else [])
+        self.career_mode = self._career_mode(state.get("career_mode"))
+        self.active_player_name = self._active_player_name(state.get("active_player_name"))
+        self.player_perspectives = self._normalize_player_perspectives(
+            state.get("player_perspectives"),
+            state.get("rivalry_heat"),
+        )
         self.championship = state.get("championship")
         self.player_car = state.get("player_car")
         self.player_team_offer = state.get("player_team_offer")
@@ -107,6 +118,43 @@ class GameplayScreen(ctk.CTkFrame):
         self.starting_difficulty = int(state.get("starting_difficulty", 75))
         self.world_sim_progress = state.get("world_sim_progress")
         self.season_complete_handled = False
+
+    def _career_mode(self, value: str | None = None) -> str:
+        normalized = str(value or "").strip().casefold()
+        if normalized == "rivals":
+            return "Rivals"
+        if normalized in {"co-op", "coop", "co op"}:
+            return "Co-op"
+        if normalized == "solo":
+            return "Solo"
+        return "Co-op" if len(self.player_names) > 1 else "Solo"
+
+    def _active_player_name(self, value: str | None = None) -> str:
+        candidate = str(value or "").strip()
+        if candidate in self.player_names:
+            return candidate
+        return self.player_names[0] if self.player_names else ""
+
+    def _normalize_player_perspectives(self, value, fallback_heat=None) -> dict[str, dict]:
+        raw = value if isinstance(value, dict) else {}
+        fallback = {
+            str(name).strip(): int(stage)
+            for name, stage in dict(fallback_heat or {}).items()
+            if str(name).strip() and str(stage).strip() in {"1", "2", "3"}
+        }
+        perspectives: dict[str, dict] = {}
+        for index, player_name in enumerate(self.player_names):
+            existing = raw.get(player_name) if isinstance(raw.get(player_name), dict) else {}
+            heat = {
+                str(name).strip(): int(stage)
+                for name, stage in dict(existing.get("rivalry_heat") or {}).items()
+                if str(name).strip() and str(stage).strip() in {"1", "2", "3"}
+            }
+            if not heat and index == 0:
+                heat = dict(fallback)
+            messages = [dict(message) for message in list(existing.get("messages") or []) if isinstance(message, dict)]
+            perspectives[player_name] = {"rivalry_heat": heat, "messages": messages}
+        return perspectives
 
     def _build_ui(self) -> None:
         top = ctk.CTkFrame(self, fg_color=("gray86", "gray13"), corner_radius=18)
@@ -491,11 +539,16 @@ class GameplayScreen(ctk.CTkFrame):
 
         self.header_label.configure(text=f"{self.game.upper()} CAREER DASHBOARD")
         self.header_meta_label.configure(
-            text=f"Save: {self.save_name} | World Year: {get_world_year(self.save_name) if self.save_name else '-'} | Race {min(self.current_race + 1, len(self.schedule)) if self.schedule else '-'} of {len(self.schedule)}"
+            text=(
+                f"Save: {self.save_name} | World Year: {get_world_year(self.save_name) if self.save_name else '-'} | "
+                f"Mode: {self.career_mode} | Viewing: {self.active_player_name or '-'} | "
+                f"Race {min(self.current_race + 1, len(self.schedule)) if self.schedule else '-'} of {len(self.schedule)}"
+            )
         )
         if self.race_status_label is not None:
             self.race_status_label.configure(text="")
 
+        self.ensure_current_race_briefing()
         self._refresh_champ_info()
         self._refresh_message_button()
         self._refresh_world_news()
@@ -523,6 +576,9 @@ class GameplayScreen(ctk.CTkFrame):
 
         self._refresh_player_car_images()
         self._section_label(self.champ_info_frame, "Current Season")
+        self._info_row(self.champ_info_frame, "Career Mode:", self.career_mode)
+        if len(self.player_names) > 1:
+            self._info_row(self.champ_info_frame, "Viewing As:", self.active_player_name or "-")
         self._info_row(self.champ_info_frame, "Championship:", championship.get("Championship", ""))
         self._info_row(self.champ_info_frame, "Current Tier:", str(championship.get("Tier", "")))
         self._info_row(self.champ_info_frame, "Player Car:", (self.player_car or {}).get("Car", "Unassigned"))
@@ -619,6 +675,100 @@ class GameplayScreen(ctk.CTkFrame):
 
         parts = [f"{class_name} {count}" for class_name, count in sorted(class_counts.items(), key=lambda item: item[0])]
         return opponent_count, " | ".join(parts)
+
+    def ensure_current_race_briefing(self) -> None:
+        if not self.save_name or not self.championship or self.current_race >= len(self.schedule):
+            return
+
+        dedupe_key = f"race-weekend:{self.current_race}:pre-race-briefing:{self.current_race}"
+        if any(str(message.get("dedupe_key", "")) == dedupe_key for message in self.messages if isinstance(message, dict)):
+            return
+
+        race = self.schedule[self.current_race]
+        championship = self.championship or {}
+        round_number = race.get("race_num", self.current_race + 1)
+        total_rounds = len(self.schedule)
+        track = str(race.get("track", "")).strip() or "the next venue"
+        layout = str(race.get("layout", "")).strip()
+        championship_name = str(championship.get("Championship", "")).strip() or "the championship"
+        race_time = str(championship.get("Race_Time", "-")).strip()
+        start_type = str(championship.get("Start_Type", "")).strip() or "standard"
+        weather_text = self._display_weather(race)
+        opponent_count, opponent_classes = self._opponent_summary()
+
+        lines = [
+            f"Round {round_number} of {total_rounds} is coming up: {track}{f' ({layout})' if layout else ''}.",
+            f"You are racing in {championship_name}.",
+            f"Race control expects {opponent_count} opponents across {opponent_classes}.",
+            f"Scheduled race length is {race_time} minutes with a {start_type} start.",
+            f"Forecast: {weather_text or 'Clear'}.",
+        ]
+
+        focus_lines = self._pre_race_focus_lines()
+        if focus_lines:
+            lines.append("")
+            lines.extend(focus_lines)
+
+        lines.append("")
+        lines.append("This is your early look at the next race. Review the setup panel before going to the race weekend.")
+
+        self.messages.append(
+            {
+                "id": f"msg-{uuid4().hex}",
+                "title": f"Pre-Race Briefing: Round {round_number}",
+                "body": "\n".join(lines),
+                "category": "Race Control",
+                "sender": "Race Control",
+                "created_at": datetime.now().isoformat(timespec="seconds"),
+                "read": False,
+                "dedupe_key": dedupe_key,
+            }
+        )
+        update_save(self.save_name, {"messages": self.messages})
+        self._refresh_message_button()
+
+    def _pre_race_focus_lines(self) -> list[str]:
+        lines: list[str] = []
+        if len(self.player_names) > 1:
+            for player_name in self.player_names:
+                perspective = self.player_perspectives.get(player_name, {}) if isinstance(self.player_perspectives, dict) else {}
+                heat = {
+                    str(name).strip(): int(stage)
+                    for name, stage in dict(perspective.get("rivalry_heat") or {}).items()
+                    if str(name).strip() and str(stage).strip() in {"1", "2", "3"}
+                }
+                if not heat:
+                    continue
+                hottest_name, hottest_stage = max(heat.items(), key=lambda item: int(item[1]))
+                lines.append(
+                    f"Rivalry watch for {player_name}: {hottest_name} is a {self._rivalry_stage_text(hottest_stage)} matchup."
+                )
+        else:
+            heat = self._active_rivalry_heat() if hasattr(self, "_active_rivalry_heat") else self.rivalry_heat
+            if heat:
+                hottest_name, hottest_stage = max(heat.items(), key=lambda item: int(item[1]))
+                lines.append(
+                    f"Rivalry watch for {self.active_player_name or 'the player'}: "
+                    f"{hottest_name} is a {self._rivalry_stage_text(hottest_stage)} matchup."
+                )
+
+        watch_drivers = [str(name).strip() for name in list(self.watch_drivers or []) if str(name).strip()]
+        if watch_drivers:
+            lines.append(f"Drivers to watch: {', '.join(watch_drivers[:3])}.")
+
+        rising_driver = str(self.rising_driver or "").strip()
+        if rising_driver:
+            lines.append(f"Form guide: {rising_driver} has been marked as a rising driver by the paddock.")
+
+        return lines
+
+    @staticmethod
+    def _rivalry_stage_text(stage: int) -> str:
+        if int(stage) >= 3:
+            return "red-hot"
+        if int(stage) == 2:
+            return "heated"
+        return "building"
 
     def _refresh_world_news(self) -> None:
         self._cancel_news_rotation()
@@ -822,6 +972,7 @@ class GameplayScreen(ctk.CTkFrame):
     def _refresh_current_race(self) -> None:
         for widget in self.race_info_frame.winfo_children():
             widget.destroy()
+        self.ensure_current_race_briefing()
 
         if self.current_race >= len(self.schedule):
             ctk.CTkLabel(
@@ -865,11 +1016,16 @@ class GameplayScreen(ctk.CTkFrame):
         self._info_row(self.race_info_frame, "Start Type:", (self.championship or {}).get("Start_Type", ""))
 
     def _refresh_player_car_images(self) -> None:
-        if (
-            self.game.strip().casefold() == "ams2"
-            and len(self.player_names) > 1
-            and self.player_liveries
-        ):
+        if len(self.player_names) > 1:
+            ctk.CTkLabel(
+                self.champ_info_frame,
+                text="Co-op Career: switch views for each driver's rivals and inbox. Season progress stays shared.",
+                font=ctk.CTkFont(size=10),
+                text_color=MUTED,
+                anchor="w",
+                justify="left",
+                wraplength=360,
+            ).pack(fill="x", pady=(0, 6))
             livery_by_driver = {
                 str(livery.get("driver_name", "")).strip(): livery
                 for livery in self.player_liveries
@@ -877,26 +1033,34 @@ class GameplayScreen(ctk.CTkFrame):
             }
             row = ctk.CTkFrame(self.champ_info_frame, fg_color="transparent")
             row.pack(fill="x", pady=(0, 8))
-            shown = 0
-            for player_name in self.player_names:
+            for index, player_name in enumerate(self.player_names):
                 livery = livery_by_driver.get(player_name)
-                path = self._player_car_image_path(livery)
+                path = self._player_car_image_path(livery) if livery else self._player_car_image_path()
                 image = self._load_asset_image(path, (175, 72))
-                if image is None:
-                    continue
+                is_active = player_name == self.active_player_name
                 card = ctk.CTkFrame(row, fg_color=("gray86", "gray18"), corner_radius=10)
-                card.pack(side="left", fill="both", expand=True, padx=(0 if shown == 0 else 4, 4))
-                ctk.CTkLabel(card, text="", image=image).pack(fill="x", padx=6, pady=(6, 2))
+                card.pack(side="left", fill="both", expand=True, padx=(0 if index == 0 else 4, 4))
+                if image is not None:
+                    ctk.CTkLabel(card, text="", image=image).pack(fill="x", padx=6, pady=(6, 2))
                 ctk.CTkLabel(
                     card,
                     text=player_name,
                     font=ctk.CTkFont(size=10, weight="bold"),
                     anchor="center",
                 ).pack(fill="x", padx=6, pady=(0, 6))
-                shown += 1
-            if shown:
-                return
-            row.destroy()
+                ctk.CTkButton(
+                    card,
+                    text="Viewing" if is_active else "View as",
+                    command=lambda name=player_name: self._set_active_player(name),
+                    height=24,
+                    font=ctk.CTkFont(size=10, weight="bold"),
+                    text_color="#ffffff",
+                    text_color_disabled="#ffffff",
+                    fg_color=ACCENT if is_active else "gray30",
+                    hover_color=ACCENT_DARK if is_active else "gray40",
+                    state="disabled" if is_active else "normal",
+                ).pack(fill="x", padx=8, pady=(0, 8))
+            return
 
         self._asset_image_label(
             self.champ_info_frame,
@@ -904,6 +1068,77 @@ class GameplayScreen(ctk.CTkFrame):
             size=(360, 118),
             pady=(0, 8),
         )
+
+    def _set_active_player(self, player_name: str) -> None:
+        cleaned = str(player_name).strip()
+        if cleaned not in self.player_names or cleaned == self.active_player_name:
+            return
+        self.active_player_name = cleaned
+        if self.save_name:
+            update_save(self.save_name, {"active_player_name": self.active_player_name})
+        self._refresh_champ_info()
+        self._refresh_standings()
+        self._refresh_message_button()
+        self.header_meta_label.configure(
+            text=(
+                f"Save: {self.save_name} | World Year: {get_world_year(self.save_name) if self.save_name else '-'} | "
+                f"Mode: {self.career_mode} | Viewing: {self.active_player_name} | "
+                f"Race {min(self.current_race + 1, len(self.schedule)) if self.schedule else '-'} of {len(self.schedule)}"
+            )
+        )
+
+    def _active_player_perspective(self) -> dict:
+        if self.active_player_name not in self.player_perspectives:
+            self.player_perspectives = self._normalize_player_perspectives(self.player_perspectives, self.rivalry_heat)
+        return self.player_perspectives.get(self.active_player_name, {"rivalry_heat": {}, "messages": []})
+
+    def _active_rivalry_heat(self) -> dict[str, int]:
+        perspective = self._active_player_perspective()
+        return {
+            str(name).strip(): int(stage)
+            for name, stage in dict(perspective.get("rivalry_heat") or {}).items()
+            if str(name).strip() and str(stage).strip() in {"1", "2", "3"}
+        }
+
+    def active_messages(self) -> list[dict]:
+        perspective = self._active_player_perspective()
+        messages = [dict(message) for message in self.messages if isinstance(message, dict)]
+        messages.extend(dict(message) for message in list(perspective.get("messages") or []) if isinstance(message, dict))
+        return sorted(messages, key=lambda message: str(message.get("created_at", "")))
+
+    def mark_active_message_read(self, message_id: str) -> None:
+        target_id = str(message_id)
+        changed = False
+        updated_shared: list[dict] = []
+        for message in self.messages:
+            row = dict(message)
+            if str(row.get("id") or row.get("created_at") or id(row)) == target_id and not bool(row.get("read")):
+                row["read"] = True
+                changed = True
+            updated_shared.append(row)
+        self.messages = updated_shared
+
+        perspective = self._active_player_perspective()
+        updated_personal: list[dict] = []
+        for message in list(perspective.get("messages") or []):
+            row = dict(message)
+            if str(row.get("id") or row.get("created_at") or id(row)) == target_id and not bool(row.get("read")):
+                row["read"] = True
+                changed = True
+            updated_personal.append(row)
+        perspective["messages"] = updated_personal
+        self.player_perspectives[self.active_player_name] = perspective
+
+        if changed and self.save_name:
+            update_save(
+                self.save_name,
+                {
+                    "messages": self.messages,
+                    "player_perspectives": self.player_perspectives,
+                },
+            )
+        if changed:
+            self._refresh_message_button()
 
     def _player_car_image_path(self, livery: dict | None = None) -> Path | None:
         candidates: list[str] = []
@@ -1124,7 +1359,7 @@ class GameplayScreen(ctk.CTkFrame):
                 ).pack(side="left", padx=(2, 0), pady=4)
 
     def _rivalry_stripe_color(self, driver_name: str) -> str:
-        stage = int(self.rivalry_heat.get(str(driver_name).strip(), 0) or 0)
+        stage = int(self._active_rivalry_heat().get(str(driver_name).strip(), 0) or 0)
         if stage >= 3:
             return "#e04747"
         if stage == 2:
@@ -1293,6 +1528,9 @@ class GameplayScreen(ctk.CTkFrame):
                     "save_name": self.save_name,
                     "players": self.player_names,
                     "game": self.game,
+                    "career_mode": self.career_mode,
+                    "active_player_name": self.active_player_name,
+                    "player_perspectives": self.player_perspectives,
                     "starting_difficulty": self.starting_difficulty,
                     "tier": self.tier,
                     "unlocked_tier": self.unlocked_tier,
@@ -1343,7 +1581,7 @@ class GameplayScreen(ctk.CTkFrame):
     def _refresh_message_button(self) -> None:
         if self.messages_btn is None:
             return
-        unread = sum(1 for message in self.messages if not bool(message.get("read")))
+        unread = sum(1 for message in self.active_messages() if not bool(message.get("read")))
         self.messages_btn.configure(text=f"Messages ({unread})" if unread else "Messages")
         if unread:
             self._start_message_blink()
@@ -1361,7 +1599,7 @@ class GameplayScreen(ctk.CTkFrame):
         if self.messages_btn is None:
             self._message_blink_after_id = None
             return
-        unread = any(not bool(message.get("read")) for message in self.messages)
+        unread = any(not bool(message.get("read")) for message in self.active_messages())
         if not unread:
             self._cancel_message_blink()
             self.messages_btn.configure(fg_color="gray30", hover_color="gray40")
@@ -1420,6 +1658,9 @@ class GameplayScreen(ctk.CTkFrame):
                 "save_name": self.save_name,
                 "players": self.player_names,
                 "game": self.game,
+                "career_mode": self.career_mode,
+                "active_player_name": self.active_player_name,
+                "player_perspectives": self.player_perspectives,
                 "starting_difficulty": self.starting_difficulty,
                 "tier": self.tier,
                 "unlocked_tier": self.unlocked_tier,
@@ -1427,6 +1668,11 @@ class GameplayScreen(ctk.CTkFrame):
                 "championship": self.championship,
                 "player_car": self.player_car,
                 "player_team_offer": self.player_team_offer,
+                "player_liveries": self.player_liveries,
+                "watch_drivers": self.watch_drivers,
+                "rising_driver": self.rising_driver,
+                "rivalry_heat": self.rivalry_heat,
+                "messages": self.messages,
                 "schedule": self.schedule,
                 "standings": self.standings,
                 "current_race": self.current_race,

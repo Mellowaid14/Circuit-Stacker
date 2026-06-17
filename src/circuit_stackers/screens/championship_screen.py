@@ -440,7 +440,10 @@ class ChampionshipScreen(ctk.CTkFrame):
                 offer_row["_offer_team_name"] = str(offer.get("team_name", "")).strip() or "Independent"
                 offer_row["_offer_team_prestige"] = str(offer.get("team_prestige", 0))
                 offer_row["_offer_team_reputation"] = str(offer.get("team_reputation", offer.get("team_prestige", 50)))
+                offer_row["_offer_team_personality"] = str(offer.get("team_personality", "")).strip()
                 offer_row["_offer_note"] = str(offer.get("offer_note", "Offer")).strip() or "Offer"
+                offer_row["_offer_expectation"] = self._team_expectation_text(offer_row)
+                offer_row["_offer_expectation_level"] = self._team_expectation_level(offer_row)
                 if str(self.save_game).strip().casefold() == "iracing":
                     csv_colors = str(offer.get("team_colors", "")).strip()
                     color_seed = (
@@ -732,6 +735,15 @@ class ChampionshipScreen(ctk.CTkFrame):
             text_color=("#15507d", "#7dbdff"),
             anchor="w",
         ).pack(fill="x", pady=(0, 8))
+        ctk.CTkLabel(
+            info,
+            text=championship.get("_offer_expectation", "Expectation: score points when possible."),
+            font=ctk.CTkFont(size=12, weight="bold"),
+            text_color=self._team_expectation_color(championship),
+            anchor="w",
+            justify="left",
+            wraplength=520,
+        ).pack(fill="x", pady=(0, 8))
 
         details = ctk.CTkFrame(info, fg_color="transparent")
         details.pack(fill="x")
@@ -924,6 +936,7 @@ class ChampionshipScreen(ctk.CTkFrame):
                 f"Selected: {championship['Championship']} | "
                 f"{championship.get('_offer_note', 'Offer')} | "
                 f"{championship.get('_offer_team_name', 'Independent')} | "
+                f"{championship.get('_offer_expectation', 'Expectation set')} | "
                 f"{preview_car.get('Car', 'No eligible car')} | {championship['Style']}"
             ),
             text_color="gray",
@@ -946,6 +959,9 @@ class ChampionshipScreen(ctk.CTkFrame):
             "team_prestige": int(self.selected.get("_offer_team_prestige", 0) or 0),
             "team_reputation": int(self.selected.get("_offer_team_reputation", 50) or 50),
             "team_colors": ",".join(self._offer_colors(self.selected)),
+            "team_personality": str(self.selected.get("_offer_team_personality", "")).strip(),
+            "team_expectation": str(self.selected.get("_offer_expectation", "")).strip(),
+            "team_expectation_level": str(self.selected.get("_offer_expectation_level", "")).strip(),
         }
         self.season_summary_message = ""
         setup_screen = self.parent.screens["WorldSetupScreen"]
@@ -977,6 +993,63 @@ class ChampionshipScreen(ctk.CTkFrame):
             for style in STYLE_ORDER
         ]
         return "Effective MMR: " + " | ".join(parts)
+
+    @classmethod
+    def _team_expectation_text(cls, championship: dict[str, str]) -> str:
+        level = cls._team_expectation_level(championship)
+        races = cls._race_count(championship)
+        if level == "wins":
+            win_target = max(1, min(races, round(races * 0.30)))
+            return f"Expectation: fight for wins, target {win_target}+ win{'s' if win_target != 1 else ''}."
+        if level == "podiums":
+            top_five_target = max(2, min(races, round(races * 0.60)))
+            return f"Expectation: challenge up front, target {top_five_target}+ top 5s."
+        if level == "top5":
+            top_five_target = max(1, min(races, round(races * 0.40)))
+            return f"Expectation: regular top 5s, target {top_five_target}+ strong finishes."
+        if level == "top10":
+            top_ten_target = max(2, min(races, round(races * 0.50)))
+            return f"Expectation: bring home points, target {top_ten_target}+ top 10s."
+        top_ten_target = max(1, min(races, round(races * 0.30)))
+        return f"Expectation: build momentum, target {top_ten_target}+ top 10 finish{'es' if top_ten_target != 1 else ''}."
+
+    @classmethod
+    def _team_expectation_level(cls, championship: dict[str, str]) -> str:
+        reputation = cls._team_reputation_value(championship)
+        if reputation >= 88:
+            return "wins"
+        if reputation >= 74:
+            return "podiums"
+        if reputation >= 58:
+            return "top5"
+        if reputation >= 38:
+            return "top10"
+        return "development"
+
+    @staticmethod
+    def _team_expectation_color(championship: dict[str, str]) -> str:
+        level = str(championship.get("_offer_expectation_level", "")).strip()
+        return {
+            "wins": "#ff7777",
+            "podiums": "#ffb347",
+            "top5": "#7dbdff",
+            "top10": "#6bbd6b",
+            "development": "gray",
+        }.get(level, "gray")
+
+    @staticmethod
+    def _race_count(championship: dict[str, str]) -> int:
+        try:
+            return max(1, int(championship.get("Num of Races", 4) or 4))
+        except (TypeError, ValueError):
+            return 4
+
+    @staticmethod
+    def _team_reputation_value(championship: dict[str, str]) -> int:
+        try:
+            return int(championship.get("_offer_team_reputation", championship.get("_offer_team_prestige", 50)) or 50)
+        except (TypeError, ValueError):
+            return 50
 
     def _current_offer_cache_key(self) -> tuple:
         mmr_values = tuple((style, self._effective_mmr_for_style(style)) for style in STYLE_ORDER)

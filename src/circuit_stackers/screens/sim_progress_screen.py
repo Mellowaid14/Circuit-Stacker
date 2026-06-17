@@ -14,6 +14,7 @@ class SimProgressScreen(ctk.CTkFrame):
         self._running = False
         self._mode = "season"
         self._offseason_request: dict | None = None
+        self._season_intro_status = "Preparing world races..."
 
         wrapper = ctk.CTkFrame(self, fg_color="transparent")
         wrapper.pack(expand=True)
@@ -52,6 +53,10 @@ class SimProgressScreen(ctk.CTkFrame):
             "starting_difficulty": int(starting_difficulty),
         }
 
+    def set_season_intro_status(self, message: str) -> None:
+        self._mode = "season"
+        self._season_intro_status = str(message or "").strip() or "Preparing world races..."
+
     def on_show(self) -> None:
         if self._running:
             return
@@ -66,8 +71,9 @@ class SimProgressScreen(ctk.CTkFrame):
         else:
             self.title_label.configure(text="Simming to next event...")
             self.detail_label.configure(text="The world calendar is running its races for this part of the season.")
-            self.status_label.configure(text="Preparing world races...")
-            self.after(100, self._run_chunk)
+            self.status_label.configure(text=self._season_intro_status)
+            self.update_idletasks()
+            self.after(150, self._run_chunk)
 
     def _run_offseason(self) -> None:
         try:
@@ -115,7 +121,10 @@ class SimProgressScreen(ctk.CTkFrame):
             state = {
                 "save_name": self.gameplay_screen.save_name,
                 "game": getattr(self.gameplay_screen, "game", "iRacing"),
+                "career_mode": getattr(self.gameplay_screen, "career_mode", "Solo"),
                 "players": self.gameplay_screen.player_names,
+                "active_player_name": getattr(self.gameplay_screen, "active_player_name", ""),
+                "player_perspectives": getattr(self.gameplay_screen, "player_perspectives", {}),
                 "starting_difficulty": self.gameplay_screen.starting_difficulty,
                 "tier": self.gameplay_screen.tier,
                 "unlocked_tier": self.gameplay_screen.unlocked_tier,

@@ -14,6 +14,7 @@ class NewGame(ctk.CTkFrame):
         self.player_entries: list[ctk.CTkEntry] = []
         self.player_rows: list[ctk.CTkFrame] = []
         self.game_var = ctk.StringVar(value="iRacing")
+        self.career_mode_var = ctk.StringVar(value="Solo")
 
         form_scroll = ctk.CTkScrollableFrame(self, fg_color="transparent")
         form_scroll.pack(fill="both", expand=True, padx=16, pady=(0, 8))
@@ -52,6 +53,25 @@ class NewGame(ctk.CTkFrame):
             font=ctk.CTkFont(size=12, weight="bold"),
         )
         self.game_selector.pack()
+
+        ctk.CTkLabel(entry_frame, text="Career Mode", font=ctk.CTkFont(size=12)).pack(anchor="w", pady=(18, 4))
+        self.career_mode_selector = ctk.CTkOptionMenu(
+            entry_frame,
+            values=["Solo", "Co-op", "Rivals (coming later)"],
+            variable=self.career_mode_var,
+            width=self.input_width,
+            height=36,
+            font=ctk.CTkFont(size=12, weight="bold"),
+        )
+        self.career_mode_selector.pack()
+        ctk.CTkLabel(
+            entry_frame,
+            text="Co-op shares one career path. Rivals mode will split drivers into separate careers later.",
+            font=ctk.CTkFont(size=11),
+            text_color="gray",
+            wraplength=self.input_width,
+            justify="left",
+        ).pack(pady=(6, 0))
 
         ctk.CTkLabel(entry_frame, text="Drivers", font=ctk.CTkFont(size=12)).pack(anchor="w", pady=(18, 4))
         self.players_frame = ctk.CTkFrame(entry_frame, fg_color="transparent")
@@ -178,6 +198,13 @@ class NewGame(ctk.CTkFrame):
         if not player_names:
             self.error_label.configure(text="Add at least one driver name.")
             return
+        career_mode = self.career_mode_var.get().strip()
+        if career_mode.startswith("Rivals"):
+            self.error_label.configure(text="Rivals mode is planned for a later 1.5 phase. Use Solo or Co-op for now.")
+            return
+        if career_mode == "Solo" and len(player_names) > 1:
+            self.error_label.configure(text="Solo careers can only have one driver. Choose Co-op for multiple drivers.")
+            return
 
         try:
             starting_difficulty = int(self.difficulty_entry.get().strip())
@@ -205,6 +232,7 @@ class NewGame(ctk.CTkFrame):
             starting_difficulty=starting_difficulty,
             world_history_years=world_history_years,
             game=selected_game,
+            career_mode=career_mode,
         )
         if not success:
             self.error_label.configure(text=message)
@@ -263,6 +291,8 @@ class NewGame(ctk.CTkFrame):
         remove_btn.pack(side="left", padx=(8, 0))
         self.player_entries.append(entry)
         self.player_rows.append(row)
+        if len(self.player_entries) > 1 and self.career_mode_var.get() == "Solo":
+            self.career_mode_var.set("Co-op")
         self._refresh_remove_buttons()
 
     def remove_player_entry(self, row: ctk.CTkFrame, entry: ctk.CTkEntry) -> None:
@@ -275,6 +305,8 @@ class NewGame(ctk.CTkFrame):
         if row in self.player_rows:
             self.player_rows.remove(row)
         row.destroy()
+        if len(self.player_entries) == 1 and self.career_mode_var.get() == "Co-op":
+            self.career_mode_var.set("Solo")
         self._refresh_remove_buttons()
 
     def _refresh_remove_buttons(self) -> None:

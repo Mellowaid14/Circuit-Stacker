@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import random
 from collections import defaultdict, deque
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 from xml.etree import ElementTree as ET
@@ -17,6 +18,15 @@ AMS2_CARS_CSV = resource_path("data", "Cars.csv")
 _AMS2_LIVERY_ROWS_CACHE: list[dict[str, str]] | None = None
 _AMS2_CAR_ROWS_CACHE: list[dict[str, str]] | None = None
 _CUSTOM_LIVERY_ROWS_CACHE: dict[str, list[dict[str, str]]] = {}
+
+
+@dataclass(frozen=True)
+class Ams2RosterValidation:
+    ok: bool
+    message: str
+    roster_paths: tuple[Path, ...] = ()
+    missing_files: tuple[str, ...] = ()
+    mismatched_rosters: tuple[str, ...] = ()
 
 
 def _driver_class_name(driver: dict[str, Any]) -> str:
@@ -434,6 +444,93 @@ def _write_roster_xml(path: Path, drivers: list[dict[str, str]]) -> None:
     _indent_xml(root)
     tree = ET.ElementTree(root)
     tree.write(path, encoding="utf-8", xml_declaration=True)
+
+
+def validate_ams2_roster_files(
+    championship: dict[str, Any],
+    standings: list[dict[str, Any]],
+    player_names: list[str],
+) -> Ams2RosterValidation:
+    ams2_root = Path(game_directory("AMS2"))
+    if not str(ams2_root).strip():
+        return Ams2RosterValidation(False, "AMS2 folder is not set in Settings.")
+
+    custom_ai_dir = ams2_root / "UserData" / "CustomAIDrivers"
+    if not custom_ai_dir.exists():
+        return Ams2RosterValidation(False, "AMS2 driver roster is not exported yet. Re-export roster before entering race.")
+
+    expected_by_roster: dict[str, set[str]] = defaultdict(set)
+    player_set = {str(name).strip() for name in player_names if str(name).strip()}
+    for driver in standings:
+        driver_name = str(driver.get("name", "")).strip()
+        if not driver_name or driver_name in player_set:
+            continue
+        class_name = _driver_class_name(driver)
+        rows = _livery_rows_for_class(class_name)
+        if not rows:
+            return Ams2RosterValidation(
+                False,
+                f"AMS2 roster could not be checked because class '{class_name}' has no livery mapping.",
+            )
+        roster_name = str(rows[0].get("Roster_Name", "")).strip()
+        if not roster_name:
+            return Ams2RosterValidation(
+                False,
+                f"AMS2 roster could not be checked because class '{class_name}' has no roster file mapping.",
+            )
+        expected_by_roster[roster_name].add(driver_name)
+
+    if not expected_by_roster:
+        return Ams2RosterValidation(True, "AMS2 driver roster is up to date.")
+
+    missing_files: list[str] = []
+    mismatched_rosters: list[str] = []
+    checked_paths: list[Path] = []
+
+    for roster_name, expected_names in sorted(expected_by_roster.items(), key=lambda item: item[0].casefold()):
+        xml_path = custom_ai_dir / roster_name
+        checked_paths.append(xml_path)
+        if not xml_path.exists():
+            missing_files.append(roster_name)
+            continue
+        exported_names = _read_ams2_roster_driver_names(xml_path)
+        if exported_names != expected_names:
+            mismatched_rosters.append(roster_name)
+
+    if missing_files or mismatched_rosters:
+        return Ams2RosterValidation(
+            False,
+            "AMS2 driver roster does not seem to match this race. Re-export roster before entering race.",
+            roster_paths=tuple(checked_paths),
+            missing_files=tuple(missing_files),
+            mismatched_rosters=tuple(mismatched_rosters),
+        )
+
+    return Ams2RosterValidation(
+        True,
+        "AMS2 driver roster is up to date.",
+        roster_paths=tuple(checked_paths),
+    )
+
+
+def _read_ams2_roster_driver_names(xml_path: Path) -> set[str]:
+    try:
+        tree = ET.parse(xml_path)
+    except (OSError, ET.ParseError):
+        return set()
+
+    names: set[str] = set()
+    for driver_node in tree.iter():
+        if str(driver_node.tag).split("}")[-1].casefold() != "driver":
+            continue
+        for child in list(driver_node):
+            if str(child.tag).split("}")[-1].casefold() != "name":
+                continue
+            driver_name = str(child.text or "").strip()
+            if driver_name:
+                names.add(driver_name)
+            break
+    return names
 
 
 def export_ams2_roster(

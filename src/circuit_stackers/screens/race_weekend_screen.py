@@ -1,7 +1,12 @@
 from __future__ import annotations
 
+from datetime import datetime
+from uuid import uuid4
+
 import customtkinter as ctk
 
+from ..ams2_exporter import validate_ams2_roster_files
+from ..save_manager import update_save
 from .manual_setup_screen import build_manual_setup_content
 
 
@@ -149,6 +154,9 @@ class RaceWeekendScreen(ctk.CTkFrame):
         time_text = gameplay._display_time(str(race.get("time_of_day", ""))) if hasattr(gameplay, "_display_time") else str(race.get("time_of_day", ""))
         weather_text = gameplay._display_weather(race) if hasattr(gameplay, "_display_weather") else str(race.get("weather", ""))
         difficulty_text = gameplay._difficulty_display() if hasattr(gameplay, "_difficulty_display") else str(getattr(gameplay, "starting_difficulty", ""))
+        opponent_count, opponent_classes = gameplay._opponent_summary() if hasattr(gameplay, "_opponent_summary") else (0, "-")
+        if hasattr(gameplay, "ensure_current_race_briefing"):
+            gameplay.ensure_current_race_briefing()
 
         self._hero_card(str(race.get("track", "")), str(race.get("layout", "")), date_text, time_text)
         self._section("Weekend Snapshot")
@@ -157,7 +165,6 @@ class RaceWeekendScreen(ctk.CTkFrame):
         self._stat_card(stats, "Weather", weather_text)
         self._stat_card(stats, "Difficulty", difficulty_text)
 
-        opponent_count, opponent_classes = gameplay._opponent_summary() if hasattr(gameplay, "_opponent_summary") else (0, "-")
         self._stat_card(stats, "Opponents", str(opponent_count))
         self._section("Race Details")
         self._info("Championship", str(championship.get("Championship", "")))
@@ -293,6 +300,79 @@ class RaceWeekendScreen(ctk.CTkFrame):
             wraplength=280,
         ).pack(fill="x")
 
+    def _send_pre_race_briefing(
+        self,
+        *,
+        race: dict,
+        championship: dict,
+        weather_text: str,
+        opponent_count: int,
+        opponent_classes: str,
+    ) -> None:
+        gameplay = self.gameplay_screen
+        if gameplay is None:
+            return
+        race_index = int(getattr(gameplay, "current_race", 0) or 0)
+        round_number = race.get("race_num", race_index + 1)
+        total_rounds = len(getattr(gameplay, "schedule", []) or [])
+        track = str(race.get("track", "")).strip() or "the next venue"
+        layout = str(race.get("layout", "")).strip()
+        championship_name = str(championship.get("Championship", "")).strip() or "the championship"
+        race_time = str(championship.get("Race_Time", "-")).strip()
+        start_type = str(championship.get("Start_Type", "")).strip() or "standard"
+
+        lines = [
+            f"Round {round_number} of {total_rounds} is next: {track}{f' ({layout})' if layout else ''}.",
+            f"You are racing in {championship_name}.",
+            f"Race control expects {opponent_count} opponents across {opponent_classes}.",
+            f"Scheduled race length is {race_time} minutes with a {start_type} start.",
+            f"Forecast: {weather_text or 'Clear'}."
+        ]
+
+        focus_lines = self._pre_race_focus_lines()
+        if focus_lines:
+            lines.append("")
+            lines.extend(focus_lines)
+
+        lines.append("")
+        lines.append("Review the setup panel, confirm the roster, and make sure the session settings match before going green.")
+
+        self._add_race_control_message(
+            f"Pre-Race Briefing: Round {round_number}",
+            "\n".join(lines),
+            dedupe_suffix=f"pre-race-briefing:{race_index}",
+        )
+
+    def _pre_race_focus_lines(self) -> list[str]:
+        gameplay = self.gameplay_screen
+        if gameplay is None:
+            return []
+
+        lines: list[str] = []
+        heat = {
+            str(name).strip(): int(stage or 0)
+            for name, stage in dict(getattr(gameplay, "rivalry_heat", {}) or {}).items()
+            if str(name).strip() and int(stage or 0) > 0
+        }
+        if heat:
+            hottest_name, hottest_stage = max(heat.items(), key=lambda item: item[1])
+            stage_text = "red-hot" if hottest_stage >= 3 else ("heated" if hottest_stage == 2 else "building")
+            lines.append(f"Rivalry watch: {hottest_name} is a {stage_text} matchup. Keep it clean, but do not give away easy track position.")
+
+        watch_drivers = [
+            str(name).strip()
+            for name in list(getattr(gameplay, "watch_drivers", []) or [])
+            if str(name).strip()
+        ]
+        if watch_drivers:
+            lines.append(f"Drivers to watch: {', '.join(watch_drivers[:3])}.")
+
+        rising_driver = str(getattr(gameplay, "rising_driver", "") or "").strip()
+        if rising_driver:
+            lines.append(f"Form guide: {rising_driver} has been marked as a rising driver by the paddock.")
+
+        return lines
+
     def reexport_roster(self) -> None:
         gameplay = self.gameplay_screen
         if gameplay is None:
@@ -300,9 +380,60 @@ class RaceWeekendScreen(ctk.CTkFrame):
         gameplay.reexport_roster()
         self._refresh()
         self.status_label.configure(text="Roster re-export requested.", text_color="#6bbd6b")
+        if str(getattr(gameplay, "game", "")).strip().casefold() == "ams2":
+            self._add_race_control_message(
+                "AMS2 Driver Roster Refreshed",
+                "Race Control has re-exported your AMS2 Custom AI roster for the current championship.\n\n"
+                "Before entering the session, restart Automobilista 2 if it was already open so the game reloads the updated driver list.",
+            )
 
     def enter_results_screen(self) -> None:
         gameplay = self.gameplay_screen
+        if gameplay is not None and str(getattr(gameplay, "game", "")).strip().casefold() == "ams2":
+            roster_validation = validate_ams2_roster_files(
+                getattr(gameplay, "championship", {}) or {},
+                list(getattr(gameplay, "standings", []) or []),
+                list(getattr(gameplay, "player_names", []) or []),
+            )
+            if not roster_validation.ok:
+                self.status_label.configure(text=roster_validation.message, text_color="#ff7777")
+                self._refresh()
+                self.status_label.configure(text=roster_validation.message, text_color="#ff7777")
+                self._add_race_control_message(
+                    "AMS2 Roster Check Failed",
+                    f"{roster_validation.message}\n\n"
+                    "Use Re-export Roster, then restart Automobilista 2 before entering the race. "
+                    "This helps prevent old AI names from staying loaded in-game.",
+                )
+                return
+            self.status_label.configure(text=roster_validation.message, text_color="#6bbd6b")
         if gameplay is not None and getattr(gameplay, "race_status_label", None) is not None:
             gameplay.race_status_label.configure(text="")
         self.show_screen("ManualResultsScreen")
+
+    def _add_race_control_message(self, title: str, body: str, *, dedupe_suffix: str | None = None) -> None:
+        gameplay = self.gameplay_screen
+        if gameplay is None:
+            return
+        messages = [dict(message) for message in list(getattr(gameplay, "messages", []) or []) if isinstance(message, dict)]
+        dedupe_key = f"race-weekend:{getattr(gameplay, 'current_race', 0)}:{dedupe_suffix or title}"
+        if any(str(message.get("dedupe_key", "")) == dedupe_key for message in messages):
+            return
+        messages.append(
+            {
+                "id": f"msg-{uuid4().hex}",
+                "title": title,
+                "body": body,
+                "category": "Race Control",
+                "sender": "Race Control",
+                "created_at": datetime.now().isoformat(timespec="seconds"),
+                "read": False,
+                "dedupe_key": dedupe_key,
+            }
+        )
+        gameplay.messages = messages
+        save_name = str(getattr(gameplay, "save_name", "") or "").strip()
+        if save_name:
+            update_save(save_name, {"messages": messages})
+        if hasattr(gameplay, "_refresh_message_button"):
+            gameplay._refresh_message_button()

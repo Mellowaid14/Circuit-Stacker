@@ -2050,7 +2050,10 @@ class ManualResultsScreen(ctk.CTkFrame):
         return {
             "save_name": self.gameplay_screen.save_name,
             "game": getattr(self.gameplay_screen, "game", "iRacing"),
+            "career_mode": getattr(self.gameplay_screen, "career_mode", "Solo"),
             "players": self.gameplay_screen.player_names,
+            "active_player_name": getattr(self.gameplay_screen, "active_player_name", ""),
+            "player_perspectives": getattr(self.gameplay_screen, "player_perspectives", {}),
             "starting_difficulty": self.gameplay_screen.starting_difficulty,
             "tier": self.gameplay_screen.tier,
             "unlocked_tier": self.gameplay_screen.unlocked_tier,
@@ -2076,10 +2079,9 @@ class ManualResultsScreen(ctk.CTkFrame):
         self.gameplay_screen.load_state(state)
         if self.gameplay_screen.race_status_label is not None:
             self.gameplay_screen.race_status_label.configure(text=message, text_color="#6bbd6b")
-        self.gameplay_screen._refresh_champ_info()
-        self.gameplay_screen._refresh_world_news()
-        self.gameplay_screen._refresh_current_race()
-        self.gameplay_screen._refresh_standings()
+        sim_progress = self.parent.screens.get("SimProgressScreen") if hasattr(self.parent, "screens") else None
+        if sim_progress is not None and hasattr(sim_progress, "set_season_intro_status"):
+            sim_progress.set_season_intro_status(f"{message} Simming the world calendar...")
         self.show_screen("SimProgressScreen")
 
     def go_back(self) -> None:

@@ -155,7 +155,15 @@ class CustomChampionshipManageScreen(ctk.CTkFrame):
         self._option("Tier (track selection)", self.tier_var, CLASS_OPTIONS)
         self.race_count_entry = self._entry("Num of Races", first.get("Num of Races", "4"))
         self.race_time_entry = self._entry("Race Time", first.get("Race_Time", "15"))
-        self.max_opponents_entry = self._entry("Max number of Opponents", first.get("Max_Opp", "20"))
+        self.max_opponents_entry = self._entry("Max Grid Size", first.get("Max_Opp", "20"))
+        ctk.CTkLabel(
+            self.edit_frame,
+            text="Includes the player and any co-op players. Example: 20 means 20 total cars on the grid.",
+            font=ctk.CTkFont(size=10),
+            text_color="gray",
+            anchor="w",
+            wraplength=420,
+        ).pack(fill="x", padx=14, pady=(0, 10))
         self.prestige_entry = self._entry("Prestige", first.get("Prestige", "1"))
 
         ctk.CTkLabel(
@@ -240,7 +248,7 @@ class CustomChampionshipManageScreen(ctk.CTkFrame):
         try:
             race_count = self._parse_int(self.race_count_entry.get(), "Num of Races", 1, 50)
             race_time = self._parse_int(self.race_time_entry.get(), "Race Time", 1, 240)
-            max_opponents = self._parse_int(self.max_opponents_entry.get(), "Max number of Opponents", 1, 80)
+            max_opponents = self._parse_int(self.max_opponents_entry.get(), "Max Grid Size", 1, 80)
             prestige = self._parse_int(self.prestige_entry.get(), "Prestige", 1, 100)
             tier = self._parse_int(self.tier_var.get(), "Tier", 1, 5)
         except ValueError as error:
