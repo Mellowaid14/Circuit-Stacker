@@ -1,0 +1,65 @@
+name: Build Release Installer
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-installer:
+    name: Build Windows Installer
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+
+      - name: Build installer
+        shell: pwsh
+        run: .\build_installer.ps1
+
+      - name: Write release notes
+        shell: pwsh
+        run: |
+          @'
+          ## General
+
+          - Added one-time pre-race briefings for each race weekend, created as soon as the next race is assigned.
+          - Improved world news so season openers can reference last season's close battles and no longer show 0-point preseason title fights.
+          - Added team personalities, team expectations, and stronger team welcome messages.
+          - Added inbox messages from drivers when they become full red rivals.
+          - Added Co-op driver perspective switching, per-player rivalry views, per-player rival messages, and a foundation for future Rivals Mode.
+          - Restyled the Messages screen with news-style cards, category badges, color stripes, red rival messages, Delete Read, and per-message delete controls.
+          - Clarified championship grid sizing so Max_Opp is treated as total grid size, including player and co-op drivers.
+
+          ## AMS2
+
+          - Updated AMS2 cars and tracks to the latest available data.
+          - Added race setup roster validation before entering a race.
+          - Added Race Control messages for roster refresh and roster validation failures.
+
+          ## iRacing
+
+          - Updated iRacing cars and tracks to the latest available data.
+          - Fixed difficulty sync so post-race and manual difficulty changes can recover the active season JSON path when older saves are missing it.
+          - Merged iRacing team paint colors into the team welcome email.
+          '@ | Set-Content -Path release_notes.md -Encoding UTF8
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Circuit Stacker 1.5
+          body_path: release_notes.md
+          files: output/CircuitStackerSetup-*.exe
