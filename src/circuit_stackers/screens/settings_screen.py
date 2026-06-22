@@ -14,6 +14,7 @@ from ..settings_manager import (
     update_custom_overlay_enabled,
     update_iracing_directory,
 )
+from ..player_profiles import default_profile_id
 from ..update_checker import update_check_configured
 from ..version import APP_VERSION
 
@@ -163,6 +164,28 @@ class SettingsScreen(ctk.CTkFrame):
         )
         self.ams2_warning_label = self._build_path_warning(ams2_box)
         self.ams2_path_entry.bind("<KeyRelease>", lambda _event: self.validate_path_entry("AMS2"))
+
+        profiles_box = ctk.CTkFrame(body, fg_color=("gray90", "gray15"), corner_radius=12)
+        profiles_box.pack(fill="x", padx=120, pady=(0, 16))
+        ctk.CTkLabel(
+            profiles_box,
+            text="Player Profiles",
+            font=ctk.CTkFont(size=14, weight="bold"),
+        ).pack(anchor="w", padx=18, pady=(16, 6))
+        ctk.CTkLabel(
+            profiles_box,
+            text="Manage each player's owned content. Co-op careers use the cars and tracks shared by all selected profiles.",
+            font=ctk.CTkFont(size=11),
+            text_color="gray",
+        ).pack(anchor="w", padx=18, pady=(0, 10))
+        ctk.CTkButton(
+            profiles_box,
+            text="Manage Player Profiles",
+            command=lambda: self.show_screen("PlayerProfilesScreen"),
+            height=34,
+            width=210,
+            font=ctk.CTkFont(size=12, weight="bold"),
+        ).pack(anchor="w", padx=18, pady=(0, 16))
 
         custom_box = ctk.CTkFrame(body, fg_color=("gray90", "gray15"), corner_radius=12)
         custom_box.pack(fill="x", padx=120, pady=(0, 16))
@@ -466,6 +489,8 @@ class SettingsScreen(ctk.CTkFrame):
         ownership_screen = self.parent.screens["OwnershipScreen"]
         if hasattr(ownership_screen, "set_game"):
             ownership_screen.set_game(game)
+        if hasattr(ownership_screen, "set_profile"):
+            ownership_screen.set_profile(default_profile_id(), "SettingsScreen")
         self.show_screen("OwnershipScreen")
 
     def go_back(self) -> None:

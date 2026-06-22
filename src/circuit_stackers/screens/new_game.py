@@ -3,6 +3,12 @@ from __future__ import annotations
 import customtkinter as ctk
 
 from ..game_logic import create_new_save
+from ..player_profiles import (
+    create_player_profile,
+    default_profile_id,
+    effective_shared_owned_assets,
+    list_player_profiles,
+)
 from ..settings_manager import game_directory
 
 
@@ -11,7 +17,8 @@ class NewGame(ctk.CTkFrame):
         super().__init__(parent, fg_color="transparent")
         self.show_screen = show_screen
         self.parent = parent
-        self.player_entries: list[ctk.CTkEntry] = []
+        self.player_entries: list[ctk.CTkOptionMenu] = []
+        self.player_vars: list[ctk.StringVar] = []
         self.player_rows: list[ctk.CTkFrame] = []
         self.game_var = ctk.StringVar(value="iRacing")
         self.career_mode_var = ctk.StringVar(value="Solo")
@@ -87,6 +94,24 @@ class NewGame(ctk.CTkFrame):
             font=ctk.CTkFont(size=11),
             fg_color="gray30",
             hover_color="gray40",
+        ).pack(pady=(8, 0))
+        self.shared_content_label = ctk.CTkLabel(
+            entry_frame,
+            text="",
+            font=ctk.CTkFont(size=11, weight="bold"),
+            text_color=("#15507d", "#7dbdff"),
+            wraplength=self.input_width + 100,
+        )
+        self.shared_content_label.pack(pady=(9, 0))
+        ctk.CTkButton(
+            entry_frame,
+            text="Create New Profile",
+            command=self.create_profile,
+            height=30,
+            width=150,
+            font=ctk.CTkFont(size=11, weight="bold"),
+            fg_color="#1f8f45",
+            hover_color="#176f35",
         ).pack(pady=(8, 0))
 
         ctk.CTkLabel(entry_frame, text="Starting Difficulty", font=ctk.CTkFont(size=12)).pack(anchor="w", pady=(18, 4))
@@ -194,9 +219,18 @@ class NewGame(ctk.CTkFrame):
             self.error_label.configure(text="Please enter a save name.")
             return
 
-        player_names = [entry.get().strip() for entry in self.player_entries if entry.get().strip()]
+        profiles = list_player_profiles()
+        profile_id_by_name = {profile["name"]: profile["id"] for profile in profiles}
+        player_names = [variable.get().strip() for variable in self.player_vars if variable.get().strip()]
+        player_profile_ids = [profile_id_by_name.get(name, "") for name in player_names]
         if not player_names:
             self.error_label.configure(text="Add at least one driver name.")
+            return
+        if any(not profile_id for profile_id in player_profile_ids):
+            self.error_label.configure(text="One of the selected player profiles no longer exists.")
+            return
+        if len(set(player_profile_ids)) != len(player_profile_ids):
+            self.error_label.configure(text="Each co-op driver must use a different player profile.")
             return
         career_mode = self.career_mode_var.get().strip()
         if career_mode.startswith("Rivals"):
@@ -233,6 +267,7 @@ class NewGame(ctk.CTkFrame):
             world_history_years=world_history_years,
             game=selected_game,
             career_mode=career_mode,
+            player_profile_ids=player_profile_ids,
         )
         if not success:
             self.error_label.configure(text=message)
@@ -263,16 +298,27 @@ class NewGame(ctk.CTkFrame):
         self.difficulty_entry.insert(0, default_value)
         self.difficulty_entry.configure(placeholder_text=f"{min_difficulty}-{max_difficulty}")
         self.difficulty_hint.configure(text=f"Set your top end AI difficulty. ({min_difficulty}-{max_difficulty})")
+        self._refresh_shared_content_summary()
 
     def _update_history_years_label(self, value: float) -> None:
         self.history_years_value.set(str(int(round(value))))
 
+    def on_show(self) -> None:
+        self._refresh_profile_choices()
+
     def add_player_entry(self) -> None:
+        profiles = list_player_profiles()
+        profile_names = [profile["name"] for profile in profiles]
+        selected_names = {variable.get() for variable in self.player_vars}
+        initial_name = next((name for name in profile_names if name not in selected_names), profile_names[0])
         row = ctk.CTkFrame(self.players_frame, fg_color="transparent")
         row.pack(fill="x", pady=4)
-        entry = ctk.CTkEntry(
+        variable = ctk.StringVar(value=initial_name)
+        entry = ctk.CTkOptionMenu(
             row,
-            placeholder_text=f"Driver {len(self.player_entries) + 1}",
+            values=profile_names,
+            variable=variable,
+            command=lambda _value: self._refresh_shared_content_summary(),
             height=34,
             width=self.input_width,
             font=ctk.CTkFont(size=13),
@@ -290,10 +336,12 @@ class NewGame(ctk.CTkFrame):
         )
         remove_btn.pack(side="left", padx=(8, 0))
         self.player_entries.append(entry)
+        self.player_vars.append(variable)
         self.player_rows.append(row)
         if len(self.player_entries) > 1 and self.career_mode_var.get() == "Solo":
             self.career_mode_var.set("Co-op")
         self._refresh_remove_buttons()
+        self._refresh_shared_content_summary()
 
     def remove_player_entry(self, row: ctk.CTkFrame, entry: ctk.CTkEntry) -> None:
         if len(self.player_entries) <= 1:
@@ -301,13 +349,58 @@ class NewGame(ctk.CTkFrame):
             return
 
         if entry in self.player_entries:
-            self.player_entries.remove(entry)
+            index = self.player_entries.index(entry)
+            self.player_entries.pop(index)
+            self.player_vars.pop(index)
         if row in self.player_rows:
             self.player_rows.remove(row)
         row.destroy()
         if len(self.player_entries) == 1 and self.career_mode_var.get() == "Co-op":
             self.career_mode_var.set("Solo")
         self._refresh_remove_buttons()
+        self._refresh_shared_content_summary()
+
+    def create_profile(self) -> None:
+        dialog = ctk.CTkInputDialog(title="Create Player Profile", text="Profile / driver name:")
+        name = str(dialog.get_input() or "").strip()
+        if not name:
+            return
+        success, message, profile = create_player_profile(name)
+        if not success or profile is None:
+            self.error_label.configure(text=message)
+            return
+        self._refresh_profile_choices(preferred_name=profile["name"])
+        self.error_label.configure(text="Profile created. Choose the content this player owns.")
+        ownership_screen = self.parent.screens["OwnershipScreen"]
+        ownership_screen.set_game(self.game_var.get())
+        ownership_screen.set_profile(profile["id"], "NewGame")
+        self.show_screen("OwnershipScreen")
+
+    def _refresh_profile_choices(self, preferred_name: str = "") -> None:
+        profiles = list_player_profiles()
+        names = [profile["name"] for profile in profiles]
+        if not names:
+            return
+        for index, entry in enumerate(self.player_entries):
+            current = self.player_vars[index].get()
+            entry.configure(values=names)
+            if preferred_name and index == len(self.player_entries) - 1:
+                self.player_vars[index].set(preferred_name)
+            elif current not in names:
+                fallback_id = default_profile_id()
+                fallback = next((profile["name"] for profile in profiles if profile["id"] == fallback_id), names[0])
+                self.player_vars[index].set(fallback)
+        self._refresh_shared_content_summary()
+
+    def _refresh_shared_content_summary(self) -> None:
+        if not hasattr(self, "shared_content_label"):
+            return
+        profiles = {profile["name"]: profile["id"] for profile in list_player_profiles()}
+        profile_ids = [profiles.get(variable.get(), "") for variable in self.player_vars]
+        profile_ids = [profile_id for profile_id in profile_ids if profile_id]
+        car_ids, track_names = effective_shared_owned_assets(profile_ids, self.game_var.get())
+        prefix = "Shared content" if len(profile_ids) > 1 else "Profile content"
+        self.shared_content_label.configure(text=f"{prefix}: {len(car_ids)} cars | {len(track_names)} tracks")
 
     def _refresh_remove_buttons(self) -> None:
         allow_remove = len(self.player_rows) > 1

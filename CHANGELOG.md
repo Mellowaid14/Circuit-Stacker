@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.5.5
+
+### General
+
+- Added individual player profiles for content ownership so each player can keep separate owned cars and tracks, with co-op careers using only content shared by every selected profile.
+
+### AMS2
+
+- Fixed the AMS2 livery list update so missing car entries, including Formula V10 Gen 3 variants, are restored from the current livery assets.
+
 ## 1.5
 
 ### General

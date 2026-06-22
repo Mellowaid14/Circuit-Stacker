@@ -11,7 +11,6 @@ from uuid import uuid4
 from .custom_championships import championship_rows
 from .driver_pool import (
     add_ai_drivers_from_standings,
-    add_human_drivers,
     advance_world_year,
     active_driver_rows_for_selection,
     active_world_ai_rows,
@@ -49,9 +48,16 @@ from .driver_pool import (
 )
 from .game_adapters import get_game_adapter
 from .paths import resource_path
+from .player_profiles import profile_refs, shared_owned_assets
 from .save_manager import create_save, load_save, update_save
 from .season_exporter import update_exported_season_difficulty
-from .settings_manager import load_settings, list_all_cars, owned_car_id_set_for_game, owned_track_id_set_for_game
+from .settings_manager import (
+    list_all_cars,
+    list_all_tracks,
+    load_settings,
+    owned_car_id_set_for_game,
+    owned_track_id_set_for_game,
+)
 from .weather import generate_ams2_weather
 
 
@@ -108,8 +114,51 @@ def _normalize_unlocked_tier(value: Any, fallback_tier: int = 1) -> int:
     return max(1, min(max_tier, tier))
 
 
-def load_owned_cars(game: str = "iRacing") -> list[dict[str, str]]:
-    owned_ids = owned_car_id_set_for_game(game)
+def _owned_assets_for_save(game: str, save_name: str | None = None) -> tuple[set[str], set[str]]:
+    normalized_game = "AMS2" if str(game).strip().casefold() == "ams2" else "iRacing"
+    if save_name:
+        save_data = load_save(save_name) or {}
+        profile_ids = [str(value).strip() for value in save_data.get("player_profile_ids", []) if str(value).strip()]
+        snapshot = save_data.get("owned_content_snapshot")
+        if profile_ids and isinstance(snapshot, dict) and str(snapshot.get("game", "")).casefold() == normalized_game.casefold():
+            car_ids = {str(value).strip() for value in snapshot.get("car_ids", []) if str(value).strip()}
+            track_names = {str(value).strip() for value in snapshot.get("track_names", []) if str(value).strip()}
+            if normalized_game == "AMS2":
+                car_ids.update(
+                    str(row.get("id", "")).strip()
+                    for row in list_all_cars()
+                    if str(row.get("Game", "")).strip().casefold() == "ams2"
+                    and str(row.get("DLC", "")).strip().casefold() in {"", "base game"}
+                )
+                track_names.update(
+                    str(row.get("Track", "")).strip()
+                    for row in list_all_tracks()
+                    if str(row.get("Game", "")).strip().casefold() == "ams2"
+                    and str(row.get("DLC", "")).strip().casefold() in {"", "base game"}
+                )
+            return car_ids, track_names
+    return owned_car_id_set_for_game(normalized_game), owned_track_id_set_for_game(normalized_game)
+
+
+def refresh_shared_content_snapshot(save_name: str) -> dict[str, Any] | None:
+    save_data = load_save(save_name) or {}
+    profile_ids = [str(value).strip() for value in save_data.get("player_profile_ids", []) if str(value).strip()]
+    if not profile_ids:
+        return None
+    game = str(save_data.get("game", "iRacing"))
+    car_ids, track_names = shared_owned_assets(profile_ids, game)
+    snapshot = {
+        "game": "AMS2" if game.strip().casefold() == "ams2" else "iRacing",
+        "car_ids": car_ids,
+        "track_names": track_names,
+        "season_year": int(save_data.get("world_year", datetime.now().year) or datetime.now().year),
+    }
+    update_save(save_name, {"owned_content_snapshot": snapshot})
+    return snapshot
+
+
+def load_owned_cars(game: str = "iRacing", save_name: str | None = None) -> list[dict[str, str]]:
+    owned_ids, _owned_tracks = _owned_assets_for_save(game, save_name)
     normalized_game = str(game).strip().casefold()
     return [
         row
@@ -1171,7 +1220,6 @@ def _underdog_news_candidates(
         if len(standings) < 8 or not schedule:
             continue
 
-        championship_name = _championship_entry_name(entry)
         sorted_standings = sorted(
             standings,
             key=lambda driver: (int(driver.get("points", 0) or 0), int(driver.get("wins", 0) or 0)),
@@ -1515,7 +1563,7 @@ def create_world_sim_progress(save_name: str, championship: dict[str, Any], play
         num_races = int(instance.get("Num of Races", 4) or 4)
         field_size = world_championship_field_size(instance)
         schedule = build_schedule(
-            load_tracks(schedule_style, tier, game),
+            load_tracks(schedule_style, tier, game, save_name),
             num_races,
             game=game,
             championship_style=schedule_style,
@@ -1549,6 +1597,7 @@ def create_world_sim_progress(save_name: str, championship: dict[str, Any], play
 
 
 def prepare_offseason_championship_select(save_name: str, player_names: list[str]) -> list[dict[str, Any]]:
+    refresh_shared_content_snapshot(save_name)
     save_data = load_save(save_name) or {}
     game = str(save_data.get("game", "iRacing"))
     championships = load_world_championships(game)
@@ -1596,7 +1645,7 @@ def prepare_offseason_championship_select(save_name: str, player_names: list[str
         num_races = int(championship.get("Num of Races", 4) or 4)
         field_size = world_championship_field_size(championship)
         schedule = build_schedule(
-            load_tracks(schedule_style, tier, game),
+            load_tracks(schedule_style, tier, game, save_name),
             num_races,
             game=game,
             championship_style=schedule_style,
@@ -1681,7 +1730,7 @@ def _populate_world_with_player_championship(
         num_races = int(instance.get("Num of Races", 4) or 4)
         field_size = world_championship_field_size(instance)
         schedule = build_schedule(
-            load_tracks(schedule_style, tier, game),
+            load_tracks(schedule_style, tier, game, save_name),
             num_races,
             game=game,
             championship_style=schedule_style,
@@ -1859,8 +1908,12 @@ def driver_class_name(driver: dict[str, Any]) -> str:
     return str(driver.get("class_name", "")).strip() or "Overall"
 
 
-def get_eligible_player_cars(championship: dict[str, Any], game: str = "iRacing") -> list[dict[str, str]]:
-    owned_cars = load_owned_cars(game)
+def get_eligible_player_cars(
+    championship: dict[str, Any],
+    game: str = "iRacing",
+    save_name: str | None = None,
+) -> list[dict[str, str]]:
+    owned_cars = load_owned_cars(game, save_name)
     eligible_ids = {
         str(car.get("id", "")).strip()
         for car in _cars_for_championship_rows(_player_entry_rows(championship, game), game)
@@ -1868,15 +1921,23 @@ def get_eligible_player_cars(championship: dict[str, Any], game: str = "iRacing"
     return [car for car in owned_cars if str(car.get("id", "")).strip() in eligible_ids]
 
 
-def select_player_car(championship: dict[str, Any], game: str = "iRacing") -> dict[str, str] | None:
-    eligible_cars = get_eligible_player_cars(championship, game)
+def select_player_car(
+    championship: dict[str, Any],
+    game: str = "iRacing",
+    save_name: str | None = None,
+) -> dict[str, str] | None:
+    eligible_cars = get_eligible_player_cars(championship, game, save_name)
     if not eligible_cars:
         return None
     return random.choice(eligible_cars)
 
 
-def championship_has_eligible_player_car(championship: dict[str, Any], game: str = "iRacing") -> bool:
-    return select_player_car(championship, game) is not None
+def championship_has_eligible_player_car(
+    championship: dict[str, Any],
+    game: str = "iRacing",
+    save_name: str | None = None,
+) -> bool:
+    return select_player_car(championship, game, save_name) is not None
 
 
 def _choose_weather(style: str) -> str:
@@ -1911,11 +1972,12 @@ def _time_slots_for_style(style: str) -> list[str]:
     return ["Morning", "Afternoon", "Evening"]
 
 
-def load_tracks(style: str, tier: int, game: str = "iRacing") -> list[dict[str, str]]:
+def load_tracks(style: str, tier: int, game: str = "iRacing", save_name: str | None = None) -> list[dict[str, str]]:
     """Load owned tracks matching the championship's mapped track style and tier."""
     tracks = []
     target_style = _track_style_for_championship(style)
-    owned_track_names = {value.casefold() for value in owned_track_id_set_for_game(game)}
+    _owned_cars, owned_tracks = _owned_assets_for_save(game, save_name)
+    owned_track_names = {value.casefold() for value in owned_tracks}
     normalized_game = str(game).strip().casefold()
     with TRACKS_CSV.open(newline="", encoding="utf-8") as file_obj:
         reader = csv.DictReader(file_obj)
@@ -2164,6 +2226,7 @@ def _apply_player_team_offer(
     standings: list[dict[str, Any]],
     player_names: list[str],
     player_team_offer: dict[str, Any] | None,
+    game: str = "Any",
 ) -> list[dict[str, Any]]:
     if not standings or not isinstance(player_team_offer, dict):
         return standings
@@ -2173,7 +2236,10 @@ def _apply_player_team_offer(
     team_id = str(player_team_offer.get("team_id", "")).strip()
     team_prestige = int(player_team_offer.get("team_prestige", 0) or 0)
     team_reputation = int(player_team_offer.get("team_reputation", team_prestige) or team_prestige)
-    team_key = str(player_team_offer.get("team_key", "")).strip() or f"{str(championship.get('Game', 'Any')).strip().casefold()}|{team_id.casefold() or team_name.casefold()}"
+    offer_game = str(player_team_offer.get("game", "") or player_team_offer.get("Game", "") or game or "Any").strip()
+    team_key = str(player_team_offer.get("team_key", "")).strip() or (
+        f"{offer_game.casefold()}|{team_id.casefold() or team_name.casefold()}"
+    )
     player_set = {str(name).strip() for name in player_names if str(name).strip()}
     team_seat = 1
     for driver in standings:
@@ -2393,7 +2459,7 @@ def _rivalry_message_body(
             "",
             "Consider this a friendly warning from the other side of the garage lane.",
             "",
-            f"We are officially racing each other now. If you want position, you are going to have to earn every inch of it.",
+            "We are officially racing each other now. If you want position, you are going to have to earn every inch of it.",
             "",
             rival_name,
         ),
@@ -2753,20 +2819,36 @@ def create_new_save(
     world_history_years: int = 5,
     game: str = "iRacing",
     career_mode: str = "",
+    player_profile_ids: list[str] | None = None,
 ) -> tuple[bool, str]:
-    normalized_players = _normalize_player_names(player_names, save_name)
+    selected_profile_ids = [str(value).strip() for value in (player_profile_ids or []) if str(value).strip()]
+    selected_profile_refs = profile_refs(selected_profile_ids)
+    if selected_profile_refs:
+        normalized_players = _normalize_player_names([ref["name"] for ref in selected_profile_refs], save_name)
+        selected_profile_ids = [ref["profile_id"] for ref in selected_profile_refs]
+    else:
+        normalized_players = _normalize_player_names(player_names, save_name)
     current_year = datetime.now().year
     normalized_history_years = max(5, min(20, int(world_history_years)))
     normalized_game = "AMS2" if str(game).strip().casefold() == "ams2" else "iRacing"
     normalized_mode = _career_mode(career_mode, normalized_players)
     player_label = ", ".join(normalized_players) or "Driver"
     player_perspectives = _normalize_player_perspectives({}, normalized_players, {})
+    shared_car_ids, shared_track_names = shared_owned_assets(selected_profile_ids, normalized_game)
     success, message = create_save(
         save_name,
         {
             "game": normalized_game,
             "career_mode": normalized_mode,
             "players": normalized_players,
+            "player_profiles": selected_profile_refs,
+            "player_profile_ids": selected_profile_ids,
+            "owned_content_snapshot": {
+                "game": normalized_game,
+                "car_ids": shared_car_ids,
+                "track_names": shared_track_names,
+                "season_year": current_year,
+            },
             "active_player_name": _active_player_name("", normalized_players),
             "player_perspectives": player_perspectives,
             "starting_difficulty": _clamp_difficulty(starting_difficulty),
@@ -2809,7 +2891,7 @@ def start_championship(
         _normalize_unlocked_tier(championship.get("unlocked_tier"), tier),
         _normalize_unlocked_tier(championship.get("unlocked_tiers"), tier),
     )
-    player_car = player_car or select_player_car(championship, game)
+    player_car = player_car or select_player_car(championship, game, save_name)
 
     if player_car is None:
         raise ValueError("No owned car is eligible for this championship.")
@@ -2844,12 +2926,17 @@ def start_championship(
     schedule_tier = int(championship_for_state.get("_field_tier", tier) or tier)
 
     schedule = build_schedule(
-        load_tracks(style, schedule_tier, game),
+        load_tracks(style, schedule_tier, game, save_name),
         num_races,
         game=game,
         championship_style=style,
         minimum_garages=total_drivers,
     )
+    if not schedule:
+        ownership_label = "shared owned" if len(player_names) > 1 else "owned"
+        raise ValueError(
+            f"No {ownership_label} tracks with enough garage spaces are available for this championship."
+        )
     set_human_primary_style_if_unassigned(save_name, player_names, str(championship_for_state.get("Style", "Sports Car")))
     player_seed_standings = assign_driver_classes(
         build_standings_from_pool(save_name, player_names, 0, championship_for_state),
@@ -2857,7 +2944,7 @@ def start_championship(
         player_names,
         player_car,
     )
-    player_seed_standings = _apply_player_team_offer(player_seed_standings, player_names, player_team_offer)
+    player_seed_standings = _apply_player_team_offer(player_seed_standings, player_names, player_team_offer, game)
     standings, world_sim_progress = _populate_world_with_player_championship(
         save_name,
         championship_for_state,
@@ -2865,7 +2952,7 @@ def start_championship(
         player_seed_standings,
         total_drivers,
     )
-    standings = _apply_player_team_offer(standings, player_names, player_team_offer)
+    standings = _apply_player_team_offer(standings, player_names, player_team_offer, game)
     standings = assign_teams_to_standings(standings, championship_for_state, save_name)
     add_ai_drivers_from_standings(save_name, standings, player_names, championship_for_state)
     set_ai_primary_style_on_first_championship(save_name, standings, str(championship_for_state.get("Style", "Sports Car")))
@@ -3088,7 +3175,12 @@ def continue_or_initialize_season(
     rivalry_heat = _merged_perspective_rivalry_heat(player_perspectives)
     if schedule and standings:
         standings = assign_teams_to_standings(list(standings), championship, save_name)
-        standings = _apply_player_team_offer(standings, _normalize_player_names(player_names, save_name), player_team_offer)
+        standings = _apply_player_team_offer(
+            standings,
+            _normalize_player_names(player_names, save_name),
+            player_team_offer,
+            current_game,
+        )
         normalized_unlocked_tier = max(
             int(championship.get("Tier", 1)),
             _normalize_unlocked_tier(unlocked_tier, int(championship.get("Tier", 1))),

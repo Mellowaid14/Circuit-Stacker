@@ -449,3 +449,6 @@ id,Car class,Car,Car_Class_ID,image file,Game,Style,DLC,Owned,FILEPATH,Iracing_I
 9265,F-V8 Gen 1,F-V8 Gen 1 R26,,F-V8_Gen1 R26,AMS2,Open Wheel,,Yes,,,F-V8_Gen1 R26
 9266,F-V8 Gen 2,F-V8 Gen 2,,F-V8 Gen2,AMS2,Open Wheel,,Yes,,,F-V8_Gen2
 9267,F-V8 Gen 2,F-V8 Gen 2 R28,,F-V8 Gen2 r28,AMS2,Open Wheel,,Yes,,,F-V8_Gen2 r28
+9268,Formula V10 Gen 3,F-V10 Gen 3 B,,F-V10_Gen3 B,AMS2,Open Wheel,,Yes,,,F-V10_Gen3 B
+9269,Formula V10 Gen 3,F-V10 Gen 3 M,,F-V10_Gen3 M,AMS2,Open Wheel,,Yes,,,F-V10_Gen3 M
+9270,Formula V10 Gen 3,Renault R25,,F-V10_Gen3 R26,AMS2,Open Wheel,,Yes,,,F-V10_Gen3 R26

@@ -23,6 +23,7 @@ from .screens.manual_setup_screen import ManualSetupScreen
 from .screens.menu_screen import MenuScreen
 from .screens.new_game import NewGame
 from .screens.ownership_screen import OwnershipScreen
+from .screens.player_profiles_screen import PlayerProfilesScreen
 from .screens.settings_screen import SettingsScreen
 from .screens.season_recap_screen import SeasonRecapScreen
 from .screens.sim_progress_screen import SimProgressScreen
@@ -48,6 +49,7 @@ SETTINGS_CHILD_SCREENS = {
     "CustomChampionshipScreen",
     "CustomChampionshipManageScreen",
     "OwnershipScreen",
+    "PlayerProfilesScreen",
 }
 
 
@@ -249,6 +251,7 @@ class App(ctk.CTk):
             WorldChampionshipsScreen,
             WorldChampionshipDetailScreen,
             SettingsScreen,
+            PlayerProfilesScreen,
             OwnershipScreen,
         ]:
             screen = screen_class(self, self.show_screen)

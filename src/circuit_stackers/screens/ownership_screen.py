@@ -12,6 +12,13 @@ from ..settings_manager import (
     reset_owned_assets_to_default_for_game,
     update_owned_assets_for_game,
 )
+from ..player_profiles import (
+    default_profile_id,
+    get_player_profile,
+    profile_owned_assets,
+    reset_profile_owned_assets,
+    update_profile_owned_assets,
+)
 
 
 class OwnershipScreen(ctk.CTkFrame):
@@ -19,6 +26,8 @@ class OwnershipScreen(ctk.CTkFrame):
         super().__init__(parent, fg_color="transparent")
         self.show_screen = show_screen
         self.current_game = "iRacing"
+        self.profile_id = default_profile_id()
+        self.return_screen = "SettingsScreen"
         self.car_vars: dict[str, tk.BooleanVar] = {}
         self.track_vars: dict[str, tk.BooleanVar] = {}
         self.car_select_all_var: tk.BooleanVar | None = None
@@ -34,6 +43,13 @@ class OwnershipScreen(ctk.CTkFrame):
             text_color="gray",
         )
         self.subtitle_label.pack(pady=(0, 16))
+        self.profile_label = ctk.CTkLabel(
+            self,
+            text="",
+            font=ctk.CTkFont(size=12, weight="bold"),
+            text_color=("#15507d", "#7dbdff"),
+        )
+        self.profile_label.pack(pady=(0, 10))
 
         buttons = ctk.CTkFrame(self, fg_color="transparent")
         buttons.pack(pady=(0, 12))
@@ -61,7 +77,7 @@ class OwnershipScreen(ctk.CTkFrame):
         ctk.CTkButton(
             buttons,
             text="<- Back",
-            command=lambda: self.show_screen("SettingsScreen"),
+            command=lambda: self.show_screen(self.return_screen),
             height=36,
             width=120,
             font=ctk.CTkFont(size=12),
@@ -96,6 +112,11 @@ class OwnershipScreen(ctk.CTkFrame):
         self.status_label.pack(pady=(0, 8))
 
     def on_show(self) -> None:
+        profile = get_player_profile(self.profile_id)
+        if profile is None:
+            self.profile_id = default_profile_id()
+            profile = get_player_profile(self.profile_id)
+        self.profile_label.configure(text=f"Profile: {(profile or {}).get('name', 'Default Player')}")
         self.title_label.configure(text=f"{self.current_game} Owned Cars and Tracks")
         if self.current_game == "AMS2":
             self.subtitle_label.configure(
@@ -115,9 +136,16 @@ class OwnershipScreen(ctk.CTkFrame):
     def set_game(self, game: str) -> None:
         self.current_game = "AMS2" if str(game).strip().casefold() == "ams2" else "iRacing"
 
+    def set_profile(self, profile_id: str, return_screen: str = "PlayerProfilesScreen") -> None:
+        self.profile_id = str(profile_id).strip() or default_profile_id()
+        self.return_screen = return_screen
+
     def populate_lists(self) -> None:
         refresh_asset_caches()
-        owned_car_ids, owned_track_names = owned_asset_lists(self.current_game)
+        if self.profile_id:
+            owned_car_ids, owned_track_names = profile_owned_assets(self.profile_id, self.current_game)
+        else:
+            owned_car_ids, owned_track_names = owned_asset_lists(self.current_game)
         owned_car_ids = set(owned_car_ids)
         owned_track_names = set(owned_track_names)
 
@@ -183,13 +211,17 @@ class OwnershipScreen(ctk.CTkFrame):
         else:
             car_ids = [asset_id for asset_id, var in self.car_vars.items() if var.get()]
             track_names = [asset_id for asset_id, var in self.track_vars.items() if var.get()]
-        update_owned_assets_for_game(self.current_game, car_ids, track_names)
-        self.status_label.configure(text=f"{self.current_game} owned content saved.")
+        update_profile_owned_assets(self.profile_id, self.current_game, car_ids, track_names)
+        if self.profile_id == default_profile_id():
+            update_owned_assets_for_game(self.current_game, car_ids, track_names)
+        self.status_label.configure(text=f"{self.current_game} owned content saved for this profile.")
 
     def reset_defaults(self) -> None:
-        reset_owned_assets_to_default_for_game(self.current_game)
+        reset_profile_owned_assets(self.profile_id, self.current_game)
+        if self.profile_id == default_profile_id():
+            reset_owned_assets_to_default_for_game(self.current_game)
         self.populate_lists()
-        self.status_label.configure(text=f"{self.current_game} ownership reset to default CSV values.")
+        self.status_label.configure(text=f"{self.current_game} ownership reset for this profile.")
 
     def _populate_ams2_car_dlcs(self, owned_car_ids: set[str]) -> None:
         dlc_to_car_ids: dict[str, set[str]] = {}
