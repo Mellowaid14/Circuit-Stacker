@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "circuit-stackers"
-version = "1.5"
-description = "Circuit Stackers Python project."
+version = "1.5.5"
+description = "A persistent motorsport career simulator for iRacing and Automobilista 2."
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [
@@ -20,6 +20,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
   "pytest>=8.0",
+  "ruff>=0.12",
 ]
 build = [
   "pyinstaller>=6.0",
@@ -35,5 +36,18 @@ package-dir = {"" = "src"}
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+circuit_stackers = [
+  "data/*.csv",
+  "assets/**/*",
+]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]
