@@ -172,15 +172,33 @@ class TeamDetailScreen(ctk.CTkFrame):
         current_championships = current_team_championships(self.save_name, self.team_key)
         team_name = str(team.get("team_name", "Team Details"))
         self.title_label.configure(text=team_name)
-        self.subtitle_label.configure(text=f"Save: {self.save_name} | {team.get('game', '-')} | Rep {team.get('reputation', '-')}")
+        self.subtitle_label.configure(
+            text=(
+                f"Save: {self.save_name} | {team.get('game', '-')} | "
+                f"Strength {team.get('current_strength', team.get('reputation', '-'))} | "
+                f"{str(team.get('trajectory', 'stable')).title()}"
+            )
+        )
 
         self._section_label(self.summary_frame, "Current Snapshot")
         self._color_swatches(self.summary_frame, self._parse_colors(str(team.get("team_colors", ""))))
-        self._info_row(self.summary_frame, "Reputation:", str(team.get("reputation", "-")))
+        self._info_row(self.summary_frame, "Current Strength:", str(team.get("current_strength", team.get("reputation", "-"))))
+        self._info_row(self.summary_frame, "Legacy Reputation:", str(team.get("reputation", "-")))
         self._info_row(self.summary_frame, "Base Prestige:", str(team.get("base_prestige", "-")))
+        self._info_row(self.summary_frame, "Trajectory:", str(team.get("trajectory", "stable")).title())
+        self._info_row(self.summary_frame, "Form:", str(team.get("team_form", 0)))
+        self._info_row(self.summary_frame, "Ambition:", str(team.get("team_ambition", "-")))
+        self._info_row(self.summary_frame, "Stability:", str(team.get("team_stability", "-")))
+        self._info_row(self.summary_frame, "Development:", str(team.get("team_development", "-")))
+        self._info_row(self.summary_frame, "Financial Strength:", str(team.get("team_financial_strength", "-")))
+        self._info_row(self.summary_frame, "Pressure:", str(team.get("team_pressure", "-")))
+        self._info_row(self.summary_frame, "Philosophy:", str(team.get("team_philosophy") or "-"))
         self._info_row(self.summary_frame, "Game:", str(team.get("game", "-")))
         self._info_row(self.summary_frame, "Last Style:", str(team.get("last_style") or "-"))
         self._info_row(self.summary_frame, "Last Series:", str(team.get("last_championship") or "-"))
+        self._info_row(self.summary_frame, "Last Season Pts:", str(team.get("last_season_points", 0)))
+        self._info_row(self.summary_frame, "Last Season Wins:", str(team.get("last_season_wins", 0)))
+        self._info_row(self.summary_frame, "Last Season Titles:", str(team.get("last_season_titles", 0)))
 
         self._section_label(self.summary_frame, "Career Totals")
         self._info_row(self.summary_frame, "Seasons:", str(team.get("seasons_completed", 0)))

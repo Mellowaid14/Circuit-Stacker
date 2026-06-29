@@ -151,11 +151,16 @@ def _generate_driver_profile(
         "ams2_general_skill": _random_ams2_general_skill(),
         "ams2_qualifying_skill": _random_ams2_qualifying_skill(ams2_race_skill),
         "ams2_race_skill": ams2_race_skill,
+        "ams2_setup_downforce": _random_ams2_stat(0.35, 0.65),
+        "ams2_setup_downforce_randomness": 0.35,
         "ams2_stamina": _random_ams2_stat(),
         "ams2_start_reactions": _random_ams2_stat(),
         "ams2_tyre_management": _random_ams2_stat(),
+        "ams2_drag_scalar": 1.0,
+        "ams2_power_scalar": 1.0,
         "ams2_vehicle_reliability": _random_ams2_stat(0.5, 1.0),
         "ams2_weather_tyre_changes": _random_ams2_stat(),
+        "ams2_weight_scalar": 1.0,
         "ams2_wet_skill": _random_ams2_stat(),
     }
 
@@ -184,11 +189,16 @@ def _apply_profile_update(connection: sqlite3.Connection, driver_id: str, profil
             ams2_general_skill = ?,
             ams2_qualifying_skill = ?,
             ams2_race_skill = ?,
+            ams2_setup_downforce = ?,
+            ams2_setup_downforce_randomness = ?,
             ams2_stamina = ?,
             ams2_start_reactions = ?,
             ams2_tyre_management = ?,
+            ams2_drag_scalar = ?,
+            ams2_power_scalar = ?,
             ams2_vehicle_reliability = ?,
             ams2_weather_tyre_changes = ?,
+            ams2_weight_scalar = ?,
             ams2_wet_skill = ?,
             updated_at = ?
         WHERE id = ?
@@ -214,11 +224,16 @@ def _apply_profile_update(connection: sqlite3.Connection, driver_id: str, profil
             profile["ams2_general_skill"],
             profile["ams2_qualifying_skill"],
             profile["ams2_race_skill"],
+            profile["ams2_setup_downforce"],
+            profile["ams2_setup_downforce_randomness"],
             profile["ams2_stamina"],
             profile["ams2_start_reactions"],
             profile["ams2_tyre_management"],
+            profile["ams2_drag_scalar"],
+            profile["ams2_power_scalar"],
             profile["ams2_vehicle_reliability"],
             profile["ams2_weather_tyre_changes"],
+            profile["ams2_weight_scalar"],
             profile["ams2_wet_skill"],
             now,
             driver_id,
@@ -368,6 +383,18 @@ def initialize_driver_pool(save_name: str, world_year: int | None = None) -> Pat
                 game TEXT NOT NULL,
                 base_prestige INTEGER NOT NULL DEFAULT 50,
                 reputation INTEGER NOT NULL DEFAULT 50,
+                current_strength INTEGER NOT NULL DEFAULT 50,
+                team_form INTEGER NOT NULL DEFAULT 0,
+                team_ambition INTEGER NOT NULL DEFAULT 50,
+                team_stability INTEGER NOT NULL DEFAULT 50,
+                team_development INTEGER NOT NULL DEFAULT 50,
+                team_financial_strength INTEGER NOT NULL DEFAULT 50,
+                team_pressure INTEGER NOT NULL DEFAULT 50,
+                team_philosophy TEXT NOT NULL DEFAULT 'Balanced',
+                trajectory TEXT NOT NULL DEFAULT 'stable',
+                last_season_points INTEGER NOT NULL DEFAULT 0,
+                last_season_wins INTEGER NOT NULL DEFAULT 0,
+                last_season_titles INTEGER NOT NULL DEFAULT 0,
                 seasons_completed INTEGER NOT NULL DEFAULT 0,
                 championships INTEGER NOT NULL DEFAULT 0,
                 wins INTEGER NOT NULL DEFAULT 0,
@@ -567,11 +594,16 @@ def initialize_driver_pool(save_name: str, world_year: int | None = None) -> Pat
         _ensure_column(connection, "drivers", "ams2_general_skill", "INTEGER")
         _ensure_column(connection, "drivers", "ams2_qualifying_skill", "REAL")
         _ensure_column(connection, "drivers", "ams2_race_skill", "REAL")
+        _ensure_column(connection, "drivers", "ams2_setup_downforce", "REAL")
+        _ensure_column(connection, "drivers", "ams2_setup_downforce_randomness", "REAL")
         _ensure_column(connection, "drivers", "ams2_stamina", "REAL")
         _ensure_column(connection, "drivers", "ams2_start_reactions", "REAL")
         _ensure_column(connection, "drivers", "ams2_tyre_management", "REAL")
+        _ensure_column(connection, "drivers", "ams2_drag_scalar", "REAL")
+        _ensure_column(connection, "drivers", "ams2_power_scalar", "REAL")
         _ensure_column(connection, "drivers", "ams2_vehicle_reliability", "REAL")
         _ensure_column(connection, "drivers", "ams2_weather_tyre_changes", "REAL")
+        _ensure_column(connection, "drivers", "ams2_weight_scalar", "REAL")
         _ensure_column(connection, "drivers", "ams2_wet_skill", "REAL")
         connection.execute(
             """
@@ -583,10 +615,37 @@ def initialize_driver_pool(save_name: str, world_year: int | None = None) -> Pat
             WHERE ams2_general_skill IS NULL
             """
         )
+        connection.execute(
+            """
+            UPDATE drivers
+            SET ams2_setup_downforce = COALESCE(ams2_setup_downforce, 0.5),
+                ams2_setup_downforce_randomness = COALESCE(ams2_setup_downforce_randomness, 0.35),
+                ams2_weight_scalar = COALESCE(ams2_weight_scalar, 1.0),
+                ams2_power_scalar = COALESCE(ams2_power_scalar, 1.0),
+                ams2_drag_scalar = COALESCE(ams2_drag_scalar, 1.0)
+            WHERE ams2_setup_downforce IS NULL
+               OR ams2_setup_downforce_randomness IS NULL
+               OR ams2_weight_scalar IS NULL
+               OR ams2_power_scalar IS NULL
+               OR ams2_drag_scalar IS NULL
+            """
+        )
         _ensure_column(connection, "driver_championship_wins", "class_name", "TEXT NOT NULL DEFAULT 'Overall'")
         _ensure_column(connection, "team_championship_seats", "driver_id", "TEXT")
         _ensure_column(connection, "team_championship_seats", "driver_name", "TEXT")
         _ensure_column(connection, "team_championship_seats", "class_name", "TEXT")
+        _ensure_column(connection, "team_reputations", "current_strength", "INTEGER NOT NULL DEFAULT 50")
+        _ensure_column(connection, "team_reputations", "team_form", "INTEGER NOT NULL DEFAULT 0")
+        _ensure_column(connection, "team_reputations", "team_ambition", "INTEGER NOT NULL DEFAULT 50")
+        _ensure_column(connection, "team_reputations", "team_stability", "INTEGER NOT NULL DEFAULT 50")
+        _ensure_column(connection, "team_reputations", "team_development", "INTEGER NOT NULL DEFAULT 50")
+        _ensure_column(connection, "team_reputations", "team_financial_strength", "INTEGER NOT NULL DEFAULT 50")
+        _ensure_column(connection, "team_reputations", "team_pressure", "INTEGER NOT NULL DEFAULT 50")
+        _ensure_column(connection, "team_reputations", "team_philosophy", "TEXT NOT NULL DEFAULT 'Balanced'")
+        _ensure_column(connection, "team_reputations", "trajectory", "TEXT NOT NULL DEFAULT 'stable'")
+        _ensure_column(connection, "team_reputations", "last_season_points", "INTEGER NOT NULL DEFAULT 0")
+        _ensure_column(connection, "team_reputations", "last_season_wins", "INTEGER NOT NULL DEFAULT 0")
+        _ensure_column(connection, "team_reputations", "last_season_titles", "INTEGER NOT NULL DEFAULT 0")
         _sync_team_reputations_from_csv(connection)
         missing_profile_rows = connection.execute(
             """
@@ -1044,7 +1103,7 @@ def update_ratings_after_race(
             for driver_id, change in rating_changes.items():
                 new_rating = max(0, int(current_ratings[driver_id]) + change)
                 connection.execute(
-                    f"""
+                    """
                     UPDATE drivers
                     SET mmr = ?,
                         career_starts = career_starts + 1,
@@ -1538,11 +1597,16 @@ def add_driver(
         "ams2_general_skill",
         "ams2_qualifying_skill",
         "ams2_race_skill",
+        "ams2_setup_downforce",
+        "ams2_setup_downforce_randomness",
         "ams2_stamina",
         "ams2_start_reactions",
         "ams2_tyre_management",
+        "ams2_drag_scalar",
+        "ams2_power_scalar",
         "ams2_vehicle_reliability",
         "ams2_weather_tyre_changes",
+        "ams2_weight_scalar",
         "ams2_wet_skill",
         "created_at",
         "updated_at",
@@ -1599,11 +1663,16 @@ def add_driver(
             profile["ams2_general_skill"],
             profile["ams2_qualifying_skill"],
             profile["ams2_race_skill"],
+            profile["ams2_setup_downforce"],
+            profile["ams2_setup_downforce_randomness"],
             profile["ams2_stamina"],
             profile["ams2_start_reactions"],
             profile["ams2_tyre_management"],
+            profile["ams2_drag_scalar"],
+            profile["ams2_power_scalar"],
             profile["ams2_vehicle_reliability"],
             profile["ams2_weather_tyre_changes"],
+            profile["ams2_weight_scalar"],
             profile["ams2_wet_skill"],
             now,
             now,
@@ -2416,26 +2485,68 @@ def _update_team_reputations_for_season(
 
     for key, stats in team_stats.items():
         base_reputation = _safe_int(championship.get("Prestige"), 50)
+        baseline_strength = _team_strength_baseline(base_reputation)
         existing = connection.execute(
-            "SELECT reputation, base_prestige FROM team_reputations WHERE team_key = ?",
+            """
+            SELECT
+                reputation,
+                current_strength,
+                base_prestige,
+                team_form,
+                team_ambition,
+                team_stability,
+                team_development,
+                team_financial_strength,
+                team_pressure,
+                team_philosophy
+            FROM team_reputations
+            WHERE team_key = ?
+            """,
             (key,),
         ).fetchone()
+        seed_profile = _team_seed_profile(stats["team_id"], stats["team_name"], game, base_reputation)
         if existing:
-            current_reputation = _safe_int(existing["reputation"], base_reputation)
+            current_reputation = _safe_int(existing["current_strength"], _safe_int(existing["reputation"], base_reputation))
             base_reputation = _safe_int(existing["base_prestige"], base_reputation)
+            previous_form = _safe_int(existing["team_form"], 0)
+            ambition = _safe_int(existing["team_ambition"], seed_profile["team_ambition"])
+            stability = _safe_int(existing["team_stability"], seed_profile["team_stability"])
+            development = _safe_int(existing["team_development"], seed_profile["team_development"])
+            financial_strength = _safe_int(existing["team_financial_strength"], seed_profile["team_financial_strength"])
+            pressure = _safe_int(existing["team_pressure"], seed_profile["team_pressure"])
+            philosophy = str(existing["team_philosophy"] or "").strip() or str(seed_profile["team_philosophy"])
         else:
-            current_reputation = base_reputation
+            current_reputation = baseline_strength
+            previous_form = 0
+            ambition = seed_profile["team_ambition"]
+            stability = seed_profile["team_stability"]
+            development = seed_profile["team_development"]
+            financial_strength = seed_profile["team_financial_strength"]
+            pressure = seed_profile["team_pressure"]
+            philosophy = str(seed_profile["team_philosophy"])
 
-        delta = (
-            int(stats["championships"]) * 4
-            + min(3, int(stats["wins"]))
-            + min(2, int(stats["top_half"]))
-            - min(4, int(stats["bottom_quarter"]))
+        wins = int(stats["wins"])
+        titles = int(stats["championships"])
+        points = int(stats["points"])
+        top_half = int(stats["top_half"])
+        bottom_quarter = int(stats["bottom_quarter"])
+        seasonal_signal = (
+            titles * 7
+            + min(6, wins * 2)
+            + min(5, top_half)
+            - min(7, bottom_quarter * 2)
         )
-        if int(stats["points"]) <= 0:
-            delta -= 1
-        delta = max(-5, min(7, delta))
-        new_reputation = max(1, min(100, current_reputation + delta))
+        if points <= 0:
+            seasonal_signal -= 4
+        development_bonus = max(-2, min(4, round((development - 50) / 12)))
+        ambition_bonus = max(-2, min(4, round((ambition - 50) / 12)))
+        financial_bonus = max(-2, min(4, round((financial_strength - 50) / 12)))
+        pressure_drag = max(-3, min(3, round((pressure - 55) / 12)))
+        stability_drag = max(-2, min(2, round((50 - stability) / 15)))
+        delta = max(-8, min(8, seasonal_signal + development_bonus + ambition_bonus + financial_bonus - pressure_drag - stability_drag))
+        new_form = _clamp_rating_stat(round((previous_form * 0.45) + delta), -12, 12)
+        new_reputation = _clamp_rating_stat(current_reputation + delta, max(1, baseline_strength - 18), min(100, baseline_strength + 18))
+        trajectory = _team_trajectory_for_strength(new_reputation, current_reputation, base_reputation, new_form)
 
         for class_name, class_stats in stats["classes"].items():
             driver_names = sorted(str(name) for name in class_stats["drivers"] if str(name).strip())
@@ -2492,6 +2603,18 @@ def _update_team_reputations_for_season(
                 game,
                 base_prestige,
                 reputation,
+                current_strength,
+                team_form,
+                team_ambition,
+                team_stability,
+                team_development,
+                team_financial_strength,
+                team_pressure,
+                team_philosophy,
+                trajectory,
+                last_season_points,
+                last_season_wins,
+                last_season_titles,
                 seasons_completed,
                 championships,
                 wins,
@@ -2500,10 +2623,22 @@ def _update_team_reputations_for_season(
                 last_style,
                 updated_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(team_key) DO UPDATE SET
                 team_name = excluded.team_name,
                 reputation = excluded.reputation,
+                current_strength = excluded.current_strength,
+                team_form = excluded.team_form,
+                team_ambition = excluded.team_ambition,
+                team_stability = excluded.team_stability,
+                team_development = excluded.team_development,
+                team_financial_strength = excluded.team_financial_strength,
+                team_pressure = excluded.team_pressure,
+                team_philosophy = excluded.team_philosophy,
+                trajectory = excluded.trajectory,
+                last_season_points = excluded.last_season_points,
+                last_season_wins = excluded.last_season_wins,
+                last_season_titles = excluded.last_season_titles,
                 seasons_completed = seasons_completed + 1,
                 championships = championships + excluded.championships,
                 wins = wins + excluded.wins,
@@ -2519,6 +2654,18 @@ def _update_team_reputations_for_season(
                 game,
                 base_reputation,
                 new_reputation,
+                new_reputation,
+                new_form,
+                ambition,
+                stability,
+                development,
+                financial_strength,
+                pressure,
+                philosophy,
+                trajectory,
+                points,
+                wins,
+                titles,
                 int(stats["championships"]),
                 int(stats["wins"]),
                 int(stats["podiums"]),
@@ -2975,6 +3122,74 @@ TEAM_PERSONALITIES = (
     "Family",
 )
 
+TEAM_PHILOSOPHIES = (
+    "Balanced",
+    "Driver Continuity",
+    "Rookie Pipeline",
+    "Win Now",
+    "Technical Excellence",
+    "Underdog Grit",
+)
+
+TEAM_TRAJECTORIES = ("rising", "stable", "falling", "rebuilding")
+
+
+def _team_seed_value(team_id: str, team_name: str, game: str, label: str) -> int:
+    return _stable_seed(str(team_id).strip(), str(team_name).strip().casefold(), str(game).strip().casefold(), label)
+
+
+def _seeded_team_rating(team_id: str, team_name: str, game: str, label: str, low: int, high: int) -> int:
+    span = max(0, int(high) - int(low))
+    if span <= 0:
+        return _clamp_rating_stat(low)
+    return _clamp_rating_stat(low + (_team_seed_value(team_id, team_name, game, label) % (span + 1)))
+
+
+def _team_philosophy_for_identity(team_id: str, team_name: str, game: str = "") -> str:
+    seed_value = _team_seed_value(team_id, team_name, game, "team-philosophy")
+    return TEAM_PHILOSOPHIES[seed_value % len(TEAM_PHILOSOPHIES)]
+
+
+def _team_strength_baseline(base_prestige: int) -> int:
+    compressed = round(5 + (_clamp_rating_stat(base_prestige, 1, 100) * 0.72))
+    return _clamp_rating_stat(compressed, 1, 88)
+
+
+def _team_identity_group_key(team_id: str, team_name: str) -> str:
+    cleaned_name = str(team_name).strip().casefold()
+    if cleaned_name:
+        return cleaned_name
+    return str(team_id).strip().casefold()
+
+
+def _team_seed_profile(team_id: str, team_name: str, game: str, base_prestige: int) -> dict[str, Any]:
+    base_strength = _team_strength_baseline(base_prestige)
+    return {
+        "current_strength": base_strength,
+        "team_form": 0,
+        "team_ambition": _seeded_team_rating(team_id, team_name, game, "team-ambition", 35, 82),
+        "team_stability": _seeded_team_rating(team_id, team_name, game, "team-stability", 35, 80),
+        "team_development": _seeded_team_rating(team_id, team_name, game, "team-development", 35, 80),
+        "team_financial_strength": _seeded_team_rating(team_id, team_name, game, "team-financial-strength", 35, 82),
+        "team_pressure": _seeded_team_rating(team_id, team_name, game, "team-pressure", 30, 80),
+        "team_philosophy": _team_philosophy_for_identity(team_id, team_name, game),
+        "trajectory": "stable",
+        "last_season_points": 0,
+        "last_season_wins": 0,
+        "last_season_titles": 0,
+    }
+
+
+def _team_trajectory_for_strength(current_strength: int, previous_strength: int, base_prestige: int, form: int) -> str:
+    delta = int(current_strength) - int(previous_strength)
+    if delta >= 3 or form >= 4:
+        return "rising"
+    if delta <= -3 or form <= -4:
+        return "falling"
+    if int(current_strength) <= max(20, int(base_prestige) - 10) and form <= -4:
+        return "rebuilding"
+    return "stable"
+
 
 def _team_row_personality_value(row: dict[str, Any]) -> str:
     for key in ("Personality", "Team Personality", "team_personality", "personality"):
@@ -3044,6 +3259,7 @@ def _sync_team_reputations_from_csv(connection: sqlite3.Connection) -> None:
         game = _team_game(row)
         base_prestige = _safe_int(row.get("Prestige"), 50)
         key = _team_key(team_id, game)
+        seed_profile = _team_seed_profile(team_id, team_name, game, base_prestige)
         connection.execute(
             """
             INSERT INTO team_reputations (
@@ -3053,14 +3269,55 @@ def _sync_team_reputations_from_csv(connection: sqlite3.Connection) -> None:
                 game,
                 base_prestige,
                 reputation,
+                current_strength,
+                team_form,
+                team_ambition,
+                team_stability,
+                team_development,
+                team_financial_strength,
+                team_pressure,
+                team_philosophy,
+                trajectory,
+                last_season_points,
+                last_season_wins,
+                last_season_titles,
                 updated_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(team_key) DO UPDATE SET
                 team_name = excluded.team_name,
-                base_prestige = excluded.base_prestige
+                base_prestige = excluded.base_prestige,
+                team_ambition = COALESCE(team_reputations.team_ambition, excluded.team_ambition),
+                team_stability = COALESCE(team_reputations.team_stability, excluded.team_stability),
+                team_development = COALESCE(team_reputations.team_development, excluded.team_development),
+                team_financial_strength = COALESCE(team_reputations.team_financial_strength, excluded.team_financial_strength),
+                team_pressure = COALESCE(team_reputations.team_pressure, excluded.team_pressure),
+                team_philosophy = CASE
+                    WHEN COALESCE(team_reputations.team_philosophy, '') = '' THEN excluded.team_philosophy
+                    ELSE team_reputations.team_philosophy
+                END
             """,
-            (key, team_id, team_name, game, base_prestige, base_prestige, now),
+            (
+                key,
+                team_id,
+                team_name,
+                game,
+                base_prestige,
+                base_prestige,
+                seed_profile["current_strength"],
+                seed_profile["team_form"],
+                seed_profile["team_ambition"],
+                seed_profile["team_stability"],
+                seed_profile["team_development"],
+                seed_profile["team_financial_strength"],
+                seed_profile["team_pressure"],
+                seed_profile["team_philosophy"],
+                seed_profile["trajectory"],
+                seed_profile["last_season_points"],
+                seed_profile["last_season_wins"],
+                seed_profile["last_season_titles"],
+                now,
+            ),
         )
 
 
@@ -3094,29 +3351,76 @@ def _sync_team_totals_from_history(connection: sqlite3.Connection) -> None:
         ).fetchone()
         existing = connection.execute(
             """
-            SELECT base_prestige, reputation, seasons_completed, championships, wins, podiums
+            SELECT
+                base_prestige,
+                reputation,
+                current_strength,
+                team_form,
+                team_ambition,
+                team_stability,
+                team_development,
+                team_financial_strength,
+                team_pressure,
+                team_philosophy,
+                trajectory,
+                seasons_completed,
+                championships,
+                wins,
+                podiums
             FROM team_reputations
             WHERE team_key = ?
             """,
             (row["team_key"],),
         ).fetchone()
         base_prestige = _safe_int(existing["base_prestige"] if existing else None, 50)
+        seed_profile = _team_seed_profile(str(row["team_id"]), str(row["team_name"]), str(row["game"]), base_prestige)
         aggregate_seasons = _safe_int(row["seasons_completed"], 0)
         aggregate_titles = _safe_int(row["championships"], 0)
         aggregate_wins = _safe_int(row["wins"], 0)
         aggregate_podiums = _safe_int(row["podiums"], 0)
-        current_reputation = _safe_int(existing["reputation"] if existing else None, base_prestige)
-        rebuilt_reputation = max(
-            1,
-            min(
-                100,
-                base_prestige
-                + min(24, aggregate_titles * 3)
-                + min(18, aggregate_wins // 3)
-                + min(10, aggregate_podiums // 8)
-                - min(8, max(0, aggregate_seasons - aggregate_podiums) // 20),
-            ),
+        baseline_strength = _team_strength_baseline(base_prestige)
+        current_reputation = _safe_int(
+            existing["current_strength"] if existing else None,
+            _safe_int(existing["reputation"] if existing else None, baseline_strength),
         )
+        previous_form = _safe_int(existing["team_form"] if existing else None, 0)
+        ambition = _safe_int(existing["team_ambition"] if existing else None, seed_profile["team_ambition"])
+        stability = _safe_int(existing["team_stability"] if existing else None, seed_profile["team_stability"])
+        development = _safe_int(existing["team_development"] if existing else None, seed_profile["team_development"])
+        financial_strength = _safe_int(existing["team_financial_strength"] if existing else None, seed_profile["team_financial_strength"])
+        pressure = _safe_int(existing["team_pressure"] if existing else None, seed_profile["team_pressure"])
+        philosophy = str(existing["team_philosophy"] if existing else seed_profile["team_philosophy"] or "").strip() or str(seed_profile["team_philosophy"])
+        recent_rows = connection.execute(
+            """
+            SELECT points, wins, championships
+            FROM team_season_results
+            WHERE team_key = ?
+            ORDER BY season_year DESC, created_at DESC
+            LIMIT 3
+            """,
+            (row["team_key"],),
+        ).fetchall()
+        recent_points = sum(_safe_int(item["points"], 0) for item in recent_rows)
+        recent_wins = sum(_safe_int(item["wins"], 0) for item in recent_rows)
+        recent_titles = sum(_safe_int(item["championships"], 0) for item in recent_rows)
+        recent_signal = min(8, recent_titles * 4 + recent_wins + recent_points // 45)
+        legacy_bonus = min(8, aggregate_titles) + min(5, aggregate_wins // 12) + min(3, aggregate_podiums // 20)
+        rebuilt_strength = _clamp_rating_stat(
+            baseline_strength
+            + legacy_bonus
+            + recent_signal
+            + max(-2, min(4, round((ambition - 50) / 13)))
+            + max(-2, min(4, round((development - 50) / 12)))
+            + max(-2, min(4, round((financial_strength - 50) / 12)))
+            - max(-2, min(4, round((pressure - 55) / 14))),
+            1,
+            100,
+        )
+        if recent_rows:
+            form = _clamp_rating_stat(previous_form + max(-4, min(4, rebuilt_strength - current_reputation)), -12, 12)
+        else:
+            form = previous_form
+        trajectory = _team_trajectory_for_strength(rebuilt_strength, current_reputation, base_prestige, form)
         connection.execute(
             """
             INSERT INTO team_reputations (
@@ -3126,6 +3430,18 @@ def _sync_team_totals_from_history(connection: sqlite3.Connection) -> None:
                 game,
                 base_prestige,
                 reputation,
+                current_strength,
+                team_form,
+                team_ambition,
+                team_stability,
+                team_development,
+                team_financial_strength,
+                team_pressure,
+                team_philosophy,
+                trajectory,
+                last_season_points,
+                last_season_wins,
+                last_season_titles,
                 seasons_completed,
                 championships,
                 wins,
@@ -3134,13 +3450,22 @@ def _sync_team_totals_from_history(connection: sqlite3.Connection) -> None:
                 last_style,
                 updated_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(team_key) DO UPDATE SET
                 team_name = excluded.team_name,
-                reputation = CASE
-                    WHEN seasons_completed = 0 THEN excluded.reputation
-                    ELSE MAX(reputation, excluded.reputation)
-                END,
+                reputation = excluded.reputation,
+                current_strength = excluded.current_strength,
+                team_form = excluded.team_form,
+                team_ambition = excluded.team_ambition,
+                team_stability = excluded.team_stability,
+                team_development = excluded.team_development,
+                team_financial_strength = excluded.team_financial_strength,
+                team_pressure = excluded.team_pressure,
+                team_philosophy = excluded.team_philosophy,
+                trajectory = excluded.trajectory,
+                last_season_points = excluded.last_season_points,
+                last_season_wins = excluded.last_season_wins,
+                last_season_titles = excluded.last_season_titles,
                 seasons_completed = MAX(seasons_completed, excluded.seasons_completed),
                 championships = MAX(championships, excluded.championships),
                 wins = MAX(wins, excluded.wins),
@@ -3155,7 +3480,19 @@ def _sync_team_totals_from_history(connection: sqlite3.Connection) -> None:
                 row["team_name"],
                 row["game"],
                 base_prestige,
-                max(current_reputation, rebuilt_reputation),
+                rebuilt_strength,
+                rebuilt_strength,
+                form,
+                ambition,
+                stability,
+                development,
+                financial_strength,
+                pressure,
+                philosophy,
+                trajectory,
+                _safe_int(recent_rows[0]["points"], 0) if recent_rows else 0,
+                _safe_int(recent_rows[0]["wins"], 0) if recent_rows else 0,
+                _safe_int(recent_rows[0]["championships"], 0) if recent_rows else 0,
                 aggregate_seasons,
                 aggregate_titles,
                 aggregate_wins,
@@ -3175,7 +3512,7 @@ def _team_reputation_value(save_name: str, team: dict[str, Any], fallback_game: 
     with _connect(save_name) as connection:
         row = connection.execute(
             """
-            SELECT reputation
+            SELECT current_strength, reputation
             FROM team_reputations
             WHERE team_key = ?
                OR (team_id = ? AND (game = ? OR game = 'Any'))
@@ -3188,8 +3525,356 @@ def _team_reputation_value(save_name: str, team: dict[str, Any], fallback_game: 
             (_team_key(team_id, game), team_id, game, team_name, _team_key(team_id, game)),
         ).fetchone()
     if row:
-        return _safe_int(row["reputation"], _safe_int(team.get("Prestige"), 50))
+        return _safe_int(row["current_strength"], _safe_int(row["reputation"], _safe_int(team.get("Prestige"), 50)))
     return _safe_int(team.get("Prestige"), 50)
+
+
+def _team_display_game(row_game: Any, target_game: str = "") -> str:
+    cleaned_row_game = str(row_game or "").strip()
+    cleaned_target_game = str(target_game or "").strip()
+    if cleaned_target_game:
+        if not cleaned_row_game or cleaned_row_game.casefold() == "any":
+            return cleaned_target_game
+        if cleaned_row_game.casefold() != cleaned_target_game.casefold():
+            return cleaned_target_game
+    return cleaned_row_game or cleaned_target_game or "Any"
+
+
+def _team_progression_snapshot(
+    connection: sqlite3.Connection,
+    *,
+    team_id: str,
+    team_name: str,
+    game: str,
+    fallback_prestige: int,
+    team_key: str = "",
+    snapshot_cache: dict[tuple[str, str], dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    cleaned_team_id = str(team_id).strip()
+    cleaned_team_name = str(team_name).strip()
+    cleaned_game = str(game or "Any").strip() or "Any"
+    lookup_key = str(team_key).strip() or _team_key(cleaned_team_id, cleaned_game)
+    cache_key = (lookup_key, cleaned_game.casefold())
+    if snapshot_cache is not None and cache_key in snapshot_cache:
+        return dict(snapshot_cache[cache_key])
+    row = connection.execute(
+        """
+        SELECT
+            team_key,
+            team_id,
+            team_name,
+            game,
+            base_prestige,
+            reputation,
+            current_strength,
+            team_form,
+            team_ambition,
+            team_stability,
+            team_development,
+            team_financial_strength,
+            team_pressure,
+            team_philosophy,
+            trajectory,
+            last_season_points,
+            last_season_wins,
+            last_season_titles,
+            seasons_completed
+        FROM team_reputations
+        WHERE team_key = ?
+           OR (team_id = ? AND (game = ? OR game = 'Any'))
+           OR team_name = ?
+        ORDER BY
+            CASE
+                WHEN team_key = ? THEN 0
+                WHEN LOWER(COALESCE(game, '')) = LOWER(?) THEN 1
+                WHEN LOWER(COALESCE(game, '')) = 'any' THEN 2
+                ELSE 3
+            END,
+            current_strength DESC,
+            seasons_completed DESC
+        LIMIT 1
+        """,
+        (lookup_key, cleaned_team_id, cleaned_game, cleaned_team_name, lookup_key, cleaned_game),
+    ).fetchone()
+    seed_profile = _team_seed_profile(cleaned_team_id, cleaned_team_name, cleaned_game, fallback_prestige)
+    baseline_strength = _team_strength_baseline(fallback_prestige)
+    if not row:
+        snapshot = {
+            "team_key": lookup_key,
+            "team_id": cleaned_team_id,
+            "team_name": cleaned_team_name or "Independent",
+            "game": cleaned_game,
+            "base_prestige": fallback_prestige,
+            "reputation": baseline_strength,
+            **seed_profile,
+            "seasons_completed": 0,
+        }
+        if snapshot_cache is not None:
+            snapshot_cache[cache_key] = dict(snapshot)
+        return snapshot
+    snapshot = {
+        "team_key": str(row["team_key"] or lookup_key).strip() or lookup_key,
+        "team_id": str(row["team_id"] or cleaned_team_id).strip() or cleaned_team_id,
+        "team_name": str(row["team_name"] or cleaned_team_name).strip() or cleaned_team_name or "Independent",
+        "game": _team_display_game(row["game"], cleaned_game),
+        "base_prestige": _safe_int(row["base_prestige"], fallback_prestige),
+        "reputation": _safe_int(row["reputation"], baseline_strength),
+        "current_strength": _safe_int(row["current_strength"], _safe_int(row["reputation"], baseline_strength)),
+        "team_form": _safe_int(row["team_form"], seed_profile["team_form"]),
+        "team_ambition": _safe_int(row["team_ambition"], seed_profile["team_ambition"]),
+        "team_stability": _safe_int(row["team_stability"], seed_profile["team_stability"]),
+        "team_development": _safe_int(row["team_development"], seed_profile["team_development"]),
+        "team_financial_strength": _safe_int(row["team_financial_strength"], seed_profile["team_financial_strength"]),
+        "team_pressure": _safe_int(row["team_pressure"], seed_profile["team_pressure"]),
+        "team_philosophy": str(row["team_philosophy"] or seed_profile["team_philosophy"]).strip() or str(seed_profile["team_philosophy"]),
+        "trajectory": str(row["trajectory"] or seed_profile["trajectory"]).strip() or str(seed_profile["trajectory"]),
+        "last_season_points": _safe_int(row["last_season_points"], 0),
+        "last_season_wins": _safe_int(row["last_season_wins"], 0),
+        "last_season_titles": _safe_int(row["last_season_titles"], 0),
+        "seasons_completed": _safe_int(row["seasons_completed"], 0),
+    }
+    if snapshot_cache is not None:
+        snapshot_cache[cache_key] = dict(snapshot)
+    return snapshot
+
+
+def _team_phase2_score_components(team_snapshot: dict[str, Any]) -> tuple[int, int, int]:
+    ambition = _safe_int(team_snapshot.get("team_ambition"), 50)
+    stability = _safe_int(team_snapshot.get("team_stability"), 50)
+    development = _safe_int(team_snapshot.get("team_development"), 50)
+    financial_strength = _safe_int(team_snapshot.get("team_financial_strength"), 50)
+    pressure = _safe_int(team_snapshot.get("team_pressure"), 50)
+    form = _safe_int(team_snapshot.get("team_form"), 0)
+    continuity_bonus = round((stability - 50) / 6)
+    ambition_bonus = round((ambition - 50) / 7) + round((development - 50) / 10) + round((financial_strength - 50) / 10)
+    pressure_penalty = round((pressure - 50) / 6)
+    return continuity_bonus, ambition_bonus, pressure_penalty + round(form / 3)
+
+
+def _team_market_aggression(team_snapshot: dict[str, Any]) -> int:
+    ambition = _safe_int(team_snapshot.get("team_ambition"), 50)
+    financial_strength = _safe_int(team_snapshot.get("team_financial_strength"), 50)
+    pressure = _safe_int(team_snapshot.get("team_pressure"), 50)
+    form = _safe_int(team_snapshot.get("team_form"), 0)
+    return round((ambition - 50) / 6) + round((financial_strength - 50) / 8) + round((pressure - 50) / 10) + round(form / 4)
+
+
+def _team_trajectory_adjustment(team_snapshot: dict[str, Any]) -> int:
+    trajectory = str(team_snapshot.get("trajectory", "stable")).strip().casefold()
+    if trajectory == "rising":
+        return 7
+    if trajectory == "falling":
+        return -6
+    if trajectory == "rebuilding":
+        return -3
+    return 1
+
+
+def _team_seat_role_adjustment(
+    team_snapshot: dict[str, Any],
+    *,
+    team_seat: int = 1,
+    team_size: int = 1,
+) -> int:
+    normalized_philosophy = str(team_snapshot.get("team_philosophy", "Balanced")).strip().casefold()
+    stability = _safe_int(team_snapshot.get("team_stability"), 50)
+    financial_strength = _safe_int(team_snapshot.get("team_financial_strength"), 50)
+    pressure = _safe_int(team_snapshot.get("team_pressure"), 50)
+    adjustment = 3 if int(team_seat) <= 1 else max(-10, 4 - (int(team_seat) * 5))
+    if int(team_size) >= 2 and int(team_seat) == 2:
+        if stability >= 60:
+            adjustment += 2
+        if financial_strength >= 60:
+            adjustment += 2
+        if normalized_philosophy in {"driver continuity", "technical excellence", "balanced", "rookie pipeline"}:
+            adjustment += 2
+        if normalized_philosophy == "win now":
+            adjustment -= 2
+        if pressure >= 68:
+            adjustment -= 2
+    return adjustment
+
+
+def _team_seat_quality_score(
+    team_snapshot: dict[str, Any],
+    *,
+    team_prestige: int,
+    team_reputation: int,
+    championship_prestige: int | None = None,
+    team_seat: int = 1,
+    team_size: int = 1,
+) -> int:
+    stability = _safe_int(team_snapshot.get("team_stability"), 50)
+    development = _safe_int(team_snapshot.get("team_development"), 50)
+    financial_strength = _safe_int(team_snapshot.get("team_financial_strength"), 50)
+    pressure = _safe_int(team_snapshot.get("team_pressure"), 50)
+    continuity_bonus, ambition_bonus, pressure_adjustment = _team_phase2_score_components(team_snapshot)
+    seat_role_adjustment = _team_seat_role_adjustment(
+        team_snapshot,
+        team_seat=int(team_seat),
+        team_size=int(team_size),
+    )
+    prestige_fit_bonus = 0
+    if championship_prestige is not None:
+        prestige_fit_bonus = max(-8, min(8, round((int(team_reputation) - (int(championship_prestige) * 10)) / 6)))
+    score = (
+        int(team_reputation)
+        + round((stability - 50) / 5)
+        + round((development - 50) / 6)
+        + round((financial_strength - 50) / 7)
+        - round((pressure - 50) / 6)
+        + continuity_bonus
+        + ambition_bonus
+        - pressure_adjustment
+        + _team_trajectory_adjustment(team_snapshot)
+        + seat_role_adjustment
+        + prestige_fit_bonus
+        + max(-4, min(4, round((int(team_reputation) - int(team_prestige)) / 8)))
+    )
+    return max(25, min(98, int(score)))
+
+
+def _seat_prestige_from_quality(championship_prestige: int, seat_quality: int) -> int:
+    return max(1, min(100, round((int(championship_prestige) * 3 + int(seat_quality)) / 4)))
+
+
+def _player_team_fit_score(
+    team_snapshot: dict[str, Any],
+    *,
+    team_prestige: int,
+    team_reputation: int,
+    championship_prestige: int,
+    player_effective_mmr: int,
+) -> int:
+    continuity_bonus, ambition_bonus, pressure_adjustment = _team_phase2_score_components(team_snapshot)
+    aggression = _team_market_aggression(team_snapshot)
+    normalized_player_rating = max(1, min(100, round((int(player_effective_mmr) - 700) / 8)))
+    player_strength_gap = normalized_player_rating - int(team_reputation)
+    prestige_fit = max(1, 120 - abs(int(team_prestige) - int(championship_prestige)))
+    upside_score = max(-16, min(22, round(player_strength_gap / 2)))
+    affordability = _safe_int(team_snapshot.get("team_financial_strength"), 50) - max(0, player_strength_gap // 2)
+    affordability_bonus = max(-10, min(10, round((affordability - 50) / 5)))
+    return max(
+        1,
+        int(team_reputation)
+        + prestige_fit
+        + continuity_bonus
+        + ambition_bonus
+        + aggression
+        + upside_score
+        + affordability_bonus
+        - pressure_adjustment,
+    )
+
+
+def _team_driver_decision(
+    driver: dict[str, Any],
+    team_snapshot: dict[str, Any],
+    team_rank: int,
+    team_size: int,
+    team_seat: int = 1,
+    seat_quality: int | None = None,
+) -> tuple[str, str]:
+    points = _safe_int(driver.get("points"), 0)
+    wins = _safe_int(driver.get("wins"), 0)
+    normalized_philosophy = str(team_snapshot.get("team_philosophy", "Balanced")).strip().casefold()
+    trajectory = str(team_snapshot.get("trajectory", "stable")).strip().casefold()
+    current_strength = _safe_int(team_snapshot.get("current_strength"), 50)
+    team_prestige = _safe_int(team_snapshot.get("reputation"), current_strength)
+    ambition = _safe_int(team_snapshot.get("team_ambition"), 50)
+    stability = _safe_int(team_snapshot.get("team_stability"), 50)
+    development = _safe_int(team_snapshot.get("team_development"), 50)
+    financial_strength = _safe_int(team_snapshot.get("team_financial_strength"), 50)
+    pressure = _safe_int(team_snapshot.get("team_pressure"), 50)
+    form = _safe_int(team_snapshot.get("team_form"), 0)
+    computed_seat_quality = (
+        _team_seat_quality_score(
+            team_snapshot,
+            team_prestige=team_prestige,
+            team_reputation=current_strength,
+            team_seat=team_seat,
+            team_size=team_size,
+        )
+        if seat_quality is None
+        else _safe_int(seat_quality, current_strength)
+    )
+
+    keep_score = min(28, points // 5) + min(18, wins * 9)
+    if team_rank == 1:
+        keep_score += 6
+    elif team_size > 1 and team_rank == team_size:
+        keep_score -= 4
+    if team_seat > 1:
+        keep_score -= max(0, team_seat - 1)
+    keep_score += round((stability - 50) / 7)
+    keep_score += round((development - 50) / 10)
+    keep_score += round((financial_strength - 50) / 11)
+    keep_score -= round((pressure - 50) / 7)
+    keep_score += round(form / 3)
+    keep_score += round((computed_seat_quality - 55) / 6)
+
+    threshold = 16 + max(0, (current_strength - 55) // 8)
+    threshold += max(-2, min(5, round((ambition - 50) / 8)))
+    threshold += max(-2, min(4, round((financial_strength - 50) / 10)))
+    reason = "season performance"
+
+    if trajectory == "rising":
+        keep_score += 5
+        threshold -= 2
+        reason = "rising team momentum"
+    elif trajectory == "stable":
+        keep_score += 1
+    elif trajectory == "falling":
+        keep_score -= 5
+        threshold += 2
+        reason = "pressure from a falling program"
+    elif trajectory == "rebuilding":
+        if normalized_philosophy in {"rookie pipeline", "driver continuity", "underdog grit"}:
+            keep_score += 2
+            threshold -= 1
+            reason = "rebuild continuity"
+        else:
+            keep_score -= 3
+            threshold += 1
+            reason = "rebuild reset"
+
+    if normalized_philosophy == "driver continuity":
+        keep_score += 6
+        threshold -= 2
+        if _team_market_aggression(team_snapshot) <= 0 and points >= 12:
+            keep_score += 3
+            threshold -= 2
+        reason = "continuity and season fit"
+    elif normalized_philosophy == "win now":
+        threshold += 4
+        keep_score += min(6, wins * 3)
+        if points < 20 and wins == 0:
+            keep_score -= 5
+        reason = "results pressure"
+    elif normalized_philosophy == "technical excellence":
+        keep_score += 3 if points >= 15 else -2
+        threshold += 1
+        reason = "technical program expectations"
+    elif normalized_philosophy == "underdog grit":
+        keep_score += 4 if points > 0 else -2
+        threshold -= 1
+        reason = "scrappy points-scoring form"
+    elif normalized_philosophy == "rookie pipeline":
+        keep_score += 2 if current_strength < 45 or points > 0 else -1
+        threshold -= 1 if current_strength < 45 else 0
+        reason = "development upside"
+
+    if computed_seat_quality >= 82 and points < 14 and wins == 0 and pressure >= 60:
+        return "released", "high-expectation seat reset"
+    if team_rank > 1 and _team_market_aggression(team_snapshot) >= 4 and wins == 0 and points < 12:
+        return "released", "upside chase in the driver market"
+    if trajectory in {"falling", "rebuilding"} and pressure >= 65 and points < 10 and wins == 0:
+        return "released", "program reset under pressure"
+    if wins > 0:
+        return "retained", "race-winning pace"
+    if keep_score >= threshold:
+        return "retained", reason
+    return "released", reason
 
 
 def active_driver_rows_for_selection(save_name: str) -> list[sqlite3.Row]:
@@ -3435,15 +4120,25 @@ def _recent_team_seat_score(
     connection: sqlite3.Connection,
     seat: sqlite3.Row,
     championship: dict[str, Any],
+    snapshot_cache: dict[tuple[str, str], dict[str, Any]] | None = None,
+    seat_score_cache: dict[tuple[str, str], int] | None = None,
 ) -> int:
     team_key = str(seat["team_key"])
     championship_id = str(seat["championship_id"])
+    cache_key = (team_key, championship_id)
+    if seat_score_cache is not None and cache_key in seat_score_cache:
+        return int(seat_score_cache[cache_key])
+    team_snapshot = _team_progression_snapshot(
+        connection,
+        team_id=str(seat["team_id"]),
+        team_name=str(seat["team_name"]),
+        game=str(seat["game"]),
+        fallback_prestige=_safe_int(seat["team_prestige"], 50),
+        team_key=team_key,
+        snapshot_cache=snapshot_cache,
+    )
     prestige = _safe_int(championship.get("Prestige"), 1)
-    reputation_row = connection.execute(
-        "SELECT reputation FROM team_reputations WHERE team_key = ?",
-        (team_key,),
-    ).fetchone()
-    reputation = _safe_int(reputation_row["reputation"], _safe_int(seat["team_prestige"], 50)) if reputation_row else _safe_int(seat["team_prestige"], 50)
+    strength = _safe_int(team_snapshot.get("current_strength"), _safe_int(seat["team_prestige"], 50))
     recent = connection.execute(
         """
         SELECT points, wins, championships
@@ -3458,9 +4153,14 @@ def _recent_team_seat_score(
     points = sum(_safe_int(row["points"], 0) for row in recent)
     wins = sum(_safe_int(row["wins"], 0) for row in recent)
     titles = sum(_safe_int(row["championships"], 0) for row in recent)
-    prestige_pressure = max(0, (prestige * 10) - reputation)
-    performance_bonus = min(20, points // 25) + min(8, wins * 2) + min(12, titles * 6)
-    return reputation + performance_bonus - prestige_pressure
+    continuity_bonus, ambition_bonus, pressure_adjustment = _team_phase2_score_components(team_snapshot)
+    aggression = _team_market_aggression(team_snapshot)
+    prestige_pressure = max(0, (prestige * 8) - strength)
+    performance_bonus = min(16, points // 35) + min(10, wins * 3) + min(14, titles * 7)
+    score = strength + performance_bonus + continuity_bonus + ambition_bonus + aggression - prestige_pressure - pressure_adjustment
+    if seat_score_cache is not None:
+        seat_score_cache[cache_key] = int(score)
+    return int(score)
 
 
 def _candidate_team_for_open_seat(
@@ -3471,35 +4171,58 @@ def _candidate_team_for_open_seat(
     protected_team_keys: set[str],
     championship_counts: dict[str, int],
     max_championships: int = 6,
+    snapshot_cache: dict[tuple[str, str], dict[str, Any]] | None = None,
+    occupied_team_keys: set[str] | None = None,
+    eligible_teams: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any] | None:
     championship_game = str(championship.get("Game", "") or "Any").strip() or "Any"
     championship_id = str(championship.get("id", "")).strip() or str(championship.get("Championship", "")).strip()
     championship_prestige = _safe_int(championship.get("Prestige"), 1)
     candidates: list[tuple[int, dict[str, Any]]] = []
-    for team in _eligible_teams_for_championship(championship):
+    championship_team_keys = occupied_team_keys if occupied_team_keys is not None else set()
+    candidate_teams = eligible_teams if eligible_teams is not None else _eligible_teams_for_championship(championship)
+    for team in candidate_teams:
         team_id = _team_row_id(team)
         team_key = _team_key(team_id, _team_game(team, championship_game))
         if not team_key or team_key == current_team_key or team_key in protected_team_keys:
             continue
         if championship_counts.get(team_key, 0) >= max_championships:
             continue
-        already_in_championship = connection.execute(
-            """
-            SELECT 1
-            FROM team_championship_seats
-            WHERE team_key = ?
-              AND championship_id = ?
-              AND status = 'active'
-            LIMIT 1
-            """,
-            (team_key, championship_id),
-        ).fetchone()
-        if already_in_championship:
+        if team_key in championship_team_keys:
             continue
-        team_reputation = _team_reputation_value(save_name, team, championship_game)
+        team_snapshot = _team_progression_snapshot(
+            connection,
+            team_id=team_id,
+            team_name=_team_row_name(team),
+            game=_team_game(team, championship_game),
+            fallback_prestige=_safe_int(team.get("Prestige"), 50),
+            team_key=team_key,
+            snapshot_cache=snapshot_cache,
+        )
         team_prestige = _safe_int(team.get("Prestige"), 50)
+        team_reputation = _safe_int(team_snapshot.get("current_strength"), team_prestige)
         prestige_fit = max(0, 100 - abs((championship_prestige * 10) - team_reputation))
-        score = team_reputation + prestige_fit + random.randint(0, 12) - max(0, championship_counts.get(team_key, 0) - 2) * 8
+        continuity_bonus, ambition_bonus, pressure_adjustment = _team_phase2_score_components(team_snapshot)
+        aggression = _team_market_aggression(team_snapshot)
+        philosophy = str(team_snapshot.get("team_philosophy", "Balanced")).strip().casefold()
+        philosophy_bonus = 0
+        if philosophy == "win now":
+            philosophy_bonus += 5
+        elif philosophy == "technical excellence":
+            philosophy_bonus += 3
+        elif philosophy == "driver continuity":
+            philosophy_bonus -= 1
+        score = (
+            team_reputation
+            + prestige_fit
+            + ambition_bonus
+            + continuity_bonus
+            + aggression
+            + philosophy_bonus
+            - pressure_adjustment
+            + random.randint(0, 10)
+            - max(0, championship_counts.get(team_key, 0) - 2) * 8
+        )
         candidates.append(
             (
                 score,
@@ -3509,6 +4232,13 @@ def _candidate_team_for_open_seat(
                     "team_name": _team_row_name(team),
                     "team_prestige": team_prestige,
                     "team_reputation": team_reputation,
+                    "team_ambition": _safe_int(team_snapshot.get("team_ambition"), 50),
+                    "team_stability": _safe_int(team_snapshot.get("team_stability"), 50),
+                    "team_development": _safe_int(team_snapshot.get("team_development"), 50),
+                    "team_financial_strength": _safe_int(team_snapshot.get("team_financial_strength"), 50),
+                    "team_pressure": _safe_int(team_snapshot.get("team_pressure"), 50),
+                    "team_philosophy": str(team_snapshot.get("team_philosophy", "Balanced")),
+                    "trajectory": str(team_snapshot.get("trajectory", "stable")),
                 },
             )
         )
@@ -3535,6 +4265,8 @@ def run_offseason_team_seat_market(
     summary = {"evaluated": 0, "lost": 0, "sold": 0, "acquired": 0, "new_teams": 0}
 
     with _connect(save_name) as connection:
+        team_snapshot_cache: dict[tuple[str, str], dict[str, Any]] = {}
+        seat_score_cache: dict[tuple[str, str], int] = {}
         seats = connection.execute(
             """
             SELECT *
@@ -3546,6 +4278,14 @@ def run_offseason_team_seat_market(
         if not seats:
             return summary
 
+        occupied_team_keys_by_championship: dict[str, set[str]] = defaultdict(set)
+        for seat in seats:
+            occupied_team_keys_by_championship[str(seat["championship_id"])].add(str(seat["team_key"]))
+        eligible_teams_by_championship: dict[str, list[dict[str, Any]]] = {
+            championship_id: _eligible_teams_for_championship(championship)
+            for championship_id, championship in championship_by_id.items()
+        }
+
         vulnerable: list[tuple[int, sqlite3.Row, dict[str, Any]]] = []
         for seat in seats:
             team_key = str(seat["team_key"])
@@ -3554,7 +4294,13 @@ def run_offseason_team_seat_market(
             if not championship or team_key in protected:
                 continue
             summary["evaluated"] += 1
-            score = _recent_team_seat_score(connection, seat, championship)
+            score = _recent_team_seat_score(
+                connection,
+                seat,
+                championship,
+                snapshot_cache=team_snapshot_cache,
+                seat_score_cache=seat_score_cache,
+            )
             championship_prestige = _safe_int(championship.get("Prestige"), 1)
             threshold = 46 + (championship_prestige * 4)
             if score < threshold:
@@ -3587,6 +4333,9 @@ def run_offseason_team_seat_market(
                 old_team_key,
                 protected,
                 championship_counts,
+                snapshot_cache=team_snapshot_cache,
+                occupied_team_keys=occupied_team_keys_by_championship.get(championship_id),
+                eligible_teams=eligible_teams_by_championship.get(championship_id),
             )
             if not buyer:
                 continue
@@ -3651,6 +4400,9 @@ def run_offseason_team_seat_market(
                     str(seat["id"]),
                 ),
             )
+            occupied_team_keys = occupied_team_keys_by_championship.setdefault(championship_id, set())
+            occupied_team_keys.discard(old_team_key)
+            occupied_team_keys.add(str(buyer["team_key"]))
             championship_counts[old_team_key] = max(0, championship_counts.get(old_team_key, 1) - 1)
             championship_counts[str(buyer["team_key"])] = championship_counts.get(str(buyer["team_key"]), 0) + 1
             summary[event_type] += 1
@@ -3835,6 +4587,14 @@ def _sync_team_seat_occupants_for_season(
     now: str,
 ) -> None:
     championship_id, championship_name, game, style = _championship_team_seat_identity(championship)
+    connection.execute(
+        """
+        DELETE FROM team_driver_decisions
+        WHERE championship_id = ?
+          AND season_year = ?
+        """,
+        (championship_id, int(season_year)),
+    )
     seat_rows = connection.execute(
         """
         SELECT id, seat_number, team_key, team_id, team_name, team_seat
@@ -3849,6 +4609,17 @@ def _sync_team_seat_occupants_for_season(
     if not seat_rows:
         return
 
+    human_driver_ids = {
+        str(row["id"]).strip()
+        for row in connection.execute(
+            """
+            SELECT id
+            FROM drivers
+            WHERE is_human = 1
+              AND status = 'active'
+            """
+        ).fetchall()
+    }
     seats_by_team: dict[str, list[sqlite3.Row]] = defaultdict(list)
     for row in seat_rows:
         seats_by_team[str(row["team_key"])].append(row)
@@ -3860,6 +4631,14 @@ def _sync_team_seat_occupants_for_season(
             drivers_by_team[team_key].append(driver)
 
     for team_key, team_seats in seats_by_team.items():
+        team_snapshot = _team_progression_snapshot(
+            connection,
+            team_id=str(team_seats[0]["team_id"]),
+            team_name=str(team_seats[0]["team_name"]),
+            game=game,
+            fallback_prestige=_safe_int(championship.get("Prestige"), 50),
+            team_key=team_key,
+        )
         assigned_drivers = sorted(
             drivers_by_team.get(team_key, []),
             key=lambda driver: (
@@ -3895,7 +4674,8 @@ def _sync_team_seat_occupants_for_season(
                     reason="Competed in this championship seat",
                     now=now,
                 )
-        for seat_row, driver in zip(team_seats, assigned_drivers):
+        seat_assignments = list(zip(team_seats, assigned_drivers))
+        for seat_row, driver in seat_assignments:
             connection.execute(
                 """
                 UPDATE team_championship_seats
@@ -3919,6 +4699,62 @@ def _sync_team_seat_occupants_for_season(
                     str(seat_row["id"]),
                 ),
             )
+        for rank, (seat_row, driver) in enumerate(seat_assignments, start=1):
+            driver_id = str(driver.get("driver_id", "")).strip()
+            driver_name = str(driver.get("name", "")).strip()
+            if not driver_id or not driver_name or driver_id in human_driver_ids:
+                continue
+            seat_quality = _team_seat_quality_score(
+                team_snapshot,
+                team_prestige=_safe_int(team_snapshot.get("reputation"), _safe_int(championship.get("Prestige"), 50)),
+                team_reputation=_safe_int(team_snapshot.get("current_strength"), _safe_int(championship.get("Prestige"), 50)),
+                championship_prestige=_safe_int(championship.get("Prestige"), 1),
+                team_seat=_safe_int(seat_row["team_seat"], rank),
+                team_size=len(team_seats),
+            )
+            decision, reason = _team_driver_decision(
+                driver,
+                team_snapshot,
+                rank,
+                len(team_seats),
+                team_seat=_safe_int(seat_row["team_seat"], rank),
+                seat_quality=seat_quality,
+            )
+            connection.execute(
+                """
+                INSERT INTO team_driver_decisions (
+                    id,
+                    team_key,
+                    team_id,
+                    team_name,
+                    driver_id,
+                    driver_name,
+                    championship_id,
+                    championship_name,
+                    season_year,
+                    decision,
+                    reason,
+                    created_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    str(uuid.uuid4()),
+                    team_key,
+                    str(team_snapshot.get("team_id", "")),
+                    str(team_snapshot.get("team_name", "")),
+                    driver_id,
+                    driver_name,
+                    championship_id,
+                    championship_name,
+                    int(season_year),
+                    decision,
+                    reason,
+                    now,
+                ),
+            )
+            if decision == "released":
+                released_driver_ids.add(driver_id)
         if len(assigned_drivers) < len(team_seats):
             for seat_row in team_seats[len(assigned_drivers):]:
                 connection.execute(
@@ -3991,6 +4827,9 @@ def _team_seat_offers_for_championship(
     reputations = reputation_map or {}
     offers: list[dict[str, Any]] = []
     seen_team_keys: set[str] = set()
+    team_sizes: dict[str, int] = defaultdict(int)
+    for seat in seat_plan:
+        team_sizes[str(seat.get("team_key", "")).strip() or str(seat.get("team_id", "")).strip() or str(seat.get("team_name", "")).strip()] += 1
     for seat in seat_plan:
         team_key = str(seat.get("team_key", "")).strip()
         team_id = str(seat.get("team_id", "")).strip()
@@ -4000,11 +4839,37 @@ def _team_seat_offers_for_championship(
             continue
         seen_team_keys.add(dedupe_key)
         team_prestige = _safe_int(seat.get("team_prestige"), 50)
+        team_snapshot = None
+        if save_name:
+            with _connect(save_name) as connection:
+                team_snapshot = _team_progression_snapshot(
+                    connection,
+                    team_id=team_id,
+                    team_name=team_name,
+                    game=game,
+                    fallback_prestige=team_prestige,
+                    team_key=team_key,
+                )
         team_reputation = (
-            reputations.get(team_key)
-            or reputations.get(team_id)
-            or reputations.get(team_name)
-            or team_prestige
+            _safe_int((team_snapshot or {}).get("current_strength"), -1)
+            if team_snapshot
+            else -1
+        )
+        if team_reputation < 0:
+            team_reputation = (
+                reputations.get(team_key)
+                or reputations.get(team_id)
+                or reputations.get(team_name)
+                or team_prestige
+            )
+        team_size = team_sizes.get(dedupe_key, 1)
+        seat_quality = _team_seat_quality_score(
+            team_snapshot or {},
+            team_prestige=team_prestige,
+            team_reputation=team_reputation,
+            championship_prestige=_safe_int(championship.get("Prestige"), 1),
+            team_seat=_safe_int(seat.get("team_seat"), 1),
+            team_size=team_size,
         )
         offers.append(
             {
@@ -4014,11 +4879,21 @@ def _team_seat_offers_for_championship(
                 "team_prestige": team_prestige,
                 "team_reputation": team_reputation,
                 "seat_number": _safe_int(seat.get("seat_number"), len(offers) + 1),
+                "team_seat": _safe_int(seat.get("team_seat"), 1),
+                "team_size": team_size,
+                "seat_quality": seat_quality,
                 "offer_note": "Offer",
                 "team_colors": str(seat.get("team_colors", "")).strip()
                 or _team_colors_for_identity(team_id, team_name, game),
                 "team_personality": str(seat.get("team_personality", "")).strip()
                 or _team_personality_for_identity(team_id, team_name, game),
+                "team_ambition": _safe_int((team_snapshot or {}).get("team_ambition"), 50),
+                "team_stability": _safe_int((team_snapshot or {}).get("team_stability"), 50),
+                "team_development": _safe_int((team_snapshot or {}).get("team_development"), 50),
+                "team_financial_strength": _safe_int((team_snapshot or {}).get("team_financial_strength"), 50),
+                "team_pressure": _safe_int((team_snapshot or {}).get("team_pressure"), 50),
+                "team_philosophy": str((team_snapshot or {}).get("team_philosophy", "Balanced")),
+                "trajectory": str((team_snapshot or {}).get("trajectory", "stable")),
             }
         )
     if not offers:
@@ -4035,9 +4910,22 @@ def _team_seat_offers_for_championship(
     )
     offer_limit = max(1, min(int(max_offers), len(offers)))
     offer_count = offer_rng.randint(1, offer_limit)
-    selected_offers = offer_rng.sample(offers, offer_count)
+    remaining_offers = list(offers)
+    selected_offers: list[dict[str, Any]] = []
+    while remaining_offers and len(selected_offers) < offer_count:
+        weights = [
+            max(
+                1,
+                _safe_int(offer.get("seat_quality"), 50)
+                + max(0, _safe_int(offer.get("team_size"), 1) - 1) * 4,
+            )
+            for offer in remaining_offers
+        ]
+        chosen_index = offer_rng.choices(range(len(remaining_offers)), weights=weights, k=1)[0]
+        selected_offers.append(remaining_offers.pop(chosen_index))
     selected_offers.sort(
         key=lambda offer: (
+            -_safe_int(offer.get("seat_quality"), 50),
             -_safe_int(offer.get("team_reputation"), 50),
             -_safe_int(offer.get("team_prestige"), 50),
             str(offer.get("team_name", "")),
@@ -4077,9 +4965,55 @@ def assign_teams_to_standings(
             str(standings[index].get("name", "")),
         ),
     )
+    seat_quality_by_identity: dict[tuple[str, int], int] = {}
+    if save_name:
+        try:
+            with _connect(save_name) as connection:
+                snapshot_cache: dict[tuple[str, str], dict[str, Any]] = {}
+                team_sizes: dict[str, int] = defaultdict(int)
+                for seat in remaining_seats:
+                    team_sizes[
+                        str(seat.get("team_key", "")).strip()
+                        or str(seat.get("team_id", "")).strip()
+                        or str(seat.get("team_name", "")).strip()
+                    ] += 1
+                for seat in remaining_seats:
+                    team_key = str(seat.get("team_key", "")).strip()
+                    team_name = str(seat.get("team_name", "")).strip() or "Independent"
+                    team_id = str(seat.get("team_id", "")).strip()
+                    team_prestige = _safe_int(seat.get("team_prestige"), 50)
+                    seat_team_size = team_sizes.get(team_key or team_id or team_name, 1)
+                    team_snapshot = _team_progression_snapshot(
+                        connection,
+                        team_id=team_id,
+                        team_name=team_name,
+                        game=str(championship.get("Game", "")).strip() or "Any",
+                        fallback_prestige=team_prestige,
+                        team_key=team_key,
+                        snapshot_cache=snapshot_cache,
+                    )
+                    seat_quality_by_identity[(team_key or team_id or team_name, _safe_int(seat.get("team_seat"), 1))] = _team_seat_quality_score(
+                        team_snapshot,
+                        team_prestige=team_prestige,
+                        team_reputation=_safe_int(team_snapshot.get("current_strength"), team_prestige),
+                        championship_prestige=_safe_int(championship.get("Prestige"), 1),
+                        team_seat=_safe_int(seat.get("team_seat"), 1),
+                        team_size=seat_team_size,
+                    )
+        except Exception:
+            seat_quality_by_identity = {}
     ordered_remaining_seats = sorted(
         remaining_seats,
         key=lambda seat: (
+            -seat_quality_by_identity.get(
+                (
+                    str(seat.get("team_key", "")).strip()
+                    or str(seat.get("team_id", "")).strip()
+                    or str(seat.get("team_name", "")).strip(),
+                    _safe_int(seat.get("team_seat"), 1),
+                ),
+                _safe_int(seat.get("team_prestige"), 50),
+            ),
             -_safe_int(seat.get("team_prestige"), 50),
             str(seat.get("team_name", "")),
             _safe_int(seat.get("team_seat"), 1),
@@ -4157,6 +5091,57 @@ def players_are_fresh_rookies(save_name: str, player_names: list[str]) -> bool:
     )
 
 
+def _promotion_expectation_threshold(expectation_level: str) -> int:
+    normalized = str(expectation_level).strip().casefold()
+    if normalized == "wins":
+        return 1
+    if normalized == "podiums":
+        return 3
+    if normalized == "top5":
+        return 5
+    if normalized == "top10":
+        return 8
+    return 10
+
+
+def current_team_promotion_is_earned(
+    save_name: str,
+    player_names: list[str],
+    current_team_offer: dict[str, Any] | None,
+) -> bool:
+    if not isinstance(current_team_offer, dict):
+        return False
+    player_set = {str(name).strip() for name in player_names if str(name).strip()}
+    if not player_set:
+        return False
+    threshold = _promotion_expectation_threshold(str(current_team_offer.get("team_expectation_level", "")).strip())
+    with _connect(save_name) as connection:
+        rows = connection.execute(
+            """
+            SELECT dsr.driver_id, dsr.finishing_place
+            FROM driver_season_results dsr
+            JOIN drivers d
+              ON d.id = dsr.driver_id
+            WHERE d.is_human = 1
+              AND d.name IN ({placeholders})
+            ORDER BY dsr.season_year DESC, dsr.created_at DESC
+            """.replace("{placeholders}", ", ".join("?" for _ in player_set)),
+            list(player_set),
+        ).fetchall()
+    if not rows:
+        return False
+    best_places_by_driver: dict[str, int] = {}
+    for row in rows:
+        driver_id = str(row["driver_id"]).strip()
+        if driver_id not in best_places_by_driver:
+            best_places_by_driver[driver_id] = _safe_int(row["finishing_place"], 999)
+    finishing_places = list(best_places_by_driver.values())
+    if not finishing_places:
+        return False
+    average_place = sum(finishing_places) / len(finishing_places)
+    return average_place <= threshold
+
+
 def team_offers_for_player(
     save_name: str,
     player_names: list[str],
@@ -4199,33 +5184,78 @@ def team_offers_for_player(
 
     remaining = [dict(team) for team in eligible]
     offers: list[dict[str, Any]] = []
-    while remaining and len(offers) < offer_count:
-        weights = []
-        for team in remaining:
-            team_prestige = _safe_int(team.get("Prestige"), 50)
-            team_key = _team_key(_team_row_id(team), _team_game(team, str(championship.get("Game", ""))))
-            team_reputation = reputations.get(team_key) or reputations.get(_team_row_id(team)) or reputations.get(_team_row_name(team))
-            if team_reputation is None:
-                team_reputation = _team_reputation_value(save_name, team, str(championship.get("Game", "")))
-            prestige_fit = max(1, 120 - abs(team_prestige - championship_prestige))
-            weights.append(max(1, team_reputation + prestige_fit))
-        chosen_index = rng.choices(range(len(remaining)), weights=weights, k=1)[0]
-        team = remaining.pop(chosen_index)
-        team_key = _team_key(_team_row_id(team), _team_game(team, str(championship.get("Game", ""))))
-        team_reputation = reputations.get(team_key) or reputations.get(_team_row_id(team)) or reputations.get(_team_row_name(team))
-        if team_reputation is None:
-            team_reputation = _team_reputation_value(save_name, team, str(championship.get("Game", "")))
-        offers.append(
-            {
-                "team_id": str(team.get("Team_ID", "")).strip() or str(team.get("ID", "")).strip(),
-                "team_key": team_key,
-                "team_name": str(team.get("Team", "")).strip() or "Independent",
-                "team_prestige": _safe_int(team.get("Prestige"), 50),
-                "team_reputation": team_reputation,
-                "team_colors": _team_row_colors(team),
-                "team_personality": _team_row_personality(team),
-            }
-        )
+    championship_game = str(championship.get("Game", ""))
+    with _connect(save_name) as connection:
+        snapshot_cache: dict[tuple[str, str], dict[str, Any]] = {}
+        while remaining and len(offers) < offer_count:
+            weights = []
+            weighted_entries: list[tuple[dict[str, Any], dict[str, Any], int, int]] = []
+            for team in remaining:
+                team_prestige = _safe_int(team.get("Prestige"), 50)
+                team_key = _team_key(_team_row_id(team), _team_game(team, championship_game))
+                team_snapshot = _team_progression_snapshot(
+                    connection,
+                    team_id=_team_row_id(team),
+                    team_name=_team_row_name(team),
+                    game=_team_game(team, championship_game),
+                    fallback_prestige=team_prestige,
+                    team_key=team_key,
+                    snapshot_cache=snapshot_cache,
+                )
+                team_reputation = _safe_int(
+                    team_snapshot.get("current_strength"),
+                    reputations.get(team_key) or reputations.get(_team_row_id(team)) or reputations.get(_team_row_name(team)) or team_prestige,
+                )
+                weight = _player_team_fit_score(
+                    team_snapshot,
+                    team_prestige=team_prestige,
+                    team_reputation=team_reputation,
+                    championship_prestige=championship_prestige,
+                    player_effective_mmr=player_effective_mmr,
+                )
+                weights.append(weight)
+                weighted_entries.append((team, team_snapshot, team_reputation, weight))
+            chosen_index = rng.choices(range(len(remaining)), weights=weights, k=1)[0]
+            team, team_snapshot, team_reputation, chosen_weight = weighted_entries[chosen_index]
+            remaining.pop(chosen_index)
+            team_key = _team_key(_team_row_id(team), _team_game(team, championship_game))
+            offer_note = "Offer"
+            aggression = _team_market_aggression(team_snapshot)
+            normalized_player_rating = max(1, min(100, round((int(player_effective_mmr) - 700) / 8)))
+            if aggression >= 5 and normalized_player_rating >= team_reputation + 6:
+                offer_note = "Aggressive Move"
+            elif aggression <= -2 and team_reputation >= normalized_player_rating + 8:
+                offer_note = "Safe Fit"
+            elif chosen_weight >= max(weights) if weights else False:
+                offer_note = "Priority Target"
+            offers.append(
+                {
+                    "team_id": str(team.get("Team_ID", "")).strip() or str(team.get("ID", "")).strip(),
+                    "team_key": team_key,
+                    "team_name": str(team.get("Team", "")).strip() or "Independent",
+                    "team_prestige": _safe_int(team.get("Prestige"), 50),
+                    "team_reputation": team_reputation,
+                    "team_size": 1,
+                    "seat_quality": _team_seat_quality_score(
+                        team_snapshot,
+                        team_prestige=_safe_int(team.get("Prestige"), 50),
+                        team_reputation=team_reputation,
+                        championship_prestige=championship_prestige,
+                        team_seat=1,
+                        team_size=1,
+                    ),
+                    "offer_note": offer_note,
+                    "team_colors": _team_row_colors(team),
+                    "team_personality": _team_row_personality(team),
+                    "team_ambition": _safe_int(team_snapshot.get("team_ambition"), 50),
+                    "team_stability": _safe_int(team_snapshot.get("team_stability"), 50),
+                    "team_development": _safe_int(team_snapshot.get("team_development"), 50),
+                    "team_financial_strength": _safe_int(team_snapshot.get("team_financial_strength"), 50),
+                    "team_pressure": _safe_int(team_snapshot.get("team_pressure"), 50),
+                    "team_philosophy": str(team_snapshot.get("team_philosophy", "Balanced")),
+                    "trajectory": str(team_snapshot.get("trajectory", "stable")),
+                }
+            )
 
     return offers
 
@@ -4245,29 +5275,106 @@ def current_team_offer_for_championship(
         return None
 
     reputations = reputation_map or {}
-    championship_game = str(championship.get("Game", "")).strip()
-    for team in _eligible_teams_for_championship(championship):
-        team_id = _team_row_id(team)
-        team_key = _team_key(team_id, _team_game(team, championship_game))
-        team_name = _team_row_name(team)
-        key_matches = bool(current_team_key and current_team_key == team_key)
-        id_matches = bool(current_team_id and current_team_id == team_id)
-        name_matches = bool(current_team_name and current_team_name.casefold() == team_name.casefold())
-        if not (key_matches or id_matches or name_matches):
-            continue
-        team_reputation = reputations.get(team_key) or reputations.get(team_id) or reputations.get(team_name)
-        if team_reputation is None:
-            team_reputation = _team_reputation_value(save_name, team, championship_game)
-        return {
-            "team_id": team_id,
-            "team_key": team_key,
-            "team_name": team_name,
-            "team_prestige": _safe_int(team.get("Prestige"), 50),
-            "team_reputation": team_reputation,
-            "offer_note": "Current",
-            "team_colors": _team_row_colors(team),
-            "team_personality": _team_row_personality(team),
-        }
+    championship_id, _championship_name, championship_game, _style = _championship_team_seat_identity(championship)
+    chosen_team: dict[str, Any] | None = None
+    chosen_seat: dict[str, Any] | None = None
+
+    with _connect(save_name) as connection:
+        seat_row = connection.execute(
+            """
+            SELECT *
+            FROM team_championship_seats
+            WHERE championship_id = ?
+              AND game = ?
+              AND status = 'active'
+              AND (
+                    team_key = ?
+                 OR team_id = ?
+                 OR team_name = ?
+              )
+            ORDER BY team_seat ASC, seat_number ASC
+            LIMIT 1
+            """,
+            (championship_id, championship_game, current_team_key, current_team_id, current_team_name),
+        ).fetchone()
+        if seat_row is not None:
+            chosen_seat = _team_seat_row_to_plan(seat_row)
+            chosen_team = {
+                "Team_ID": str(seat_row["team_id"]),
+                "Team": str(seat_row["team_name"]),
+                "Prestige": _safe_int(seat_row["team_prestige"], 50),
+            }
+        else:
+            for team in _eligible_teams_for_championship(championship):
+                team_id = _team_row_id(team)
+                team_key = _team_key(team_id, _team_game(team, championship_game))
+                team_name = _team_row_name(team)
+                key_matches = bool(current_team_key and current_team_key == team_key)
+                id_matches = bool(current_team_id and current_team_id == team_id)
+                name_matches = bool(current_team_name and current_team_name.casefold() == team_name.casefold())
+                if not (key_matches or id_matches or name_matches):
+                    continue
+                chosen_team = dict(team)
+                break
+        if not chosen_team:
+            return None
+
+        team_id = str(chosen_seat.get("team_id", "") if chosen_seat else _team_row_id(chosen_team)).strip()
+        team_key = str(chosen_seat.get("team_key", "") if chosen_seat else "").strip() or _team_key(team_id, championship_game)
+        team_name = str(chosen_seat.get("team_name", "") if chosen_seat else _team_row_name(chosen_team)).strip() or "Independent"
+        team_prestige = _safe_int(chosen_seat.get("team_prestige") if chosen_seat else chosen_team.get("Prestige"), 50)
+        team_snapshot = _team_progression_snapshot(
+            connection,
+            team_id=team_id,
+            team_name=team_name,
+            game=championship_game,
+            fallback_prestige=team_prestige,
+            team_key=team_key,
+        )
+    team_reputation = _safe_int(team_snapshot.get("current_strength"), reputations.get(team_key) or reputations.get(team_id) or reputations.get(team_name) or team_prestige)
+    team_seat = _safe_int(chosen_seat.get("team_seat") if chosen_seat else 1, 1)
+    team_size = 1
+    if chosen_seat is not None:
+        with _connect(save_name) as connection:
+            size_row = connection.execute(
+                """
+                SELECT COUNT(*) AS seat_count
+                FROM team_championship_seats
+                WHERE championship_id = ?
+                  AND game = ?
+                  AND status = 'active'
+                  AND team_key = ?
+                """,
+                (championship_id, championship_game, team_key),
+            ).fetchone()
+        team_size = max(1, _safe_int(size_row["seat_count"] if size_row else 1, 1))
+    return {
+        "team_id": team_id,
+        "team_key": team_key,
+        "team_name": team_name,
+        "team_prestige": team_prestige,
+        "team_reputation": team_reputation,
+        "team_size": team_size,
+        "team_seat": team_seat,
+        "seat_quality": _team_seat_quality_score(
+            team_snapshot,
+            team_prestige=team_prestige,
+            team_reputation=team_reputation,
+            championship_prestige=_safe_int(championship.get("Prestige"), 1),
+            team_seat=team_seat,
+            team_size=team_size,
+        ),
+        "offer_note": "Current",
+        "team_colors": _team_row_colors(chosen_team),
+        "team_personality": _team_row_personality(chosen_team),
+        "team_ambition": _safe_int(team_snapshot.get("team_ambition"), 50),
+        "team_stability": _safe_int(team_snapshot.get("team_stability"), 50),
+        "team_development": _safe_int(team_snapshot.get("team_development"), 50),
+        "team_financial_strength": _safe_int(team_snapshot.get("team_financial_strength"), 50),
+        "team_pressure": _safe_int(team_snapshot.get("team_pressure"), 50),
+        "team_philosophy": str(team_snapshot.get("team_philosophy", "Balanced")),
+        "trajectory": str(team_snapshot.get("trajectory", "stable")),
+    }
     return None
 
 
@@ -4340,11 +5447,16 @@ def driver_profile_map(save_name: str) -> dict[str, dict[str, Any]]:
                 ams2_general_skill,
                 ams2_qualifying_skill,
                 ams2_race_skill,
+                ams2_setup_downforce,
+                ams2_setup_downforce_randomness,
                 ams2_stamina,
                 ams2_start_reactions,
                 ams2_tyre_management,
+                ams2_drag_scalar,
+                ams2_power_scalar,
                 ams2_vehicle_reliability,
                 ams2_weather_tyre_changes,
+                ams2_weight_scalar,
                 ams2_wet_skill
             FROM drivers
             """
@@ -4568,7 +5680,7 @@ def team_reputation_map(save_name: str) -> dict[str, int]:
         connection.commit()
         rows = connection.execute(
             """
-            SELECT team_key, team_id, team_name, reputation
+            SELECT team_key, team_id, team_name, reputation, current_strength
                  , game
             FROM team_reputations
             """
@@ -4576,18 +5688,27 @@ def team_reputation_map(save_name: str) -> dict[str, int]:
     for row in rows:
         team_id = str(row["team_id"] or "").strip()
         team_name = str(row["team_name"] or "").strip()
-        group_key = team_id or team_name
+        group_key = _team_identity_group_key(team_id, team_name)
         if not group_key:
             continue
         existing = selected_rows.get(group_key)
         row_game = str(row["game"] or "").strip().casefold()
         existing_game = str((existing or {}).get("game", "")).strip().casefold()
-        if existing is None or (row_game == target_game_key and existing_game != target_game_key):
+        if existing is None:
             selected_rows[group_key] = dict(row)
+            continue
+        if row_game == target_game_key and existing_game != target_game_key:
+            selected_rows[group_key] = dict(row)
+            continue
+        if row_game == existing_game:
+            row_strength = _safe_int(row["current_strength"], _safe_int(row["reputation"], 50))
+            existing_strength = _safe_int(existing.get("current_strength"), _safe_int(existing.get("reputation"), 50))
+            if row_strength > existing_strength:
+                selected_rows[group_key] = dict(row)
 
     reputations: dict[str, int] = {}
     for row in selected_rows.values():
-        reputation = _safe_int(row["reputation"], 50)
+        reputation = _safe_int(row["current_strength"], _safe_int(row["reputation"], 50))
         for key in (row["team_key"], row["team_id"], row["team_name"]):
             normalized = str(key or "").strip()
             if normalized:
@@ -4619,6 +5740,18 @@ def list_teams_page(
                 game,
                 base_prestige,
                 reputation,
+                current_strength,
+                team_form,
+                team_ambition,
+                team_stability,
+                team_development,
+                team_financial_strength,
+                team_pressure,
+                team_philosophy,
+                trajectory,
+                last_season_points,
+                last_season_wins,
+                last_season_titles,
                 seasons_completed,
                 championships,
                 wins,
@@ -4638,7 +5771,7 @@ def list_teams_page(
             continue
         team_id = str(item.get("team_id", "")).strip()
         team_name = str(item.get("team_name", "")).strip()
-        group_key = team_id or team_name
+        group_key = _team_identity_group_key(team_id, team_name)
         if not group_key:
             continue
         existing = selected_rows.get(group_key)
@@ -4648,10 +5781,16 @@ def list_teams_page(
         elif row_game == target_game_key and existing_game != target_game_key:
             selected_rows[group_key] = item
         elif row_game == existing_game:
-            if _safe_int(item.get("seasons_completed"), 0) > _safe_int(existing.get("seasons_completed"), 0):
+            item_strength = _safe_int(item.get("current_strength"), _safe_int(item.get("reputation"), 50))
+            existing_strength = _safe_int(existing.get("current_strength"), _safe_int(existing.get("reputation"), 50))
+            if item_strength > existing_strength:
+                selected_rows[group_key] = item
+            elif item_strength == existing_strength and _safe_int(item.get("seasons_completed"), 0) > _safe_int(existing.get("seasons_completed"), 0):
                 selected_rows[group_key] = item
 
     teams = list(selected_rows.values())
+    for team in teams:
+        team["game"] = _team_display_game(team.get("game", ""), target_game)
     if cleaned_search:
         search_value = cleaned_search.casefold()
         teams = [
@@ -4664,10 +5803,10 @@ def list_teams_page(
 
     sort_options = {
         "Name": lambda row: (str(row.get("team_name", "")),),
-        "Reputation": lambda row: (-_safe_int(row.get("reputation"), 50), -_safe_int(row.get("championships"), 0), -_safe_int(row.get("wins"), 0), str(row.get("team_name", ""))),
-        "Titles": lambda row: (-_safe_int(row.get("championships"), 0), -_safe_int(row.get("reputation"), 50), -_safe_int(row.get("wins"), 0), str(row.get("team_name", ""))),
-        "Wins": lambda row: (-_safe_int(row.get("wins"), 0), -_safe_int(row.get("reputation"), 50), -_safe_int(row.get("championships"), 0), str(row.get("team_name", ""))),
-        "Seasons": lambda row: (-_safe_int(row.get("seasons_completed"), 0), -_safe_int(row.get("reputation"), 50), str(row.get("team_name", ""))),
+        "Reputation": lambda row: (-_safe_int(row.get("current_strength"), _safe_int(row.get("reputation"), 50)), -_safe_int(row.get("championships"), 0), -_safe_int(row.get("wins"), 0), str(row.get("team_name", ""))),
+        "Titles": lambda row: (-_safe_int(row.get("championships"), 0), -_safe_int(row.get("current_strength"), _safe_int(row.get("reputation"), 50)), -_safe_int(row.get("wins"), 0), str(row.get("team_name", ""))),
+        "Wins": lambda row: (-_safe_int(row.get("wins"), 0), -_safe_int(row.get("current_strength"), _safe_int(row.get("reputation"), 50)), -_safe_int(row.get("championships"), 0), str(row.get("team_name", ""))),
+        "Seasons": lambda row: (-_safe_int(row.get("seasons_completed"), 0), -_safe_int(row.get("current_strength"), _safe_int(row.get("reputation"), 50)), str(row.get("team_name", ""))),
     }
     teams.sort(key=sort_options.get(sort_by, sort_options["Reputation"]))
     total = len(teams)
@@ -4681,9 +5820,21 @@ def get_team_profile(save_name: str, team_key: str) -> dict[str, Any] | None:
     cleaned_key = str(team_key).strip()
     if not cleaned_key:
         return None
+    save_data = save_manager.load_save(save_name) or {}
+    target_game = str(save_data.get("game", "iRacing")).strip()
     with _connect(save_name) as connection:
         _sync_team_totals_from_history(connection)
         connection.commit()
+        identity_row = connection.execute(
+            """
+            SELECT team_key, team_id, team_name, game
+            FROM team_reputations
+            WHERE team_key = ?
+            """,
+            (cleaned_key,),
+        ).fetchone()
+        if not identity_row:
+            return None
         team_row = connection.execute(
             """
             SELECT
@@ -4693,6 +5844,18 @@ def get_team_profile(save_name: str, team_key: str) -> dict[str, Any] | None:
                 game,
                 base_prestige,
                 reputation,
+                current_strength,
+                team_form,
+                team_ambition,
+                team_stability,
+                team_development,
+                team_financial_strength,
+                team_pressure,
+                team_philosophy,
+                trajectory,
+                last_season_points,
+                last_season_wins,
+                last_season_titles,
                 seasons_completed,
                 championships,
                 wins,
@@ -4701,8 +5864,26 @@ def get_team_profile(save_name: str, team_key: str) -> dict[str, Any] | None:
                 last_style
             FROM team_reputations
             WHERE team_key = ?
+               OR team_id = ?
+               OR team_name = ?
+            ORDER BY
+                CASE
+                    WHEN LOWER(COALESCE(game, '')) = LOWER(?) THEN 0
+                    WHEN LOWER(COALESCE(game, '')) = 'any' THEN 1
+                    WHEN team_key = ? THEN 2
+                    ELSE 3
+                END,
+                current_strength DESC,
+                seasons_completed DESC
+            LIMIT 1
             """,
-            (cleaned_key,),
+            (
+                cleaned_key,
+                str(identity_row["team_id"] or "").strip(),
+                str(identity_row["team_name"] or "").strip(),
+                target_game,
+                cleaned_key,
+            ),
         ).fetchone()
         if not team_row:
             return None
@@ -4767,6 +5948,7 @@ def get_team_profile(save_name: str, team_key: str) -> dict[str, Any] | None:
         ).fetchall()
 
     team = dict(team_row)
+    team["game"] = _team_display_game(team.get("game", ""), target_game)
     team["team_colors"] = _team_colors_for_identity(
         str(team.get("team_id", "")),
         str(team.get("team_name", "")),
@@ -4778,6 +5960,27 @@ def get_team_profile(save_name: str, team_key: str) -> dict[str, Any] | None:
         "driver_decisions": [dict(row) for row in decision_rows],
         "ownership_history": [dict(row) for row in ownership_rows],
     }
+
+
+def get_team_snapshot_for_identity(
+    save_name: str,
+    *,
+    team_id: str,
+    team_name: str,
+    game: str,
+    fallback_prestige: int,
+    team_key: str = "",
+) -> dict[str, Any]:
+    initialize_driver_pool(save_name)
+    with _connect(save_name) as connection:
+        return _team_progression_snapshot(
+            connection,
+            team_id=str(team_id).strip(),
+            team_name=str(team_name).strip(),
+            game=str(game or "Any").strip() or "Any",
+            fallback_prestige=_safe_int(fallback_prestige, 50),
+            team_key=str(team_key).strip(),
+        )
 
 
 def rename_team(save_name: str, team_key: str, new_name: str) -> tuple[bool, str]:
@@ -5414,38 +6617,97 @@ def _draft_seat_entries_for_championship(
 
     championship_prestige = _safe_int(championship.get("Prestige"), 0)
     championship_tier = _safe_int(championship.get("Tier"), 1)
+    team_sizes: dict[str, int] = defaultdict(int)
+    for seat in seat_plan[:seat_count]:
+        team_sizes[
+            str(seat.get("team_key", "")).strip()
+            or str(seat.get("team_id", "")).strip()
+            or str(seat.get("team_name", "")).strip()
+        ] += 1
     entries: list[dict[str, Any]] = []
-    for seat_index, seat in enumerate(seat_plan[:seat_count], start=1):
-        team_reputation = _safe_int(seat.get("team_prestige"), 50)
-        team_key = str(seat.get("team_key", "")).strip()
-        if reputation_map is not None:
-            team_reputation = reputation_map.get(team_key) or reputation_map.get(str(seat.get("team_id", "")).strip()) or reputation_map.get(str(seat.get("team_name", "")).strip()) or team_reputation
-        elif team_key:
-            try:
-                with _connect(save_name) as connection:
+    try:
+        with _connect(save_name) as connection:
+            snapshot_cache: dict[tuple[str, str], dict[str, Any]] = {}
+            for seat_index, seat in enumerate(seat_plan[:seat_count], start=1):
+                team_reputation = _safe_int(seat.get("team_prestige"), 50)
+                team_key = str(seat.get("team_key", "")).strip()
+                if reputation_map is not None:
+                    team_reputation = reputation_map.get(team_key) or reputation_map.get(str(seat.get("team_id", "")).strip()) or reputation_map.get(str(seat.get("team_name", "")).strip()) or team_reputation
+                elif team_key:
                     reputation_row = connection.execute(
                         "SELECT reputation FROM team_reputations WHERE team_key = ?",
                         (team_key,),
                     ).fetchone()
-                if reputation_row:
-                    team_reputation = _safe_int(reputation_row["reputation"], team_reputation)
-            except Exception:
-                pass
-        entries.append(
-            {
-                "championship_id": str(championship.get("id", "")).strip(),
-                "championship_name": str(championship.get("Championship", "")).strip(),
-                "prestige": championship_prestige,
-                "tier": championship_tier,
-                "game": game,
-                "team_id": str(seat.get("team_id", "")).strip(),
-                "team_key": team_key,
-                "team_name": str(seat.get("team_name", "")).strip() or "Independent",
-                "team_prestige": _safe_int(seat.get("team_prestige"), 50),
-                "team_reputation": team_reputation,
-                "seat_index": seat_index,
-            }
-        )
+                    if reputation_row:
+                        team_reputation = _safe_int(reputation_row["reputation"], team_reputation)
+                team_prestige = _safe_int(seat.get("team_prestige"), 50)
+                seat_team_size = team_sizes.get(team_key or str(seat.get("team_id", "")).strip() or str(seat.get("team_name", "")).strip(), 1)
+                team_snapshot = _team_progression_snapshot(
+                    connection,
+                    team_id=str(seat.get("team_id", "")).strip(),
+                    team_name=str(seat.get("team_name", "")).strip() or "Independent",
+                    game=championship_game,
+                    fallback_prestige=team_prestige,
+                    team_key=team_key,
+                    snapshot_cache=snapshot_cache,
+                )
+                seat_quality = _team_seat_quality_score(
+                    team_snapshot,
+                    team_prestige=team_prestige,
+                    team_reputation=team_reputation,
+                    championship_prestige=championship_prestige,
+                    team_seat=_safe_int(seat.get("team_seat"), 1),
+                    team_size=seat_team_size,
+                )
+                entries.append(
+                    {
+                        "championship_id": str(championship.get("id", "")).strip(),
+                        "championship_name": str(championship.get("Championship", "")).strip(),
+                        "prestige": _seat_prestige_from_quality(championship_prestige, seat_quality),
+                        "tier": championship_tier,
+                        "game": game,
+                        "team_id": str(seat.get("team_id", "")).strip(),
+                        "team_key": team_key,
+                        "team_name": str(seat.get("team_name", "")).strip() or "Independent",
+                        "team_prestige": team_prestige,
+                        "team_reputation": team_reputation,
+                        "seat_index": seat_index,
+                        "team_size": seat_team_size,
+                        "seat_quality": seat_quality,
+                    }
+                )
+    except Exception:
+        for seat_index, seat in enumerate(seat_plan[:seat_count], start=1):
+            team_key = str(seat.get("team_key", "")).strip()
+            team_prestige = _safe_int(seat.get("team_prestige"), 50)
+            team_reputation = (
+                reputation_map.get(team_key) if reputation_map is not None else None
+            ) or team_prestige
+            seat_team_size = team_sizes.get(team_key or str(seat.get("team_id", "")).strip() or str(seat.get("team_name", "")).strip(), 1)
+            seat_quality = max(
+                25,
+                min(
+                    98,
+                    team_reputation + (4 if _safe_int(seat.get("team_seat"), 1) == 1 else 0) + max(0, seat_team_size - 1) * 2,
+                ),
+            )
+            entries.append(
+                {
+                    "championship_id": str(championship.get("id", "")).strip(),
+                    "championship_name": str(championship.get("Championship", "")).strip(),
+                    "prestige": _seat_prestige_from_quality(championship_prestige, seat_quality),
+                    "tier": championship_tier,
+                    "game": game,
+                    "team_id": str(seat.get("team_id", "")).strip(),
+                    "team_key": team_key,
+                    "team_name": str(seat.get("team_name", "")).strip() or "Independent",
+                    "team_prestige": team_prestige,
+                    "team_reputation": team_reputation,
+                    "seat_index": seat_index,
+                    "team_size": seat_team_size,
+                    "seat_quality": seat_quality,
+                }
+            )
     return entries
 
 

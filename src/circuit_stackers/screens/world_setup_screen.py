@@ -159,6 +159,8 @@ class WorldSetupScreen(ctk.CTkFrame):
             team_name=team_name,
             championship_name=championship_name,
             personality=personality,
+            philosophy=str(player_team_offer.get("team_philosophy", "")).strip(),
+            trajectory=str(player_team_offer.get("team_trajectory", "")).strip(),
         )
         if player_car:
             intro_lines.append("")
@@ -173,6 +175,25 @@ class WorldSetupScreen(ctk.CTkFrame):
                     expectation,
                 ]
             )
+        offer_reason = str(player_team_offer.get("team_offer_reason", "")).strip()
+        trajectory = str(player_team_offer.get("team_trajectory", "")).strip()
+        philosophy = str(player_team_offer.get("team_philosophy", "")).strip()
+        if offer_reason or trajectory or philosophy:
+            intro_lines.append("")
+            if offer_reason:
+                intro_lines.extend(
+                    [
+                        "Why this seat came your way:",
+                        offer_reason,
+                    ]
+                )
+            if trajectory or philosophy:
+                identity_bits = []
+                if trajectory:
+                    identity_bits.append(f"{trajectory.title()} trajectory")
+                if philosophy:
+                    identity_bits.append(f"{philosophy} philosophy")
+                intro_lines.append("Team identity: " + " | ".join(identity_bits))
 
         team_colors = self._team_color_codes(state.get("player_team_offer") or {})
         if str(state.get("game", "iRacing")).strip().casefold() == "iracing" and team_colors:
@@ -254,6 +275,8 @@ class WorldSetupScreen(ctk.CTkFrame):
         team_name: str,
         championship_name: str,
         personality: str,
+        philosophy: str = "",
+        trajectory: str = "",
     ) -> list[str]:
         team_label = team_name or "the team"
         normalized = personality.strip().casefold()
@@ -290,13 +313,36 @@ class WorldSetupScreen(ctk.CTkFrame):
                 "This is a serious opportunity: prepare well, keep the car clean, and build momentum every weekend.",
             ),
         )
+        philosophy_line = WorldSetupScreen._team_philosophy_welcome_line(philosophy, trajectory, championship_name)
         return [
             f"{player_label},",
             "",
             opening,
             "",
             focus,
+            *([ "", philosophy_line ] if philosophy_line else []),
         ]
+
+    @staticmethod
+    def _team_philosophy_welcome_line(philosophy: str, trajectory: str, championship_name: str) -> str:
+        normalized = str(philosophy).strip().casefold()
+        trend = str(trajectory).strip().casefold()
+        trend_text = ""
+        if trend == "rising":
+            trend_text = " The garage feels like it is climbing."
+        elif trend == "falling":
+            trend_text = " There is real urgency around this campaign."
+        elif trend == "rebuilding":
+            trend_text = " This season is being treated like a reset."
+        lines = {
+            "win now": f"This team is in win-now mode for {championship_name}: results will be judged quickly.{trend_text}",
+            "driver continuity": f"This group values continuity, trust, and building a season together over abrupt changes.{trend_text}",
+            "technical excellence": f"The emphasis here is technical sharpness, clean execution, and making every session count.{trend_text}",
+            "underdog grit": f"The plan is to scrap for everything available and make bigger programs work for every point.{trend_text}",
+            "rookie pipeline": f"This program is built around development, upside, and turning raw pace into real racecraft.{trend_text}",
+            "balanced": f"The team is looking for steady weekends, solid progress, and a season that builds properly.{trend_text}",
+        }
+        return lines.get(normalized, "").strip()
 
     @staticmethod
     def _team_welcome_closing(personality: str, sender: str) -> list[str]:

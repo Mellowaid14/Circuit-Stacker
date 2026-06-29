@@ -96,7 +96,11 @@ class CustomChampionshipManageScreen(ctk.CTkFrame):
         for group in self.groups:
             group_id = str(group.get("championship_id", ""))
             selected = group_id == self.selected_group_id
-            row = ctk.CTkFrame(row_parent := self.list_frame, fg_color=("#d8ecff", "#173a59") if selected else ("gray84", "gray20"), corner_radius=12)
+            row = ctk.CTkFrame(
+                self.list_frame,
+                fg_color=("#d8ecff", "#173a59") if selected else ("gray84", "gray20"),
+                corner_radius=12,
+            )
             row.pack(fill="x", padx=10, pady=4)
             label_stack = ctk.CTkFrame(row, fg_color="transparent")
             label_stack.pack(side="left", fill="x", expand=True, padx=10, pady=8)

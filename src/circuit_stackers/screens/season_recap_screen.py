@@ -16,6 +16,7 @@ class SeasonRecapScreen(ctk.CTkFrame):
         self.championship_name = ""
         self.summary: dict = {}
         self.final_standings: list[dict] = []
+        self.player_team_offer: dict = {}
         self.career_mode = "Solo"
         self.player_perspectives: dict[str, dict] = {}
         self.next_tier = 1
@@ -116,6 +117,7 @@ class SeasonRecapScreen(ctk.CTkFrame):
         self.championship_name = championship_name
         self.summary = dict(summary)
         self.final_standings = [dict(row) for row in final_standings]
+        self.player_team_offer = dict(self.summary.get("player_team_offer") or {}) if isinstance(self.summary.get("player_team_offer"), dict) else {}
         self.career_mode = str(self.summary.get("career_mode") or ("Co-op" if len(self.player_names) > 1 else "Solo"))
         self.player_perspectives = {
             str(name): dict(value)
@@ -165,6 +167,12 @@ class SeasonRecapScreen(ctk.CTkFrame):
             self._info_row(self.summary_frame, f"{player_name}:", self._player_result_text(player_name, fallback_position))
             if len(self.player_names) > 1:
                 self._info_row(self.summary_frame, "Rivalries:", self._player_rivalry_text(player_name))
+
+        team_name = str(self.player_team_offer.get("team_name", "")).strip()
+        if team_name:
+            self._section_label(self.summary_frame, "Garage View")
+            self._info_row(self.summary_frame, "Team:", team_name)
+            self._info_row(self.summary_frame, "Season Read:", self._team_season_recap_text())
 
         self._section_label(self.summary_frame, "World Update")
         self._info_row(self.summary_frame, "World Year:", str(driver_pool.get("next_world_year", "-")))
@@ -332,6 +340,47 @@ class SeasonRecapScreen(ctk.CTkFrame):
             return f"{len(full_rivals)} full rival{'s' if len(full_rivals) != 1 else ''} | Hottest: {hot_name}"
         stage_text = "orange" if int(hot_stage) == 2 else "yellow"
         return f"{len(heat)} active | Hottest: {hot_name} ({stage_text})"
+
+    def _team_season_recap_text(self) -> str:
+        team_name = str(self.player_team_offer.get("team_name", "")).strip() or "The team"
+        philosophy = str(self.player_team_offer.get("team_philosophy", "")).strip().casefold()
+        trajectory = str(self.player_team_offer.get("team_trajectory", "")).strip().casefold()
+        outcome = str((self.summary or {}).get("outcome", "stayed")).strip().casefold()
+        average_position = self.summary.get("average_position")
+        average_text = f"{average_position:.1f}" if isinstance(average_position, (int, float)) else "-"
+
+        outcome_line = {
+            "promoted": f"The season ended in a step forward, and {team_name} will see that as proof the program is moving.",
+            "stayed": f"The season held position overall, which leaves {team_name} looking closely at how to sharpen the next campaign.",
+            "demoted": f"The season slipped backward, and {team_name} will treat that as a reset point rather than something to hide from.",
+        }.get(outcome, f"{team_name} is reviewing the season and setting the next target.")
+
+        philosophy_line = {
+            "win now": "A win-now team will judge this year mostly through whether the results were big enough often enough.",
+            "driver continuity": "A continuity-focused team will care about whether the group kept building together over the full season.",
+            "technical excellence": "A technical program will look at execution, clean weekends, and whether the details improved round to round.",
+            "underdog grit": "An underdog team will value how many points were stolen from weekends that could have gone nowhere.",
+            "rookie pipeline": "A development-focused team will care about whether the season showed real growth, not just isolated flashes.",
+            "balanced": "A balanced team will weigh both the headline results and the steadiness of the campaign as a whole.",
+        }.get(philosophy, "The garage will judge the season through its own standards and what it thinks comes next.")
+
+        trajectory_line = {
+            "rising": "The feeling in the garage should still be upward-looking heading into the offseason.",
+            "falling": "The garage mood is likely to be sharper and more demanding after the trend this year.",
+            "rebuilding": "The team is likely to frame the next phase as part of a larger rebuild.",
+            "stable": "The team should see the offseason as a chance to refine rather than reinvent.",
+        }.get(trajectory, "")
+
+        return " ".join(
+            part
+            for part in (
+                outcome_line,
+                philosophy_line,
+                trajectory_line,
+                f"Average finishing position for your side of the garage: {average_text}.",
+            )
+            if part
+        )
 
     def _refresh_standings(self) -> None:
         for widget in self.standings_frame.winfo_children():

@@ -7,7 +7,6 @@ import customtkinter as ctk
 
 from .exporter import (
     ChampionshipOption,
-    ExportError,
     build_iracing_roster_payload,
     default_source_folder,
     export_roster_json,

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import random
 import uuid
 from hashlib import sha256
@@ -8,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from .driver_pool import driver_profile_map, team_colors_for_identity
+from .json_storage import write_json_atomic
 from .settings_manager import list_all_cars, load_settings
 
 
@@ -66,7 +66,6 @@ def _driver_class_name(driver: dict[str, Any]) -> str:
 
 
 def _championship_cars(championship: dict[str, Any]) -> list[dict[str, str]]:
-    championship_id = str(championship.get("id", "")).strip()
     car_ids = set(str(value).strip() for value in str(championship.get("_championship_car_ids", "")).split(",") if str(value).strip())
     if not car_ids:
         return []
@@ -157,5 +156,5 @@ def export_roster(
 
     payload = {"drivers": build_roster_drivers(save_name, standings, championship, player_names, player_car)}
     roster_path = roster_dir / "roster.json"
-    roster_path.write_text(json.dumps(payload, indent=4), encoding="utf-8")
+    write_json_atomic(roster_path, payload)
     return roster_path

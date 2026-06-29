@@ -566,7 +566,6 @@ class GameplayScreen(ctk.CTkFrame):
             widget.destroy()
 
         championship = self.championship or {}
-        actual_opponents = max(0, len(self.standings) - len(self.player_names))
         player_rows = {str(driver.get("name", "")): driver for driver in self._player_driver_rows()}
         active_count, retired_count = self._pool_counts()
         try:
@@ -585,6 +584,18 @@ class GameplayScreen(ctk.CTkFrame):
         team_name = str((self.player_team_offer or {}).get("team_name", "")).strip()
         if team_name:
             self._info_row(self.champ_info_frame, "Player Team:", team_name)
+            team_trajectory = str((self.player_team_offer or {}).get("team_trajectory", "")).strip()
+            team_philosophy = str((self.player_team_offer or {}).get("team_philosophy", "")).strip()
+            team_offer_reason = str((self.player_team_offer or {}).get("team_offer_reason", "")).strip()
+            if team_trajectory or team_philosophy:
+                identity_bits = []
+                if team_trajectory:
+                    identity_bits.append(f"{team_trajectory.title()} trajectory")
+                if team_philosophy:
+                    identity_bits.append(f"{team_philosophy} philosophy")
+                self._info_row(self.champ_info_frame, "Team Identity:", " | ".join(identity_bits))
+            if team_offer_reason:
+                self._info_row(self.champ_info_frame, "Team Outlook:", team_offer_reason)
         if self.game.strip().casefold() == "ams2":
             if self.player_liveries:
                 for entry in self.player_liveries:
@@ -760,7 +771,47 @@ class GameplayScreen(ctk.CTkFrame):
         if rising_driver:
             lines.append(f"Form guide: {rising_driver} has been marked as a rising driver by the paddock.")
 
+        team_offer = self.player_team_offer if isinstance(self.player_team_offer, dict) else {}
+        team_name = str(team_offer.get("team_name", "")).strip()
+        team_philosophy = str(team_offer.get("team_philosophy", "")).strip()
+        team_trajectory = str(team_offer.get("team_trajectory", "")).strip()
+        team_expectation = str(team_offer.get("team_expectation", "")).strip()
+        if team_name:
+            focus = [f"Team focus: {team_name}"]
+            if team_philosophy:
+                focus.append(f"{team_philosophy} approach")
+            if team_trajectory:
+                focus.append(f"{team_trajectory.title()} trajectory")
+            lines.append(" | ".join(focus) + ".")
+            philosophy_line = self._team_philosophy_race_focus(team_philosophy, team_trajectory)
+            if philosophy_line:
+                lines.append(philosophy_line)
+        if team_expectation:
+            lines.append(team_expectation)
+
         return lines
+
+    @staticmethod
+    def _team_philosophy_race_focus(philosophy: str, trajectory: str) -> str:
+        normalized = str(philosophy).strip().casefold()
+        trend = str(trajectory).strip().casefold()
+        trend_clause = ""
+        if trend == "rising":
+            trend_clause = " Momentum is with the team right now."
+        elif trend == "falling":
+            trend_clause = " The garage will be sensitive to a weak weekend."
+        elif trend == "rebuilding":
+            trend_clause = " Even small gains will matter this weekend."
+        lines = {
+            "win now": "Garage brief: convert pace immediately and do not leave results on the table.",
+            "driver continuity": "Garage brief: keep the weekend clean, stay connected to the plan, and bank the finish.",
+            "technical excellence": "Garage brief: focus on precision, avoid unforced mistakes, and execute the details.",
+            "underdog grit": "Garage brief: race hard, defend every point, and make the other teams earn every position.",
+            "rookie pipeline": "Garage brief: build confidence through the sessions and turn learning into points.",
+            "balanced": "Garage brief: stack a tidy weekend and let the result come from consistency.",
+        }
+        base = lines.get(normalized, "")
+        return (base + trend_clause).strip()
 
     @staticmethod
     def _rivalry_stage_text(stage: int) -> str:

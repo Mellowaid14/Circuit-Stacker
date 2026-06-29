@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+from .json_storage import write_json_atomic
 from .roster_exporter import build_roster_drivers
 from .settings_manager import load_settings
 
@@ -402,7 +403,7 @@ def export_season(
     }
 
     season_path = season_dir / f"{roster_name}.json"
-    season_path.write_text(json.dumps(payload, indent=4), encoding="utf-8")
+    write_json_atomic(season_path, payload)
     return season_path
 
 
@@ -425,7 +426,7 @@ def update_exported_season_difficulty(
     payload["maxSkill"] = max_skill
 
     try:
-        path.write_text(json.dumps(payload, indent=4), encoding="utf-8")
+        write_json_atomic(path, payload)
     except OSError:
         return False
     return True

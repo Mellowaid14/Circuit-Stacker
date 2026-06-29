@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import csv
-import json
 from pathlib import Path
 from typing import Any
 
 from .paths import resource_path, user_data_dir
+from .json_storage import read_json_object, write_json_atomic
 
 SETTINGS_PATH = user_data_dir() / "settings.json"
+SETTINGS_SCHEMA_VERSION = 2
 DEFAULT_IRACING_DIR = ""
 DEFAULT_AMS2_DIR = ""
 
@@ -41,7 +42,12 @@ def list_all_tracks() -> list[dict[str, str]]:
 
 
 def default_owned_car_ids() -> list[str]:
-    return sorted(str(row["id"]).strip() for row in list_all_cars() if row.get("Owned", "").strip().casefold() == "yes")
+    return sorted(
+        str(row["id"]).strip()
+        for row in list_all_cars()
+        if row.get("Owned", "").strip().casefold() == "yes"
+        and str(row.get("Game", "")).strip().casefold() in {"", "iracing"}
+    )
 
 
 def default_owned_track_ids() -> list[str]:
@@ -50,8 +56,26 @@ def default_owned_track_ids() -> list[str]:
             str(row.get("Track", "")).strip()
             for row in list_all_tracks()
             if row.get("Owned", "").strip().casefold() == "yes" and str(row.get("Track", "")).strip()
+            and str(row.get("Game", "")).strip().casefold() in {"", "iracing"}
         }
     )
+
+
+def legacy_cross_game_iracing_track_defaults() -> set[str]:
+    ams2_default_names = {
+        str(row.get("Track", "")).strip()
+        for row in list_all_tracks()
+        if str(row.get("Game", "")).strip().casefold() == "ams2"
+        and str(row.get("Owned", "")).strip().casefold() == "yes"
+        and str(row.get("Track", "")).strip()
+    }
+    return {
+        str(row.get("Track", "")).strip()
+        for row in list_all_tracks()
+        if str(row.get("Game", "")).strip().casefold() == "iracing"
+        and str(row.get("Owned", "")).strip().casefold() != "yes"
+        and str(row.get("Track", "")).strip() in ams2_default_names
+    }
 
 
 def _game_prefix(game: str) -> str:
@@ -80,6 +104,7 @@ def _ams2_base_track_names() -> set[str]:
 
 def default_settings() -> dict[str, Any]:
     return {
+        "settings_schema_version": SETTINGS_SCHEMA_VERSION,
         "iracing_directory": DEFAULT_IRACING_DIR,
         "owned_car_ids": default_owned_car_ids(),
         "owned_track_names": default_owned_track_ids(),
@@ -101,8 +126,24 @@ def load_settings() -> dict[str, Any]:
     if not SETTINGS_PATH.exists():
         return defaults
 
-    saved = json.loads(SETTINGS_PATH.read_text(encoding="utf-8"))
+    saved = read_json_object(SETTINGS_PATH)
+    if saved is None:
+        return defaults
+    try:
+        saved_schema_version = int(saved.get("settings_schema_version", 1) or 1)
+    except (TypeError, ValueError):
+        saved_schema_version = 1
+    saved_iracing_tracks = sorted(
+        saved.get(
+            "iracing_owned_track_names",
+            saved.get("owned_track_names", saved.get("owned_track_ids", defaults["iracing_owned_track_names"])),
+        )
+    )
+    if saved_schema_version < SETTINGS_SCHEMA_VERSION:
+        erroneous_defaults = legacy_cross_game_iracing_track_defaults()
+        saved_iracing_tracks = [track for track in saved_iracing_tracks if str(track).strip() not in erroneous_defaults]
     return {
+        "settings_schema_version": SETTINGS_SCHEMA_VERSION,
         "iracing_directory": saved.get("iracing_directory", defaults["iracing_directory"]),
         "owned_car_ids": sorted(saved.get("owned_car_ids", defaults["owned_car_ids"])),
         "owned_track_names": sorted(
@@ -111,12 +152,7 @@ def load_settings() -> dict[str, Any]:
         "iracing_owned_car_ids": sorted(
             saved.get("iracing_owned_car_ids", saved.get("owned_car_ids", defaults["iracing_owned_car_ids"]))
         ),
-        "iracing_owned_track_names": sorted(
-            saved.get(
-                "iracing_owned_track_names",
-                saved.get("owned_track_names", saved.get("owned_track_ids", defaults["iracing_owned_track_names"])),
-            )
-        ),
+        "iracing_owned_track_names": saved_iracing_tracks,
         "ams2_directory": saved.get("ams2_directory", defaults["ams2_directory"]),
         "ams2_owned_car_ids": sorted(saved.get("ams2_owned_car_ids", defaults["ams2_owned_car_ids"])),
         "ams2_owned_track_names": sorted(
@@ -140,6 +176,7 @@ def load_settings() -> dict[str, Any]:
 
 def save_settings(settings: dict[str, Any]) -> None:
     payload = {
+        "settings_schema_version": SETTINGS_SCHEMA_VERSION,
         "iracing_directory": settings.get("iracing_directory", DEFAULT_IRACING_DIR),
         "owned_car_ids": sorted(str(value) for value in settings.get("owned_car_ids", [])),
         "owned_track_names": sorted(str(value) for value in settings.get("owned_track_names", [])),
@@ -156,7 +193,7 @@ def save_settings(settings: dict[str, Any]) -> None:
         "check_for_updates_on_launch": bool(settings.get("check_for_updates_on_launch", True)),
         "menu_music_volume": _clamp_float(settings.get("menu_music_volume", 0.45), 0.0, 1.0),
     }
-    SETTINGS_PATH.write_text(json.dumps(payload, indent=4), encoding="utf-8")
+    write_json_atomic(SETTINGS_PATH, payload)
 
 
 def _clamp_float(value: Any, minimum: float, maximum: float) -> float:

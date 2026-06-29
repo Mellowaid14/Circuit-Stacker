@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import threading
+
 import customtkinter as ctk
 
 from ..game_logic import prepare_offseason_championship_select, run_world_simulation_step
@@ -15,6 +17,8 @@ class SimProgressScreen(ctk.CTkFrame):
         self._mode = "season"
         self._offseason_request: dict | None = None
         self._season_intro_status = "Preparing world races..."
+        self._offseason_status_base = "Teams are picking drivers and reserving open seats"
+        self._offseason_status_step = 0
 
         wrapper = ctk.CTkFrame(self, fg_color="transparent")
         wrapper.pack(expand=True)
@@ -67,6 +71,7 @@ class SimProgressScreen(ctk.CTkFrame):
                 text="Teams are reviewing seats, making offers, and building the next season's grid."
             )
             self.status_label.configure(text="Opening the offseason team market...")
+            self._offseason_status_step = 0
             self.after(100, self._run_offseason)
         else:
             self.title_label.configure(text="Simming to next event...")
@@ -76,41 +81,72 @@ class SimProgressScreen(ctk.CTkFrame):
             self.after(150, self._run_chunk)
 
     def _run_offseason(self) -> None:
-        try:
-            request = self._offseason_request or {}
-            save_name = str(request.get("save_name", "")).strip()
-            player_names = list(request.get("player_names") or [])
-            if not save_name:
-                self.show_screen("ChampionshipScreen")
-                return
-
-            self.status_label.configure(text="Teams are picking drivers and reserving open seats...")
-            self.update_idletasks()
-            reserved_instances = prepare_offseason_championship_select(save_name, player_names)
-            self.status_label.configure(
-                text=f"Team picks complete. {len(reserved_instances)} world championships reserved."
-            )
-            self.update_idletasks()
-
-            championship_screen = self.parent.screens["ChampionshipScreen"]
-            championship_screen.save_name = save_name
-            championship_screen.player_names = player_names
-            championship_screen.current_tier = int(request.get("next_tier", 1) or 1)
-            championship_screen.starting_difficulty = int(request.get("starting_difficulty", 75) or 75)
-            championship_screen.season_summary_message = ""
-            championship_screen.season_summary_color = "gray"
-            self._mode = "season"
-            self._offseason_request = None
-            self.after(250, lambda: self.show_screen("ChampionshipScreen"))
-        except Exception as error:
-            championship_screen = self.parent.screens["ChampionshipScreen"]
-            championship_screen.season_summary_message = f"Could not prepare championship select: {error}"
-            championship_screen.season_summary_color = "#ff5555"
-            self._mode = "season"
-            self._offseason_request = None
-            self.show_screen("ChampionshipScreen")
-        finally:
+        request = self._offseason_request or {}
+        save_name = str(request.get("save_name", "")).strip()
+        player_names = list(request.get("player_names") or [])
+        if not save_name:
             self._running = False
+            self.show_screen("ChampionshipScreen")
+            return
+
+        self.status_label.configure(text=f"{self._offseason_status_base}...")
+        self.update_idletasks()
+        self.after(400, self._tick_offseason_status)
+
+        def worker() -> None:
+            try:
+                reserved_instances = prepare_offseason_championship_select(save_name, player_names)
+            except Exception as error:
+                self.after(0, lambda err=error: self._finish_offseason_error(err))
+                return
+            self.after(
+                0,
+                lambda req=dict(request), current_save=save_name, players=list(player_names), reserved=list(reserved_instances):
+                self._finish_offseason_success(req, current_save, players, reserved),
+            )
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _tick_offseason_status(self) -> None:
+        if not self._running or self._mode != "offseason":
+            return
+        self._offseason_status_step = (self._offseason_status_step + 1) % 4
+        dots = "." * self._offseason_status_step
+        self.status_label.configure(text=f"{self._offseason_status_base}{dots}")
+        self.after(400, self._tick_offseason_status)
+
+    def _finish_offseason_success(
+        self,
+        request: dict,
+        save_name: str,
+        player_names: list[str],
+        reserved_instances: list[dict],
+    ) -> None:
+        self.status_label.configure(
+            text=f"Team picks complete. {len(reserved_instances)} world championships reserved."
+        )
+        self.update_idletasks()
+
+        championship_screen = self.parent.screens["ChampionshipScreen"]
+        championship_screen.save_name = save_name
+        championship_screen.player_names = player_names
+        championship_screen.current_tier = int(request.get("next_tier", 1) or 1)
+        championship_screen.starting_difficulty = int(request.get("starting_difficulty", 75) or 75)
+        championship_screen.season_summary_message = ""
+        championship_screen.season_summary_color = "gray"
+        self._mode = "season"
+        self._offseason_request = None
+        self._running = False
+        self.after(250, lambda: self.show_screen("ChampionshipScreen"))
+
+    def _finish_offseason_error(self, error: Exception) -> None:
+        championship_screen = self.parent.screens["ChampionshipScreen"]
+        championship_screen.season_summary_message = f"Could not prepare championship select: {error}"
+        championship_screen.season_summary_color = "#ff5555"
+        self._mode = "season"
+        self._offseason_request = None
+        self._running = False
+        self.show_screen("ChampionshipScreen")
 
     def _run_chunk(self) -> None:
         try:

@@ -799,7 +799,6 @@ class ManualResultsScreen(ctk.CTkFrame):
             self._hide_ams2_sync()
             return
         game = self._current_game_key()
-        player_names = [str(name).strip() for name in getattr(self.gameplay_screen, "player_names", []) if str(name).strip()]
         if game not in {"ams2", "iracing"}:
             self._hide_ams2_sync()
             self.stop_ams2_live_order_updates()
@@ -852,15 +851,17 @@ class ManualResultsScreen(ctk.CTkFrame):
 
     def _live_sync_status_from_participants(self, game_label: str, expected_names: list[str], participants, error: str, session_name: str = ""):
         expected = [name for name in expected_names if str(name).strip()]
-        mapped_names = self._mapped_app_names_for_sync(participants)
+        mapped_names, unexpected_live_names = self._mapped_app_names_for_sync(participants)
         found = [name for name in expected if self._normalize_driver_name(name) in mapped_names]
         missing = [name for name in expected if self._normalize_driver_name(name) not in mapped_names]
         has_participants = bool(participants)
-        all_found = has_participants and bool(expected) and not missing
+        all_found = has_participants and bool(expected) and not missing and not unexpected_live_names
         if all_found:
             summary = f"{game_label} Sync: ready"
         elif has_participants and missing:
             summary = f"{game_label} Sync: missing drivers"
+        elif has_participants and unexpected_live_names:
+            summary = f"{game_label} Sync: roster mismatch"
         elif has_participants:
             summary = f"{game_label} Sync: no expected drivers"
         else:
@@ -870,7 +871,8 @@ class ManualResultsScreen(ctk.CTkFrame):
             f"{game_label} {detected_label} detected: {'Yes' if has_participants else 'No'}\n"
             f"Session: {session_name or '-'}\n"
             f"Drivers found: {len(found)} / {len(expected)}\n"
-            f"Missing: {self._format_missing_names(missing)}"
+            f"Missing: {self._format_missing_names(missing)}\n"
+            f"Unexpected live drivers: {self._format_missing_names(unexpected_live_names)}"
         )
         if error and not has_participants:
             message = f"{message}\nLast error: {error}"
@@ -885,25 +887,37 @@ class ManualResultsScreen(ctk.CTkFrame):
             },
         )()
 
-    def _mapped_app_names_for_sync(self, participants) -> set[str]:
-        live_names = {
-            self._normalize_driver_name(getattr(participant, "name", ""))
-            for participant in participants
-            if str(getattr(participant, "name", "")).strip()
-        }
+    def _mapped_app_names_for_sync(self, participants) -> tuple[set[str], list[str]]:
+        live_name_map: dict[str, str] = {}
+        for participant in participants:
+            live_name = str(getattr(participant, "name", "")).strip()
+            normalized_live_name = self._normalize_driver_name(live_name)
+            if normalized_live_name:
+                live_name_map.setdefault(normalized_live_name, live_name)
+        live_names = set(live_name_map)
         mapped_app_names: set[str] = set()
+        accounted_live_names: set[str] = set()
         for app_player, screen_name in self._current_player_name_mappings().items():
-            if self._normalize_driver_name(screen_name) in live_names:
+            normalized_screen_name = self._normalize_driver_name(screen_name)
+            if normalized_screen_name in live_names:
                 mapped_app_names.add(self._normalize_driver_name(app_player))
+                accounted_live_names.add(normalized_screen_name)
         for driver in getattr(self.gameplay_screen, "standings", []) if self.gameplay_screen is not None else []:
             app_name = str(driver.get("name", "")).strip()
             normalized_app_name = self._normalize_driver_name(app_name)
             if normalized_app_name and normalized_app_name in live_names:
                 mapped_app_names.add(normalized_app_name)
+                accounted_live_names.add(normalized_app_name)
         for live_key, app_name in self.ams2_ai_name_mappings.items():
-            if self._normalize_driver_name(live_key) in live_names:
+            normalized_live_key = self._normalize_driver_name(live_key)
+            if normalized_live_key in live_names:
                 mapped_app_names.add(self._normalize_driver_name(app_name))
-        return mapped_app_names
+                accounted_live_names.add(normalized_live_key)
+        unexpected_live_names = [
+            live_name_map[key]
+            for key in sorted(live_names - accounted_live_names)
+        ]
+        return mapped_app_names, unexpected_live_names
 
     def _apply_ams2_sync_status(self, status, request_id: int) -> None:
         if request_id != self.ams2_sync_request_id:

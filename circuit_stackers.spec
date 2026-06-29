@@ -11,11 +11,7 @@ package_root = src_root / "circuit_stackers"
 icon_path = package_root / "assets" / "circuit_stacker_icon.ico"
 
 datas = collect_data_files("circuit_stackers")
-datas += [
-    (str(project_root / "README.md"), "."),
-    (str(package_root / "assets"), "circuit_stackers/assets"),
-    (str(package_root / "data"), "circuit_stackers/data"),
-]
+datas.append((str(project_root / "README.md"), "."))
 
 analysis = Analysis(
     [str(project_root / "launch_circuit_stackers.py")],

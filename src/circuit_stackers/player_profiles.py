@@ -8,14 +8,20 @@ from uuid import uuid4
 
 from .json_storage import read_json_object, write_json_atomic
 from .paths import user_data_dir
-from .settings_manager import (
-    default_owned_car_ids,
-    default_owned_track_ids,
-    legacy_cross_game_iracing_track_defaults,
-    list_all_cars,
-    list_all_tracks,
-    load_settings,
-)
+from . import settings_manager
+
+default_owned_car_ids = settings_manager.default_owned_car_ids
+default_owned_track_ids = settings_manager.default_owned_track_ids
+list_all_cars = settings_manager.list_all_cars
+list_all_tracks = settings_manager.list_all_tracks
+load_settings = settings_manager.load_settings
+
+
+def legacy_cross_game_iracing_track_defaults() -> set[str]:
+    fallback = getattr(settings_manager, "legacy_cross_game_iracing_track_defaults", None)
+    if callable(fallback):
+        return set(fallback())
+    return set()
 
 
 PROFILES_PATH = user_data_dir() / "player_profiles.json"

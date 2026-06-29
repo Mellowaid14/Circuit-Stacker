@@ -1499,6 +1499,24 @@ def build_world_news_items(
             }
         )
 
+    player_team_offer = save_data.get("player_team_offer") if isinstance(save_data.get("player_team_offer"), dict) else {}
+    player_team_name = str(player_team_offer.get("team_name", "")).strip()
+    player_team_philosophy = str(player_team_offer.get("team_philosophy", "")).strip()
+    player_team_trajectory = str(player_team_offer.get("team_trajectory", "")).strip()
+    player_team_reason = str(player_team_offer.get("team_offer_reason", "")).strip()
+    if player_team_name:
+        items.append(
+            {
+                "title": "Inside Your Garage",
+                "body": _player_team_identity_news_body(
+                    player_team_name,
+                    player_team_philosophy,
+                    player_team_trajectory,
+                    player_team_reason,
+                ),
+            }
+        )
+
     if watch_drivers:
         watch_names = [str(name).strip() for name in watch_drivers if str(name).strip()]
         if watch_names:
@@ -1547,6 +1565,37 @@ def build_world_news_items(
     if len(deduped) <= 3:
         return deduped
     return random.sample(deduped, 3)
+
+
+def _player_team_identity_news_body(
+    team_name: str,
+    philosophy: str,
+    trajectory: str,
+    offer_reason: str,
+) -> str:
+    normalized = str(philosophy).strip().casefold()
+    trend = str(trajectory).strip().casefold()
+    trend_text = {
+        "rising": "The mood is that the program is moving forward.",
+        "falling": "There is pressure to stop the slide quickly.",
+        "rebuilding": "The team is treating this phase as a reset and rebuild.",
+        "stable": "The garage looks calm and measured heading into the next round.",
+    }.get(trend, "")
+    bodies = {
+        "win now": f"**{team_name}** is carrying a win-now tone inside the garage. Every clean chance to score big matters immediately.",
+        "driver continuity": f"**{team_name}** is leaning into continuity. The message is trust the process, keep the group together, and let the season build.",
+        "technical excellence": f"**{team_name}** is talking about execution more than noise. Precision, feedback, and detail are setting the tone.",
+        "underdog grit": f"**{team_name}** is embracing the underdog role. The goal is to make larger teams uncomfortable over a full weekend.",
+        "rookie pipeline": f"**{team_name}** is framing the season around growth. Development and upside are being treated as real competitive assets.",
+        "balanced": f"**{team_name}** is aiming for a measured season. The focus is clean weekends, solid points, and building momentum without forcing it.",
+    }
+    base = bodies.get(normalized, f"**{team_name}** is setting the tone for your season from inside the garage.")
+    additions = []
+    if trend_text:
+        additions.append(trend_text)
+    if offer_reason:
+        additions.append(offer_reason)
+    return " ".join([base, *additions]).strip()
 
 
 def create_world_sim_progress(save_name: str, championship: dict[str, Any], player_schedule: list[dict[str, Any]]) -> dict[str, Any]:
@@ -2592,6 +2641,123 @@ def _update_rivalry_heat(
     state["rivalry_heat"] = heat
 
 
+def _team_post_race_message_body(
+    *,
+    team_name: str,
+    philosophy: str,
+    trajectory: str,
+    championship_name: str,
+    track_name: str,
+    summary_text: str,
+    pressure_round: bool,
+    teammate_note: str,
+) -> str:
+    normalized = str(philosophy).strip().casefold()
+    trend = str(trajectory).strip().casefold()
+    pressure_line = " This part of the season carries extra weight in the garage." if pressure_round else ""
+    trend_line = {
+        "rising": " The team feels like it is building momentum.",
+        "falling": " The feedback will be sharper until the trend turns.",
+        "rebuilding": " Even small gains still matter during this phase.",
+    }.get(trend, "")
+    base_lines = {
+        "win now": f"{summary_text} {team_name} is not in the mood to let good opportunities drift away.",
+        "driver continuity": f"{summary_text} {team_name} is leaning on trust, steadiness, and staying connected as a group.",
+        "technical excellence": f"{summary_text} {team_name} is looking at the details, the execution, and where the lap-by-lap edge can improve.",
+        "underdog grit": f"{summary_text} {team_name} is treating every point like something that had to be earned.",
+        "rookie pipeline": f"{summary_text} {team_name} is focused on what was learned and how quickly it turns into a stronger next round.",
+        "balanced": f"{summary_text} {team_name} is aiming to turn weekends like this into steady season momentum.",
+    }
+    opening = base_lines.get(normalized, f"{summary_text} {team_name} is reviewing the weekend and looking ahead.")
+    track_clause = f" after {track_name}" if track_name else ""
+    teammate_clause = f" {teammate_note}" if teammate_note else ""
+    return f"{opening}{pressure_line}{trend_line}{teammate_clause} The attention now shifts back to {championship_name}{track_clause}.".strip()
+
+
+def _add_team_post_race_message(
+    state: dict[str, Any],
+    result_rows: list[dict[str, Any]],
+    player_names: list[str],
+    player_results: dict[str, int],
+    player_class_sizes: dict[str, int],
+) -> None:
+    messages = [dict(message) for message in list(state.get("messages") or []) if isinstance(message, dict)]
+    team_offer = state.get("player_team_offer")
+    if not isinstance(team_offer, dict):
+        return
+    team_name = str(team_offer.get("team_name", "")).strip() or "Team Management"
+    philosophy = str(team_offer.get("team_philosophy", "")).strip() or "Balanced"
+    trajectory = str(team_offer.get("team_trajectory", "")).strip() or "stable"
+    dedupe_key = f"team-post-race:{int(state.get('current_race', 0) or 0)}"
+    if any(str(message.get("dedupe_key", "")).strip() == dedupe_key for message in messages):
+        return
+
+    normalized_players = [str(name).strip() for name in player_names if str(name).strip()]
+    if not normalized_players or not player_results:
+        return
+    best_finish = min(int(position) for position in player_results.values())
+    best_class_size = max(1, max(int(player_class_sizes.get(name, 0) or 0) for name in player_results))
+    if best_finish == 1:
+        summary_text = "That was a proper statement result."
+    elif best_finish <= 3:
+        summary_text = "That was a podium-level weekend the garage can really use."
+    elif best_finish <= 5:
+        summary_text = "That was a competitive points run with useful pace underneath it."
+    elif best_finish <= max(6, round(best_class_size * 0.5)):
+        summary_text = "There were respectable points available, even if the weekend never fully opened up."
+    else:
+        summary_text = "That landed short of the level the garage wanted."
+
+    championship = state.get("championship") or {}
+    championship_name = championship_pool_display_name(championship)
+    schedule = list(state.get("schedule") or [])
+    current_race = int(state.get("current_race", 0) or 0)
+    race = schedule[current_race] if 0 <= current_race < len(schedule) else {}
+    track_name = str(race.get("track", "")).strip()
+    pressure_round = bool(schedule) and current_race >= max(0, len(schedule) - 2)
+
+    player_set = set(normalized_players)
+    team_key = str(team_offer.get("team_key", "")).strip()
+    teammate_rows = [
+        row
+        for row in result_rows
+        if str(row.get("team_key", "")).strip() == team_key
+        and str(row.get("driver_name", "")).strip() not in player_set
+    ]
+    teammate_note = ""
+    if teammate_rows:
+        best_teammate = min(teammate_rows, key=lambda row: int(row.get("class_pos", row.get("overall_pos", 999)) or 999))
+        teammate_name = str(best_teammate.get("driver_name", "")).strip()
+        teammate_pos = int(best_teammate.get("class_pos", best_teammate.get("overall_pos", 999)) or 999)
+        if teammate_name and teammate_pos < best_finish:
+            teammate_note = f"{teammate_name} set the benchmark on the other side of the garage this time."
+        elif teammate_name and teammate_pos > best_finish:
+            teammate_note = f"You came back ahead of teammate {teammate_name} this weekend."
+
+    messages.append(
+        {
+            "id": uuid4().hex,
+            "created_at": datetime.now().isoformat(timespec="seconds"),
+            "category": "Team Message",
+            "sender": team_name,
+            "title": f"{team_name} Debrief",
+            "body": _team_post_race_message_body(
+                team_name=team_name,
+                philosophy=philosophy,
+                trajectory=trajectory,
+                championship_name=championship_name,
+                track_name=track_name,
+                summary_text=summary_text,
+                pressure_round=pressure_round,
+                teammate_note=teammate_note,
+            ),
+            "read": False,
+            "dedupe_key": dedupe_key,
+        }
+    )
+    state["messages"] = messages
+
+
 def _rivalry_explainer_message(player_label: str = "Driver") -> dict[str, Any]:
     lines = [
         f"{player_label},",
@@ -3346,6 +3512,7 @@ def simulate_race(state: dict[str, Any]) -> dict[str, Any]:
     _update_player_rivalry_perspectives(state, result_rows, player_names)
     player_results = _player_class_results(result_rows, player_names)
     player_class_sizes = _player_class_sizes(result_rows, player_names)
+    _add_team_post_race_message(state, result_rows, player_names, player_results, player_class_sizes)
     state["starting_difficulty"] = _adjust_difficulty_after_race(
         state.get("starting_difficulty", 75),
         player_results,
@@ -3419,6 +3586,13 @@ def apply_manual_race_results(state: dict[str, Any], player_positions: dict[str,
         result_rows,
         _normalize_player_names(state.get("players"), state["save_name"]),
     )
+    _add_team_post_race_message(
+        state,
+        result_rows,
+        _normalize_player_names(state.get("players"), state["save_name"]),
+        ordered_player_results,
+        player_class_sizes,
+    )
     state["starting_difficulty"] = _adjust_difficulty_after_race(
         state.get("starting_difficulty", 75),
         ordered_player_results,
@@ -3457,6 +3631,7 @@ def apply_finish_order(state: dict[str, Any], finish_order_names: list[str]) -> 
     _update_player_rivalry_perspectives(state, result_rows, player_names)
     player_results = _player_class_results(result_rows, player_names)
     player_class_sizes = _player_class_sizes(result_rows, player_names)
+    _add_team_post_race_message(state, result_rows, player_names, player_results, player_class_sizes)
     state["starting_difficulty"] = _adjust_difficulty_after_race(
         state.get("starting_difficulty", 75),
         player_results,
@@ -3741,6 +3916,7 @@ def finalize_season(state: dict[str, Any]) -> tuple[dict[str, Any], dict[str, An
         "player_positions": player_positions,
         "career_mode": _career_mode(state.get("career_mode"), player_names),
         "active_player_name": _active_player_name(state.get("active_player_name"), player_names),
+        "player_team_offer": dict(state.get("player_team_offer") or {}) if isinstance(state.get("player_team_offer"), dict) else {},
         "player_perspectives": _normalize_player_perspectives(
             state.get("player_perspectives"),
             player_names,

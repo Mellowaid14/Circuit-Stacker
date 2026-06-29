@@ -10,6 +10,7 @@ from PIL import Image, ImageOps
 from ..ams2_exporter import preview_player_livery_for_car
 from ..custom_championships import championship_rows
 from ..driver_pool import (
+    current_team_promotion_is_earned,
     championship_pool_display_name,
     current_team_offer_for_championship,
     get_world_year,
@@ -184,7 +185,7 @@ def load_championships(
         if eligible_cars_by_id is not None and row_id:
             eligible_cars = eligible_cars_by_id.get(row_id)
         if eligible_cars is None:
-            eligible_cars = get_eligible_player_cars(row, game)
+            eligible_cars = get_eligible_player_cars(row, game, save_name)
             if eligible_cars_by_id is not None and row_id:
                 eligible_cars_by_id[row_id] = eligible_cars
         if not eligible_cars:
@@ -380,10 +381,12 @@ class ChampionshipScreen(ctk.CTkFrame):
         )
         reputations = team_reputation_map(self.save_name or "") if self.save_name else {}
         seen_offer_ids: set[str] = set()
+        used_ams2_liveries_by_group: dict[str, set[str]] = {}
         for championship in championships:
-            eligible_cars = get_eligible_player_cars(championship, self.save_game)
+            eligible_cars = get_eligible_player_cars(championship, self.save_game, self.save_name)
             if not eligible_cars:
                 continue
+            championship_group_key = str(championship.get("Championship_ID", "") or championship.get("id", "")).strip()
             style_name = _display_style(str(championship.get("Style", "")).strip())
             offers = team_offers_for_player(
                 self.save_name or "",
@@ -400,6 +403,15 @@ class ChampionshipScreen(ctk.CTkFrame):
             )
             if current_offer:
                 current_offer = dict(current_offer)
+                championship_prestige = int(championship.get("Prestige", 0) or 0)
+                is_promotion = championship_prestige > self.current_championship_prestige
+                if is_promotion and not current_team_promotion_is_earned(
+                    self.save_name or "",
+                    self.player_names,
+                    self.current_team_offer,
+                ):
+                    current_offer = None
+            if current_offer:
                 championship_prestige = int(championship.get("Prestige", 0) or 0)
                 current_offer["offer_note"] = "Promotion" if championship_prestige > self.current_championship_prestige else "Current"
                 current_key = str(current_offer.get("team_key", "")).strip()
@@ -418,14 +430,12 @@ class ChampionshipScreen(ctk.CTkFrame):
                 if offer_id in seen_offer_ids:
                     continue
                 seen_offer_ids.add(offer_id)
-                preview_car = dict(random.choice(eligible_cars))
-                if str(self.save_game).strip().casefold() == "ams2":
-                    preview_livery = preview_player_livery_for_car(preview_car)
-                    if preview_livery:
-                        preview_car["_preview_livery_name"] = str(preview_livery.get("livery_name", "")).strip()
-                        preview_car["_preview_roster_name"] = str(preview_livery.get("Roster_Name", "")).strip()
-                        preview_car["_preview_livery_class"] = str(preview_livery.get("Class", "")).strip()
-                        preview_car["_preview_livery_car_name"] = str(preview_livery.get("Car_Name", "")).strip()
+                preview_car = self._preview_car_for_offer(
+                    championship,
+                    offer,
+                    eligible_cars,
+                    used_ams2_liveries_by_group.setdefault(championship_group_key, set()),
+                )
                 entry_label = (
                     str(preview_car.get("Car class", "")).strip()
                     or str(preview_car.get("Car", "")).strip()
@@ -440,10 +450,22 @@ class ChampionshipScreen(ctk.CTkFrame):
                 offer_row["_offer_team_name"] = str(offer.get("team_name", "")).strip() or "Independent"
                 offer_row["_offer_team_prestige"] = str(offer.get("team_prestige", 0))
                 offer_row["_offer_team_reputation"] = str(offer.get("team_reputation", offer.get("team_prestige", 50)))
+                offer_row["_offer_seat_number"] = str(offer.get("seat_number", offer_index))
+                offer_row["_offer_team_seat"] = str(offer.get("team_seat", "1"))
+                offer_row["_offer_team_size"] = str(offer.get("team_size", "1"))
+                offer_row["_offer_seat_quality"] = str(offer.get("seat_quality", offer.get("team_reputation", 50)))
                 offer_row["_offer_team_personality"] = str(offer.get("team_personality", "")).strip()
+                offer_row["_offer_team_ambition"] = str(offer.get("team_ambition", 50))
+                offer_row["_offer_team_stability"] = str(offer.get("team_stability", 50))
+                offer_row["_offer_team_development"] = str(offer.get("team_development", 50))
+                offer_row["_offer_team_financial_strength"] = str(offer.get("team_financial_strength", 50))
+                offer_row["_offer_team_pressure"] = str(offer.get("team_pressure", 50))
+                offer_row["_offer_team_philosophy"] = str(offer.get("team_philosophy", "Balanced")).strip() or "Balanced"
+                offer_row["_offer_team_trajectory"] = str(offer.get("trajectory", "stable")).strip() or "stable"
                 offer_row["_offer_note"] = str(offer.get("offer_note", "Offer")).strip() or "Offer"
                 offer_row["_offer_expectation"] = self._team_expectation_text(offer_row)
                 offer_row["_offer_expectation_level"] = self._team_expectation_level(offer_row)
+                offer_row["_offer_reason"] = self._team_offer_reason_text(offer_row)
                 if str(self.save_game).strip().casefold() == "iracing":
                     csv_colors = str(offer.get("team_colors", "")).strip()
                     color_seed = (
@@ -455,6 +477,51 @@ class ChampionshipScreen(ctk.CTkFrame):
                 offer_rows.append(offer_row)
                 self.preview_cars[offer_id] = preview_car
         return offer_rows
+
+    def _preview_car_for_offer(
+        self,
+        championship: dict[str, str],
+        offer: dict[str, str],
+        eligible_cars: list[dict[str, str]],
+        used_ams2_liveries: set[str],
+    ) -> dict[str, str]:
+        if not eligible_cars:
+            return {}
+        assignment_key = "|".join(
+            [
+                str(self.save_name or "").strip(),
+                str(championship.get("Championship_ID", "") or championship.get("id", "")).strip(),
+                str(offer.get("team_key", "")).strip() or str(offer.get("team_id", "")).strip() or str(offer.get("team_name", "")).strip(),
+                str(offer.get("seat_number", "")).strip(),
+                str(offer.get("team_seat", "")).strip(),
+            ]
+        )
+        ordered_cars = sorted(
+            (dict(car) for car in eligible_cars),
+            key=lambda car: (
+                str(car.get("id", "")).strip(),
+                str(car.get("Car", "")).strip().casefold(),
+                str(car.get("Car class", "")).strip().casefold(),
+            ),
+        )
+        seed = sum(ord(char) for char in assignment_key)
+        preview_car = ordered_cars[seed % len(ordered_cars)] if assignment_key else dict(random.choice(ordered_cars))
+        if str(self.save_game).strip().casefold() != "ams2":
+            return preview_car
+        preview_livery = preview_player_livery_for_car(
+            preview_car,
+            assignment_key=assignment_key,
+            reserved_livery_names=used_ams2_liveries,
+        )
+        if preview_livery:
+            preview_car["_preview_livery_name"] = str(preview_livery.get("livery_name", "")).strip()
+            preview_car["_preview_roster_name"] = str(preview_livery.get("Roster_Name", "")).strip()
+            preview_car["_preview_livery_class"] = str(preview_livery.get("Class", "")).strip()
+            preview_car["_preview_livery_car_name"] = str(preview_livery.get("Car_Name", "")).strip()
+            livery_name = str(preview_livery.get("livery_name", "")).strip()
+            if livery_name:
+                used_ams2_liveries.add(livery_name)
+        return preview_car
 
     def _render_style_summary(self) -> None:
         grouped: dict[str, list[dict[str, str]]] = {}
@@ -708,7 +775,7 @@ class ChampionshipScreen(ctk.CTkFrame):
         )
 
         info = ctk.CTkFrame(row, fg_color="transparent")
-        info.pack(side="left", fill="both", expand=True, padx=(0, 8), pady=12)
+        info.pack(side="left", fill="x", expand=True, padx=(0, 8), pady=12, anchor="n")
 
         title_line = ctk.CTkFrame(info, fg_color="transparent")
         title_line.pack(fill="x")
@@ -737,6 +804,15 @@ class ChampionshipScreen(ctk.CTkFrame):
         ).pack(fill="x", pady=(0, 8))
         ctk.CTkLabel(
             info,
+            text=championship.get("_offer_reason", "Team interest is based on current fit."),
+            font=ctk.CTkFont(size=11),
+            text_color=MUTED,
+            anchor="w",
+            justify="left",
+            wraplength=520,
+        ).pack(fill="x", pady=(0, 6))
+        ctk.CTkLabel(
+            info,
             text=championship.get("_offer_expectation", "Expectation: score points when possible."),
             font=ctk.CTkFont(size=12, weight="bold"),
             text_color=self._team_expectation_color(championship),
@@ -752,7 +828,7 @@ class ChampionshipScreen(ctk.CTkFrame):
         self._detail_chip(details, "Time", f"{championship['Race_Time']} min").pack(side="left", padx=(0, 6))
 
         visual = ctk.CTkFrame(row, fg_color="transparent")
-        visual.pack(side="right", padx=(4, 12), pady=6)
+        visual.pack(side="right", padx=(4, 12), pady=10, anchor="n")
         self._car_preview_frame(visual, preview_car, championship).pack(side="left", padx=(0, 10))
 
         ctk.CTkButton(
@@ -802,14 +878,14 @@ class ChampionshipScreen(ctk.CTkFrame):
         return chip
 
     def _car_preview_frame(self, parent, car: dict[str, str], championship: dict[str, str]) -> ctk.CTkFrame:
-        frame = ctk.CTkFrame(parent, fg_color=("gray86", "gray18"), corner_radius=12, width=315, height=128)
+        frame = ctk.CTkFrame(parent, fg_color=("gray86", "gray18"), corner_radius=12, width=300, height=104)
         frame.pack_propagate(False)
-        self._car_image_label(frame, car).pack(side="left", padx=(10, 0), pady=8)
+        self._car_image_label(frame, car).pack(side="left", padx=(10, 0), pady=6)
         if str(self.save_game).strip().casefold() == "iracing":
             colors = self._offer_colors(championship)
             if colors:
                 swatches = ctk.CTkFrame(frame, fg_color="transparent")
-                swatches.pack(side="left", padx=(8, 6), pady=8)
+                swatches.pack(side="left", padx=(8, 6), pady=6)
                 ctk.CTkLabel(swatches, text="Team", font=ctk.CTkFont(size=9, weight="bold"), text_color="gray").pack()
                 for color in colors:
                     ctk.CTkFrame(
@@ -824,10 +900,10 @@ class ChampionshipScreen(ctk.CTkFrame):
         return frame
 
     def _car_image_label(self, parent, car: dict[str, str]) -> ctk.CTkLabel:
-        image = self._load_car_image(car, (212, 116))
+        image = self._load_car_image(car, (196, 92))
         if image is None:
-            return ctk.CTkLabel(parent, text="", width=212)
-        return ctk.CTkLabel(parent, text="", image=image, width=212)
+            return ctk.CTkLabel(parent, text="", width=196)
+        return ctk.CTkLabel(parent, text="", image=image, width=196)
 
     def _offer_colors(self, championship: dict[str, str]) -> list[str]:
         raw_colors = str(championship.get("_offer_team_colors", "")).strip()
@@ -936,7 +1012,7 @@ class ChampionshipScreen(ctk.CTkFrame):
                 f"Selected: {championship['Championship']} | "
                 f"{championship.get('_offer_note', 'Offer')} | "
                 f"{championship.get('_offer_team_name', 'Independent')} | "
-                f"{championship.get('_offer_expectation', 'Expectation set')} | "
+                f"{championship.get('_offer_reason', 'Team interest set')} | "
                 f"{preview_car.get('Car', 'No eligible car')} | {championship['Style']}"
             ),
             text_color="gray",
@@ -958,8 +1034,19 @@ class ChampionshipScreen(ctk.CTkFrame):
             "team_name": str(self.selected.get("_offer_team_name", "")).strip() or "Independent",
             "team_prestige": int(self.selected.get("_offer_team_prestige", 0) or 0),
             "team_reputation": int(self.selected.get("_offer_team_reputation", 50) or 50),
+            "team_size": int(self.selected.get("_offer_team_size", 1) or 1),
+            "seat_quality": int(self.selected.get("_offer_seat_quality", self.selected.get("_offer_team_reputation", 50)) or 50),
             "team_colors": ",".join(self._offer_colors(self.selected)),
             "team_personality": str(self.selected.get("_offer_team_personality", "")).strip(),
+            "team_ambition": int(self.selected.get("_offer_team_ambition", 50) or 50),
+            "team_stability": int(self.selected.get("_offer_team_stability", 50) or 50),
+            "team_development": int(self.selected.get("_offer_team_development", 50) or 50),
+            "team_financial_strength": int(self.selected.get("_offer_team_financial_strength", 50) or 50),
+            "team_pressure": int(self.selected.get("_offer_team_pressure", 50) or 50),
+            "team_philosophy": str(self.selected.get("_offer_team_philosophy", "Balanced")).strip() or "Balanced",
+            "team_trajectory": str(self.selected.get("_offer_team_trajectory", "stable")).strip() or "stable",
+            "offer_note": str(self.selected.get("_offer_note", "Offer")).strip() or "Offer",
+            "team_offer_reason": str(self.selected.get("_offer_reason", "")).strip(),
             "team_expectation": str(self.selected.get("_offer_expectation", "")).strip(),
             "team_expectation_level": str(self.selected.get("_offer_expectation_level", "")).strip(),
         }
@@ -1015,14 +1102,18 @@ class ChampionshipScreen(ctk.CTkFrame):
 
     @classmethod
     def _team_expectation_level(cls, championship: dict[str, str]) -> str:
-        reputation = cls._team_reputation_value(championship)
-        if reputation >= 88:
+        seat_quality = cls._offer_stat_value(
+            championship,
+            "_offer_seat_quality",
+            cls._team_reputation_value(championship),
+        )
+        if seat_quality >= 90:
             return "wins"
-        if reputation >= 74:
+        if seat_quality >= 78:
             return "podiums"
-        if reputation >= 58:
+        if seat_quality >= 62:
             return "top5"
-        if reputation >= 38:
+        if seat_quality >= 44:
             return "top10"
         return "development"
 
@@ -1050,6 +1141,48 @@ class ChampionshipScreen(ctk.CTkFrame):
             return int(championship.get("_offer_team_reputation", championship.get("_offer_team_prestige", 50)) or 50)
         except (TypeError, ValueError):
             return 50
+
+    @staticmethod
+    def _offer_stat_value(championship: dict[str, str], key: str, fallback: int = 50) -> int:
+        try:
+            return int(championship.get(key, fallback) or fallback)
+        except (TypeError, ValueError):
+            return fallback
+
+    @staticmethod
+    def _pressure_band(value: int) -> str:
+        if value <= 40:
+            return "low"
+        if value >= 67:
+            return "high"
+        return "medium"
+
+    @classmethod
+    def _team_offer_reason_text(cls, championship: dict[str, str]) -> str:
+        note = str(championship.get("_offer_note", "Offer")).strip() or "Offer"
+        philosophy = str(championship.get("_offer_team_philosophy", "Balanced")).strip() or "Balanced"
+        trajectory = str(championship.get("_offer_team_trajectory", "stable")).strip().title() or "Stable"
+        ambition = cls._offer_stat_value(championship, "_offer_team_ambition")
+        funds = cls._offer_stat_value(championship, "_offer_team_financial_strength")
+        stability = cls._offer_stat_value(championship, "_offer_team_stability")
+        pressure = cls._offer_stat_value(championship, "_offer_team_pressure")
+        pressure_band = cls._pressure_band(pressure)
+
+        if note == "Current":
+            return f"Your current team is offering continuity. {trajectory} trajectory, {philosophy} philosophy."
+        if note == "Promotion":
+            return f"Your current team can move up with you. {trajectory} trajectory, {philosophy} philosophy."
+        if note == "Aggressive Move":
+            return f"This team is pushing hard in the market with ambition {ambition} and funding {funds}."
+        if note == "Priority Target":
+            return f"You are one of this team's top offseason targets. {philosophy} mindset, {trajectory} program."
+        if note == "Safe Fit":
+            return f"This is a steady seat with stability {stability} and lower market pressure at {pressure}."
+        if ambition >= 70 and funds >= 70:
+            return f"A fast-moving program with ambition {ambition}, funding {funds}, and a {trajectory.lower()} trend."
+        if stability >= 65 and pressure <= 45:
+            return f"A calmer long-term fit built on stability {stability} and manageable pressure."
+        return f"{philosophy} philosophy, {trajectory.lower()} trajectory, and {pressure_band} team pressure shape this offer."
 
     def _current_offer_cache_key(self) -> tuple:
         mmr_values = tuple((style, self._effective_mmr_for_style(style)) for style in STYLE_ORDER)
