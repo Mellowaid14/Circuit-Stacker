@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.6.0
+
+### Custom Championship and Career Path Updates
+
+- Added a complete custom championship editor with multiclass support, custom class names, individual class prestige, and car and track management.
+- Added a unified championship management screen with editing and deletion support.
+- Added customizable career paths with championship searching, importing, and exporting.
+
+### AMS2 and iRacing Updates
+
+- Improved AMS2 livery, class, and track metadata matching.
+- Improved iRacing folder structure and background-image handling.
+- Added better rookie progression rules for multiclass championships.
+
 ## 1.5.5
 
 ### General
