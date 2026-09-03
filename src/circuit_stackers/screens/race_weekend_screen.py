@@ -125,6 +125,8 @@ class RaceWeekendScreen(ctk.CTkFrame):
 
     def _refresh(self) -> None:
         gameplay = self.gameplay_screen
+        if gameplay is not None and hasattr(gameplay, "reload_active_rivals_state"):
+            gameplay.reload_active_rivals_state()
         for widget in self.summary_frame.winfo_children():
             widget.destroy()
         for widget in self.setup_frame.winfo_children():
@@ -377,6 +379,8 @@ class RaceWeekendScreen(ctk.CTkFrame):
         gameplay = self.gameplay_screen
         if gameplay is None:
             return
+        if hasattr(gameplay, "reload_active_rivals_state"):
+            gameplay.reload_active_rivals_state()
         gameplay.reexport_roster()
         self._refresh()
         self.status_label.configure(text="Roster re-export requested.", text_color="#6bbd6b")
@@ -389,6 +393,8 @@ class RaceWeekendScreen(ctk.CTkFrame):
 
     def enter_results_screen(self) -> None:
         gameplay = self.gameplay_screen
+        if gameplay is not None and hasattr(gameplay, "reload_active_rivals_state"):
+            gameplay.reload_active_rivals_state()
         if gameplay is not None and str(getattr(gameplay, "game", "")).strip().casefold() == "ams2":
             roster_validation = validate_ams2_roster_files(
                 getattr(gameplay, "championship", {}) or {},

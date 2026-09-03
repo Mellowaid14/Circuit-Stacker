@@ -10,6 +10,7 @@ from ..player_profiles import (
     list_player_profiles,
 )
 from ..settings_manager import game_directory
+from ..career_paths import list_career_paths
 
 
 class NewGame(ctk.CTkFrame):
@@ -22,6 +23,9 @@ class NewGame(ctk.CTkFrame):
         self.player_rows: list[ctk.CTkFrame] = []
         self.game_var = ctk.StringVar(value="iRacing")
         self.career_mode_var = ctk.StringVar(value="Solo")
+        self.career_path_var = ctk.StringVar(value="Default Career Path")
+        self.career_paths: list[dict[str, object]] = []
+        self.career_path_by_title: dict[str, dict[str, object]] = {}
 
         form_scroll = ctk.CTkScrollableFrame(self, fg_color="transparent")
         form_scroll.pack(fill="both", expand=True, padx=16, pady=(0, 8))
@@ -62,10 +66,11 @@ class NewGame(ctk.CTkFrame):
         self.game_selector.pack()
 
         ctk.CTkLabel(entry_frame, text="Career Mode", font=ctk.CTkFont(size=12)).pack(anchor="w", pady=(18, 4))
-        self.career_mode_selector = ctk.CTkOptionMenu(
+        self.career_mode_selector = ctk.CTkSegmentedButton(
             entry_frame,
-            values=["Solo", "Co-op", "Rivals (coming later)"],
+            values=["Solo", "Co-op", "Rivals"],
             variable=self.career_mode_var,
+            command=lambda _value: self._refresh_shared_content_summary(),
             width=self.input_width,
             height=36,
             font=ctk.CTkFont(size=12, weight="bold"),
@@ -73,11 +78,22 @@ class NewGame(ctk.CTkFrame):
         self.career_mode_selector.pack()
         ctk.CTkLabel(
             entry_frame,
-            text="Co-op shares one career path. Rivals mode will split drivers into separate careers later.",
+            text="Co-op shares one career path. Rivals gives each driver a separate career in the same world.",
             font=ctk.CTkFont(size=11),
             text_color="gray",
             wraplength=self.input_width,
             justify="left",
+        ).pack(pady=(6, 0))
+
+        ctk.CTkLabel(entry_frame, text="Career Path", font=ctk.CTkFont(size=12)).pack(anchor="w", pady=(18, 4))
+        self.career_path_selector = ctk.CTkComboBox(
+            entry_frame, variable=self.career_path_var, values=["Default Career Path"], width=self.input_width, height=36
+        )
+        self.career_path_selector.pack()
+        ctk.CTkLabel(
+            entry_frame,
+            text="Choose the progression structure for this career. The default path uses the built-in championship data.",
+            font=ctk.CTkFont(size=11), text_color="gray", wraplength=self.input_width, justify="left",
         ).pack(pady=(6, 0))
 
         ctk.CTkLabel(entry_frame, text="Drivers", font=ctk.CTkFont(size=12)).pack(anchor="w", pady=(18, 4))
@@ -230,14 +246,14 @@ class NewGame(ctk.CTkFrame):
             self.error_label.configure(text="One of the selected player profiles no longer exists.")
             return
         if len(set(player_profile_ids)) != len(player_profile_ids):
-            self.error_label.configure(text="Each co-op driver must use a different player profile.")
+            self.error_label.configure(text="Each driver must use a different player profile.")
             return
         career_mode = self.career_mode_var.get().strip()
-        if career_mode.startswith("Rivals"):
-            self.error_label.configure(text="Rivals mode is planned for a later 1.5 phase. Use Solo or Co-op for now.")
-            return
         if career_mode == "Solo" and len(player_names) > 1:
             self.error_label.configure(text="Solo careers can only have one driver. Choose Co-op for multiple drivers.")
+            return
+        if career_mode == "Rivals" and len(player_names) < 2:
+            self.error_label.configure(text="Rivals careers need at least two drivers.")
             return
 
         try:
@@ -268,6 +284,7 @@ class NewGame(ctk.CTkFrame):
             game=selected_game,
             career_mode=career_mode,
             player_profile_ids=player_profile_ids,
+            career_path_id=str((self.career_path_by_title.get(self.career_path_var.get()) or {}).get("path_id", "default")),
         )
         if not success:
             self.error_label.configure(text=message)
@@ -292,6 +309,7 @@ class NewGame(ctk.CTkFrame):
         return 0, 125
 
     def _on_game_changed(self, selected_game: str) -> None:
+        self._refresh_career_paths()
         min_difficulty, max_difficulty = self._difficulty_range_for_game(selected_game)
         default_value = "95" if str(selected_game).strip().casefold() == "ams2" else "75"
         self.difficulty_entry.delete(0, "end")
@@ -305,6 +323,15 @@ class NewGame(ctk.CTkFrame):
 
     def on_show(self) -> None:
         self._refresh_profile_choices()
+        self._refresh_career_paths()
+
+    def _refresh_career_paths(self) -> None:
+        self.career_paths = list_career_paths(self.game_var.get())
+        self.career_path_by_title = {str(path.get("title", "")): path for path in self.career_paths}
+        titles = list(self.career_path_by_title) or ["Default Career Path"]
+        self.career_path_selector.configure(values=titles)
+        if self.career_path_var.get() not in titles:
+            self.career_path_var.set(titles[0])
 
     def add_player_entry(self) -> None:
         profiles = list_player_profiles()
@@ -355,7 +382,7 @@ class NewGame(ctk.CTkFrame):
         if row in self.player_rows:
             self.player_rows.remove(row)
         row.destroy()
-        if len(self.player_entries) == 1 and self.career_mode_var.get() == "Co-op":
+        if len(self.player_entries) == 1 and self.career_mode_var.get() in {"Co-op", "Rivals"}:
             self.career_mode_var.set("Solo")
         self._refresh_remove_buttons()
         self._refresh_shared_content_summary()

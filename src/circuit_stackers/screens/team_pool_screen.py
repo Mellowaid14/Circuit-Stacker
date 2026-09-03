@@ -156,6 +156,7 @@ class TeamPoolScreen(ctk.CTkFrame):
             ("Team", 220),
             ("Game", 80),
             ("Str", 55),
+            ("Move", 60),
             ("Amb", 55),
             ("Funds", 55),
             ("Base", 55),
@@ -187,6 +188,7 @@ class TeamPoolScreen(ctk.CTkFrame):
                 (team.get("team_name", ""), 220),
                 (team.get("game", ""), 80),
                 (str(team.get("current_strength", team.get("reputation", ""))), 55),
+                (self._movement_text(team), 60),
                 (str(team.get("team_ambition", "")), 55),
                 (str(team.get("team_financial_strength", "")), 55),
                 (str(team.get("base_prestige", "")), 55),
@@ -210,6 +212,15 @@ class TeamPoolScreen(ctk.CTkFrame):
                 font=ctk.CTkFont(size=10),
                 command=lambda current_team=team: self.open_team_detail(current_team),
             ).pack(side="right", padx=6, pady=4)
+
+    @staticmethod
+    def _movement_text(team: dict) -> str:
+        delta = int(team.get("latest_strength_delta", 0) or 0)
+        if delta > 0:
+            return f"+{delta}"
+        if delta < 0:
+            return str(delta)
+        return "-"
 
     def next_page(self) -> None:
         if self.current_offset + self.page_size >= self.total_teams:

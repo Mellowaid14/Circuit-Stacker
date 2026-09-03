@@ -149,16 +149,20 @@ class SimProgressScreen(ctk.CTkFrame):
         self.show_screen("ChampionshipScreen")
 
     def _run_chunk(self) -> None:
-        try:
-            if self.gameplay_screen is None or not self.gameplay_screen.save_name:
-                self.show_screen("GameplayScreen")
-                return
+        if self.gameplay_screen is None or not self.gameplay_screen.save_name:
+            self._running = False
+            self.show_screen("GameplayScreen")
+            return
 
-            state = {
+        # Run the simulation away from Tk's event loop.  A season chunk can
+        # touch a large driver/team roster and must not prevent Windows from
+        # dispatching move, paint, and expose events for the application.
+        state = {
                 "save_name": self.gameplay_screen.save_name,
                 "game": getattr(self.gameplay_screen, "game", "iRacing"),
                 "career_mode": getattr(self.gameplay_screen, "career_mode", "Solo"),
                 "players": self.gameplay_screen.player_names,
+                "all_players": getattr(self.gameplay_screen, "all_player_names", self.gameplay_screen.player_names),
                 "active_player_name": getattr(self.gameplay_screen, "active_player_name", ""),
                 "player_perspectives": getattr(self.gameplay_screen, "player_perspectives", {}),
                 "starting_difficulty": self.gameplay_screen.starting_difficulty,
@@ -177,7 +181,21 @@ class SimProgressScreen(ctk.CTkFrame):
                 "current_race": self.gameplay_screen.current_race,
                 "world_sim_progress": self.gameplay_screen.world_sim_progress,
             }
-            state = run_world_simulation_step(state)
+
+        def worker() -> None:
+            try:
+                result = run_world_simulation_step(state)
+            except Exception as error:
+                self.after(0, lambda err=error: self._finish_chunk_error(err))
+                return
+            self.after(0, lambda result=result: self._finish_chunk(result))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _finish_chunk(self, state: dict) -> None:
+        try:
+            if self.gameplay_screen is None:
+                return
             self.gameplay_screen.load_state(state)
 
             progress = state.get("world_sim_progress") or {}
@@ -195,3 +213,10 @@ class SimProgressScreen(ctk.CTkFrame):
                 self.after(250, lambda: self.show_screen("GameplayScreen"))
         finally:
             self._running = False
+
+    def _finish_chunk_error(self, error: Exception) -> None:
+        self._running = False
+        if self.gameplay_screen is not None:
+            self.gameplay_screen.season_summary_message = f"Could not simulate the world: {error}"
+            self.gameplay_screen.season_summary_color = "#ff5555"
+        self.show_screen("GameplayScreen")

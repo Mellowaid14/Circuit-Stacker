@@ -2,7 +2,14 @@ from __future__ import annotations
 
 import customtkinter as ctk
 
-from ..driver_pool import best_driver_in_world, latest_tier_champions, notable_retirements, top_rookies_for_year
+from ..driver_pool import (
+    best_driver_in_world,
+    latest_team_reputation_move_for_year,
+    latest_tier_champions,
+    notable_retirements,
+    recent_team_reputation_moves,
+    top_rookies_for_year,
+)
 from ..game_logic import load_world_championships
 
 
@@ -172,6 +179,12 @@ class SeasonRecapScreen(ctk.CTkFrame):
         if team_name:
             self._section_label(self.summary_frame, "Garage View")
             self._info_row(self.summary_frame, "Team:", team_name)
+            expectation = str(self.player_team_offer.get("team_expectation", "")).strip()
+            if expectation:
+                self._info_row(self.summary_frame, "Season Goal:", expectation)
+            verdict = self._team_expectation_verdict()
+            if verdict:
+                self._info_row(self.summary_frame, "Garage Verdict:", verdict)
             self._info_row(self.summary_frame, "Season Read:", self._team_season_recap_text())
 
         self._section_label(self.summary_frame, "World Update")
@@ -237,11 +250,34 @@ class SeasonRecapScreen(ctk.CTkFrame):
             for driver in rookies:
                 self._info_row(self.summary_frame, "", str(driver.get("name", "-")))
 
+        if self.save_name and completed_year > 0:
+            risers = recent_team_reputation_moves(self.save_name, completed_year, direction="rise", limit=4)
+            fallers = recent_team_reputation_moves(self.save_name, completed_year, direction="fall", limit=4)
+            if risers:
+                self._section_label(self.summary_frame, f"Biggest Team Risers ({completed_year})")
+                for team in risers:
+                    label = f"{team.get('team_name', '-')}:"
+                    value = (
+                        f"+{int(team.get('delta', 0) or 0)} to {team.get('new_strength', '-')}"
+                        f" | {team.get('championship_name', '-')}"
+                    )
+                    self._info_row(self.summary_frame, label, value)
+            if fallers:
+                self._section_label(self.summary_frame, f"Biggest Team Fallers ({completed_year})")
+                for team in fallers:
+                    label = f"{team.get('team_name', '-')}:"
+                    value = (
+                        f"{int(team.get('delta', 0) or 0)} to {team.get('new_strength', '-')}"
+                        f" | {team.get('championship_name', '-')}"
+                    )
+                    self._info_row(self.summary_frame, label, value)
+
     def _headline_tier_champions(self, champions: list[dict]) -> list[dict]:
+        champion_tiers = {str(champion.get("tier", "")).strip() for champion in champions if str(champion.get("tier", "")).strip()}
         championships_by_id = {
             str(championship.get("id", "")).strip(): championship
             for championship in load_world_championships()
-            if str(championship.get("Tier", "")).strip() == "5"
+            if not champion_tiers or str(championship.get("Tier", "")).strip() in champion_tiers
         }
         grouped: dict[str, list[dict]] = {}
         for champion in champions:
@@ -343,11 +379,18 @@ class SeasonRecapScreen(ctk.CTkFrame):
 
     def _team_season_recap_text(self) -> str:
         team_name = str(self.player_team_offer.get("team_name", "")).strip() or "The team"
+        team_key = str(self.player_team_offer.get("team_key", "")).strip()
         philosophy = str(self.player_team_offer.get("team_philosophy", "")).strip().casefold()
         trajectory = str(self.player_team_offer.get("team_trajectory", "")).strip().casefold()
         outcome = str((self.summary or {}).get("outcome", "stayed")).strip().casefold()
         average_position = self.summary.get("average_position")
         average_text = f"{average_position:.1f}" if isinstance(average_position, (int, float)) else "-"
+        completed_year = int(((self.summary or {}).get("driver_pool") or {}).get("next_world_year", 0) or 0) - 1
+        resource_move = (
+            latest_team_reputation_move_for_year(self.save_name, team_key, completed_year)
+            if self.save_name and team_key and completed_year > 0
+            else None
+        )
 
         outcome_line = {
             "promoted": f"The season ended in a step forward, and {team_name} will see that as proof the program is moving.",
@@ -370,17 +413,69 @@ class SeasonRecapScreen(ctk.CTkFrame):
             "rebuilding": "The team is likely to frame the next phase as part of a larger rebuild.",
             "stable": "The team should see the offseason as a chance to refine rather than reinvent.",
         }.get(trajectory, "")
+        resource_line = self._team_resource_line(team_name, resource_move)
 
         return " ".join(
             part
             for part in (
+                self._team_expectation_verdict(),
                 outcome_line,
                 philosophy_line,
                 trajectory_line,
+                resource_line,
                 f"Average finishing position for your side of the garage: {average_text}.",
             )
             if part
         )
+
+    @staticmethod
+    def _team_resource_line(team_name: str, resource_move: dict | None) -> str:
+        if not isinstance(resource_move, dict):
+            return ""
+        capital_delta = int(resource_move.get("capital_delta", 0) or 0)
+        backing_delta = int(resource_move.get("sponsor_backing_delta", 0) or 0)
+        new_capital = int(resource_move.get("new_team_capital", 50) or 50)
+        new_backing = int(resource_move.get("new_sponsor_backing", 50) or 50)
+
+        if capital_delta >= 8 and backing_delta >= 6:
+            return f"{team_name} ends the year with stronger backing and enough capital to push development harder."
+        if capital_delta >= 8:
+            return f"{team_name} finishes the season with healthier resources and room to be more aggressive next year."
+        if backing_delta >= 6:
+            return f"{team_name} has attracted stronger backing, which should help the next round of development."
+        if capital_delta <= -8 and new_capital <= 40:
+            return f"Resources are stretched at {team_name}, so the garage may need to be selective with its next move."
+        if backing_delta <= -6 and new_backing <= 42:
+            return f"Sponsor support looks thinner than before, so {team_name} may feel more pressure to deliver early."
+        return f"{team_name} heads into the offseason with a broadly steady resource picture."
+
+    def _team_expectation_verdict(self) -> str:
+        expectation_level = str(self.player_team_offer.get("team_expectation_level", "")).strip().casefold()
+        expectation = str(self.player_team_offer.get("team_expectation", "")).strip()
+        average_position = self.summary.get("average_position")
+        outcome = str((self.summary or {}).get("outcome", "stayed")).strip().casefold()
+        team_name = str(self.player_team_offer.get("team_name", "")).strip() or "The team"
+        if not expectation:
+            return ""
+        if not isinstance(average_position, (int, float)):
+            return f"{team_name} is still waiting to judge whether that goal was really met."
+
+        if expectation_level == "wins":
+            status = "exceeded" if average_position <= 2.0 else "met" if average_position <= 3.5 else "missed"
+        elif expectation_level == "podiums":
+            status = "exceeded" if average_position <= 4.0 else "met" if average_position <= 6.0 else "missed"
+        elif expectation_level == "top5":
+            status = "exceeded" if average_position <= 5.0 else "met" if average_position <= 7.5 else "missed"
+        elif expectation_level == "top10":
+            status = "exceeded" if average_position <= 7.5 else "met" if average_position <= 10.5 else "missed"
+        else:
+            status = "exceeded" if outcome == "promoted" or average_position <= 10.0 else "met" if average_position <= 14.0 else "missed"
+
+        if status == "exceeded":
+            return f"{team_name} will feel that the group beat its own brief this year."
+        if status == "met":
+            return f"{team_name} should see the season as delivering what the garage asked for."
+        return f"{team_name} is likely to read the year as falling short of the brief and push harder next season."
 
     def _refresh_standings(self) -> None:
         for widget in self.standings_frame.winfo_children():

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import threading
+
 import customtkinter as ctk
 from datetime import datetime
 from uuid import uuid4
@@ -84,20 +86,17 @@ class WorldSetupScreen(ctk.CTkFrame):
                     text=f"Simulating world history year {current_year} of {self._total_years}..."
                 )
                 self.update_idletasks()
-                summary = simulate_world_history_year(self._save_name)
-                self._status_lines.append(
-                    f"Year {current_year}: {summary.get('championships', 0)} championships, "
-                    f"{summary.get('races', 0)} races, {summary.get('teams', 0)} teams, "
-                    f"{summary.get('rookies_added', 0)} rookies."
-                )
-                self._years_remaining -= 1
-                if self._years_remaining == 0:
-                    save_data = load_save(self._save_name) or {"save_name": self._save_name}
-                    save_data["world_year"] = datetime.now().year
-                    save_data["world_setup_complete"] = True
-                    update_save(self._save_name, save_data)
-                self.status_label.configure(text=self._status_lines[-1])
-                self.after(75, self._run_next_step)
+                save_name = self._save_name
+
+                def worker() -> None:
+                    try:
+                        summary = simulate_world_history_year(save_name)
+                    except Exception as error:
+                        self.after(0, lambda err=error: self._finish_error(err))
+                        return
+                    self.after(0, lambda result=summary: self._finish_history_year(result))
+
+                threading.Thread(target=worker, daemon=True).start()
                 return
 
             if not self._championship:
@@ -129,11 +128,30 @@ class WorldSetupScreen(ctk.CTkFrame):
             self._running = False
             self.show_screen("GameplayScreen")
         except Exception as error:
-            self._running = False
-            championship_screen = self.parent.screens["ChampionshipScreen"]
-            championship_screen.season_summary_message = f"Could not start championship: {error}"
-            championship_screen.season_summary_color = "#ff5555"
-            self.show_screen("ChampionshipScreen")
+            self._finish_error(error)
+
+    def _finish_history_year(self, summary: dict) -> None:
+        current_year = self._total_years - self._years_remaining + 1
+        self._status_lines.append(
+            f"Year {current_year}: {summary.get('championships', 0)} championships, "
+            f"{summary.get('races', 0)} races, {summary.get('teams', 0)} teams, "
+            f"{summary.get('rookies_added', 0)} rookies."
+        )
+        self._years_remaining -= 1
+        if self._years_remaining == 0:
+            save_data = load_save(self._save_name) or {"save_name": self._save_name}
+            save_data["world_year"] = datetime.now().year
+            save_data["world_setup_complete"] = True
+            update_save(self._save_name, save_data)
+        self.status_label.configure(text=self._status_lines[-1])
+        self.after(75, self._run_next_step)
+
+    def _finish_error(self, error: Exception) -> None:
+        self._running = False
+        championship_screen = self.parent.screens["ChampionshipScreen"]
+        championship_screen.season_summary_message = f"Could not start championship: {error}"
+        championship_screen.season_summary_color = "#ff5555"
+        self.show_screen("ChampionshipScreen")
 
     def _add_championship_start_messages(self, state: dict) -> None:
         messages = self._championship_start_messages(state)

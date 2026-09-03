@@ -64,6 +64,12 @@ class RaceResultsScreen(ctk.CTkFrame):
         self.back_screen = back_screen or "WorldChampionshipDetailScreen"
 
     def on_show(self) -> None:
+        if (
+            self.override_schedule is None
+            and self.gameplay_screen is not None
+            and hasattr(self.gameplay_screen, "reload_active_rivals_state")
+        ):
+            self.gameplay_screen.reload_active_rivals_state()
         for widget in self.info_frame.winfo_children():
             widget.destroy()
         for widget in self.results_frame.winfo_children():

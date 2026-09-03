@@ -379,13 +379,14 @@ class ManualResultsScreen(ctk.CTkFrame):
 
         bottom_controls = ctk.CTkFrame(right, fg_color="transparent")
         bottom_controls.pack(side="bottom", fill="x", padx=14, pady=14)
-        ctk.CTkButton(
+        self.simulate_button = ctk.CTkButton(
             bottom_controls,
             text="Simulate Results",
             command=self.simulate_results,
             width=170,
             height=34,
-        ).pack(anchor="w", pady=(0, 8))
+        )
+        self.simulate_button.pack(anchor="w", pady=(0, 8))
         self.import_button = ctk.CTkButton(
             bottom_controls,
             text="Import iRacing Results JSON",
@@ -427,6 +428,8 @@ class ManualResultsScreen(ctk.CTkFrame):
             self.stop_ams2_live_order_updates()
             self._hide_ams2_sync()
             return
+        if hasattr(self.gameplay_screen, "reload_active_rivals_state"):
+            self.gameplay_screen.reload_active_rivals_state()
         if self.gameplay_screen.current_race >= len(self.gameplay_screen.schedule):
             self.stop_ams2_live_order_updates()
             self.finish_order = []
@@ -1968,8 +1971,27 @@ class ManualResultsScreen(ctk.CTkFrame):
             return
 
         self.stop_ams2_live_order_updates()
-        state = simulate_race(self._build_state_payload())
+        payload = self._build_state_payload()
+        self.status_label.configure(text="Simulating race...", text_color="#4da6ff")
+        self.simulate_button.configure(state="disabled")
+
+        def worker() -> None:
+            try:
+                state = simulate_race(payload)
+            except Exception as error:
+                self.after(0, lambda err=error: self._finish_simulation_error(err))
+                return
+            self.after(0, lambda result=state: self._finish_simulation(result))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _finish_simulation(self, state: dict) -> None:
+        self.simulate_button.configure(state="normal")
         self._apply_updated_state(state, "Race simulated.")
+
+    def _finish_simulation_error(self, error: Exception) -> None:
+        self.simulate_button.configure(state="normal")
+        self.status_label.configure(text=f"Could not simulate race: {error}", text_color="#ff7777")
 
     def import_results_json(self) -> None:
         if self.gameplay_screen is None:
@@ -2066,6 +2088,7 @@ class ManualResultsScreen(ctk.CTkFrame):
             "game": getattr(self.gameplay_screen, "game", "iRacing"),
             "career_mode": getattr(self.gameplay_screen, "career_mode", "Solo"),
             "players": self.gameplay_screen.player_names,
+            "all_players": getattr(self.gameplay_screen, "all_player_names", self.gameplay_screen.player_names),
             "active_player_name": getattr(self.gameplay_screen, "active_player_name", ""),
             "player_perspectives": getattr(self.gameplay_screen, "player_perspectives", {}),
             "starting_difficulty": self.gameplay_screen.starting_difficulty,

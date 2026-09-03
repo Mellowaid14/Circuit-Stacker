@@ -168,8 +168,8 @@ def load_owned_cars(game: str = "iRacing", save_name: str | None = None) -> list
     ]
 
 
-def _championship_rows_for_game(game: str = "iRacing") -> list[dict[str, str]]:
-    return championship_rows(game)
+def _championship_rows_for_game(game: str = "iRacing", career_path_id: str | None = None) -> list[dict[str, str]]:
+    return championship_rows(game, career_path_id)
 
 
 def _championship_group_rows(
@@ -246,8 +246,11 @@ def _cars_for_championship_rows(rows: list[dict[str, str]], game: str = "iRacing
 def _class_names_for_rows(rows: list[dict[str, str]], game: str = "iRacing") -> list[str]:
     class_names: list[str] = []
     seen: set[str] = set()
-    for car in _cars_for_championship_rows(rows, game):
-        class_name = str(car.get("Car class", "")).strip() or str(car.get("Car", "")).strip()
+    for row in rows:
+        custom_name = str(row.get("Class_Name", "")).strip()
+        matching_cars = _cars_for_championship_rows([row], game)
+        fallback = str(matching_cars[0].get("Car class", "")) if matching_cars else ""
+        class_name = custom_name or fallback or str(row.get("Sub_Champ", "")).strip() or "Overall"
         if class_name and class_name.casefold() not in seen:
             seen.add(class_name.casefold())
             class_names.append(class_name)
@@ -289,10 +292,10 @@ def _build_world_championship_group(rows: list[dict[str, str]], game: str = "iRa
     return championship
 
 
-def load_world_championships(game: str = "iRacing") -> list[dict[str, Any]]:
+def load_world_championships(game: str = "iRacing", career_path_id: str | None = None) -> list[dict[str, Any]]:
     championships: list[dict[str, Any]] = []
     grouped_rows: dict[str, list[dict[str, str]]] = {}
-    for row in _championship_rows_for_game(game):
+    for row in _championship_rows_for_game(game, career_path_id):
         championship_group_id = str(row.get("Championship_ID", "")).strip() or str(row.get("id", "")).strip()
         grouped_rows.setdefault(championship_group_id, []).append(row)
     for rows in grouped_rows.values():
@@ -1602,7 +1605,7 @@ def create_world_sim_progress(save_name: str, championship: dict[str, Any], play
     save_data = load_save(save_name) or {}
     game = str(save_data.get("game", "iRacing"))
     excluded_id = str(championship.get("id", "")).strip()
-    instances = build_world_championship_instances(load_world_championships(game), excluded_id)
+    instances = build_world_championship_instances(load_world_championships(game, save_data.get("career_path_id")), excluded_id)
     progress_instances: list[dict[str, Any]] = []
 
     for instance in instances:
@@ -1612,7 +1615,13 @@ def create_world_sim_progress(save_name: str, championship: dict[str, Any], play
         num_races = int(instance.get("Num of Races", 4) or 4)
         field_size = world_championship_field_size(instance)
         schedule = build_schedule(
-            load_tracks(schedule_style, tier, game, save_name),
+            load_tracks(
+                schedule_style,
+                tier,
+                game,
+                save_name,
+                _custom_track_selection(instance.get("championship") or instance),
+            ),
             num_races,
             game=game,
             championship_style=schedule_style,
@@ -1649,7 +1658,9 @@ def prepare_offseason_championship_select(save_name: str, player_names: list[str
     refresh_shared_content_snapshot(save_name)
     save_data = load_save(save_name) or {}
     game = str(save_data.get("game", "iRacing"))
-    championships = load_world_championships(game)
+    career_path_id = save_data.get("career_path_id")
+    championship_rows = _championship_rows_for_game(game, career_path_id)
+    championships = load_world_championships(game, career_path_id)
     current_team_offer = save_data.get("player_team_offer") if isinstance(save_data.get("player_team_offer"), dict) else {}
     protected_team_keys = {
         str(current_team_offer.get("team_key", "")).strip()
@@ -1669,7 +1680,7 @@ def prepare_offseason_championship_select(save_name: str, player_names: list[str
             save_name,
             player_names,
             style,
-            championship_rows=championships,
+            championship_rows=championship_rows,
             game=game,
             driver_rows=selection_driver_rows,
             reputation_map=reputation_map,
@@ -1694,7 +1705,13 @@ def prepare_offseason_championship_select(save_name: str, player_names: list[str
         num_races = int(championship.get("Num of Races", 4) or 4)
         field_size = world_championship_field_size(championship)
         schedule = build_schedule(
-            load_tracks(schedule_style, tier, game, save_name),
+            load_tracks(
+                schedule_style,
+                tier,
+                game,
+                save_name,
+                _custom_track_selection(instance.get("championship") or instance),
+            ),
             num_races,
             game=game,
             championship_style=schedule_style,
@@ -1746,7 +1763,7 @@ def _populate_world_with_player_championship(
     save_data = load_save(save_name) or {}
     game = str(save_data.get("game", "iRacing"))
     excluded_id = str(player_championship.get("id", "")).strip()
-    world_instances = build_world_championship_instances(load_world_championships(game), excluded_id)
+    world_instances = build_world_championship_instances(load_world_championships(game, save_data.get("career_path_id")), excluded_id)
     progress_instances: list[dict[str, Any]] = []
     preseason_reserved_instances = [
         instance
@@ -1779,7 +1796,13 @@ def _populate_world_with_player_championship(
         num_races = int(instance.get("Num of Races", 4) or 4)
         field_size = world_championship_field_size(instance)
         schedule = build_schedule(
-            load_tracks(schedule_style, tier, game, save_name),
+            load_tracks(
+                schedule_style,
+                tier,
+                game,
+                save_name,
+                _custom_track_selection(instance.get("championship") or instance),
+            ),
             num_races,
             game=game,
             championship_style=schedule_style,
@@ -2021,7 +2044,13 @@ def _time_slots_for_style(style: str) -> list[str]:
     return ["Morning", "Afternoon", "Evening"]
 
 
-def load_tracks(style: str, tier: int, game: str = "iRacing", save_name: str | None = None) -> list[dict[str, str]]:
+def load_tracks(
+    style: str,
+    tier: int,
+    game: str = "iRacing",
+    save_name: str | None = None,
+    selected_track_keys: set[str] | None = None,
+) -> list[dict[str, str]]:
     """Load owned tracks matching the championship's mapped track style and tier."""
     tracks = []
     target_style = _track_style_for_championship(style)
@@ -2035,19 +2064,22 @@ def load_tracks(style: str, tier: int, game: str = "iRacing", save_name: str | N
                 continue
             if str(row.get("Track", "")).strip().casefold() not in owned_track_names:
                 continue
-            row_style = row["Style"].strip().casefold()
-            if target_style == "mixed_open_wheel":
-                if row_style not in {"road", "oval"}:
-                    continue
-            elif target_style == "mixed_oval":
-                if row_style not in {"road", "oval"}:
-                    continue
-            elif row_style != target_style:
+            track_key = f"{row.get('Track', '').strip()}::{row.get('Layout', '').strip()}"
+            if selected_track_keys and track_key not in selected_track_keys:
                 continue
-
+            row_style = row["Style"].strip().casefold()
+            if not selected_track_keys:
+                if target_style == "mixed_open_wheel":
+                    if row_style not in {"road", "oval"}:
+                        continue
+                elif target_style == "mixed_oval":
+                    if row_style not in {"road", "oval"}:
+                        continue
+                elif row_style != target_style:
+                    continue
             tiers_raw = row.get("My_Tiers", "")
             tier_list = [value.strip() for value in tiers_raw.split(".") if value.strip()]
-            if str(tier) in tier_list:
+            if selected_track_keys or str(tier) in tier_list:
                 tracks.append(row)
 
     return tracks
@@ -2055,6 +2087,14 @@ def load_tracks(style: str, tier: int, game: str = "iRacing", save_name: str | N
 
 def _max_available_tier() -> int:
     return 5
+
+
+def _custom_track_selection(championship: dict[str, Any]) -> set[str] | None:
+    raw = str(championship.get("Track_Selection", "")).strip()
+    if not raw:
+        return None
+    selected = {value.strip() for value in raw.split("||") if value.strip()}
+    return selected or None
 
 
 def build_schedule(
@@ -2174,7 +2214,7 @@ def assign_driver_classes(
         return standings
 
     classes = championship_classes(championship)
-    player_class = str(player_car.get("Car class", "")).strip() or str(player_car.get("Car", "")).strip()
+    player_class = str(championship.get("_player_class_name", "")).strip() or str(player_car.get("Car class", "")).strip() or str(player_car.get("Car", "")).strip()
     class_tiers = championship.get("_class_tiers", {})
     if isinstance(class_tiers, dict) and len(class_tiers) > 1:
         player_set = set(player_names)
@@ -2396,6 +2436,17 @@ def _active_player_name(value: Any, player_names: list[str]) -> str:
     return player_names[0] if player_names else ""
 
 
+def _all_player_names(state: dict[str, Any], save_name: str = "") -> list[str]:
+    return _normalize_player_names(state.get("all_players") or state.get("players"), save_name)
+
+
+def _career_player_names(state: dict[str, Any], save_name: str = "") -> list[str]:
+    if _career_mode(state.get("career_mode"), _all_player_names(state, save_name)) == "Rivals":
+        active_player = _active_player_name(state.get("active_player_name"), _all_player_names(state, save_name))
+        return [active_player] if active_player else []
+    return _normalize_player_names(state.get("players"), save_name)
+
+
 def _normalize_player_perspectives(
     value: Any,
     player_names: list[str],
@@ -2427,6 +2478,220 @@ def _merged_perspective_rivalry_heat(player_perspectives: dict[str, dict[str, An
         for driver_name, stage in _rivalry_heat(perspective.get("rivalry_heat")).items():
             merged[driver_name] = max(int(stage), int(merged.get(driver_name, 0) or 0))
     return merged
+
+
+CAREER_SNAPSHOT_KEYS = (
+    "players",
+    "starting_difficulty",
+    "tier",
+    "unlocked_tier",
+    "score",
+    "championship",
+    "player_car",
+    "player_team_offer",
+    "player_liveries",
+    "watch_drivers",
+    "rising_driver",
+    "roster_path",
+    "season_path",
+    "schedule",
+    "standings",
+    "current_race",
+    "world_sim_progress",
+    "offseason_world_instances",
+    "offseason_player_style_limits",
+)
+
+
+def _rivals_career_snapshot(state: dict[str, Any], player_name: str) -> dict[str, Any]:
+    snapshot = {key: state.get(key) for key in CAREER_SNAPSHOT_KEYS if key in state}
+    snapshot["players"] = [player_name] if player_name else _career_player_names(state, str(state.get("save_name", "")))
+    snapshot["updated_at"] = datetime.now().isoformat(timespec="seconds")
+    return snapshot
+
+
+def _normalized_player_careers(value: Any, player_names: list[str]) -> dict[str, dict[str, Any]]:
+    raw = value if isinstance(value, dict) else {}
+    careers: dict[str, dict[str, Any]] = {}
+    for player_name in player_names:
+        existing = raw.get(player_name)
+        careers[player_name] = dict(existing) if isinstance(existing, dict) else {}
+    return careers
+
+
+def hydrate_active_rivals_state(save_data: dict[str, Any] | None) -> dict[str, Any]:
+    state = dict(save_data or {})
+    all_players = _normalize_player_names(state.get("all_players") or state.get("players"), str(state.get("save_name", "")))
+    if _career_mode(state.get("career_mode"), all_players) != "Rivals" or not all_players:
+        return state
+
+    active_player = _active_player_name(state.get("active_player_name"), all_players)
+    raw_careers = state.get("player_careers")
+    has_existing_career_slots = isinstance(raw_careers, dict) and any(
+        isinstance(career, dict) and bool(career)
+        for career in raw_careers.values()
+    )
+    careers = _normalized_player_careers(raw_careers, all_players)
+    active_career = dict(careers.get(active_player) or {})
+    if not active_career and not has_existing_career_slots and state.get("championship"):
+        active_career = _rivals_career_snapshot({**state, "players": [active_player]}, active_player)
+        careers[active_player] = active_career
+
+    defaults = {
+        "players": [active_player],
+        "starting_difficulty": state.get("starting_difficulty", 75),
+        "tier": 1,
+        "unlocked_tier": 1,
+        "score": 0,
+        "championship": None,
+        "player_car": None,
+        "player_team_offer": None,
+        "player_liveries": [],
+        "watch_drivers": [],
+        "rising_driver": None,
+        "roster_path": "",
+        "season_path": "",
+        "schedule": [],
+        "standings": [],
+        "current_race": 0,
+        "world_sim_progress": None,
+        "offseason_world_instances": [],
+        "offseason_player_style_limits": {},
+    }
+    for key in CAREER_SNAPSHOT_KEYS:
+        state[key] = active_career.get(key, defaults.get(key))
+
+    state["all_players"] = all_players
+    state["players"] = [active_player]
+    state["active_player_name"] = active_player
+    state["player_careers"] = careers
+    state["player_perspectives"] = _normalize_player_perspectives(
+        state.get("player_perspectives"),
+        all_players,
+        state.get("rivalry_heat"),
+    )
+    state["rivalry_heat"] = _merged_perspective_rivalry_heat(state["player_perspectives"])
+    state.setdefault("championship", None)
+    state.setdefault("schedule", [])
+    state.setdefault("standings", [])
+    state.setdefault("current_race", 0)
+    return state
+
+
+def _rivals_save_payload(state: dict[str, Any]) -> dict[str, Any]:
+    save_name = str(state.get("save_name", "")).strip()
+    save_data = load_save(save_name) or {}
+    all_players = _all_player_names(state, save_name) or _normalize_player_names(save_data.get("players"), save_name)
+    active_player = _active_player_name(state.get("active_player_name") or save_data.get("active_player_name"), all_players)
+    careers = _normalized_player_careers(save_data.get("player_careers"), all_players)
+    careers[active_player] = _rivals_career_snapshot(state, active_player)
+    player_perspectives = _normalize_player_perspectives(
+        state.get("player_perspectives") or save_data.get("player_perspectives"),
+        all_players,
+        state.get("rivalry_heat") or save_data.get("rivalry_heat"),
+    )
+    payload = {
+        "game": str(state.get("game") or save_data.get("game", "iRacing") or "iRacing"),
+        "career_mode": "Rivals",
+        "players": all_players,
+        "all_players": all_players,
+        "active_player_name": active_player,
+        "player_careers": careers,
+        "player_perspectives": player_perspectives,
+        "rivalry_heat": _merged_perspective_rivalry_heat(player_perspectives),
+        "messages": state.get("messages", save_data.get("messages", [])),
+        "starting_difficulty": state.get("starting_difficulty", save_data.get("starting_difficulty", 75)),
+        "world_setup_complete": state.get("world_setup_complete", save_data.get("world_setup_complete", True)),
+        "world_year": state.get("world_year", save_data.get("world_year")),
+    }
+    active_career = careers.get(active_player) or {}
+    for key in CAREER_SNAPSHOT_KEYS:
+        if key == "players":
+            continue
+        payload[key] = active_career.get(key)
+    payload.setdefault("championship", None)
+    payload.setdefault("schedule", [])
+    payload.setdefault("standings", [])
+    payload.setdefault("current_race", 0)
+    return payload
+
+
+def _career_has_active_season(career: dict[str, Any]) -> bool:
+    return isinstance(career.get("championship"), dict) and bool(career.get("schedule"))
+
+
+def _career_season_is_complete(career: dict[str, Any]) -> bool:
+    schedule = list(career.get("schedule") or [])
+    if not schedule:
+        return False
+    current_race = int(career.get("current_race", 0) or 0)
+    return current_race >= len(schedule) or all(bool(race.get("completed")) for race in schedule if isinstance(race, dict))
+
+
+def rivals_waiting_for_drivers(save_name: str) -> list[str]:
+    save_data = load_save(save_name) or {}
+    all_players = _normalize_player_names(save_data.get("all_players") or save_data.get("players"), save_name)
+    if _career_mode(save_data.get("career_mode"), all_players) != "Rivals":
+        return []
+    careers = _normalized_player_careers(save_data.get("player_careers"), all_players)
+    waiting: list[str] = []
+    for player_name in all_players:
+        career = careers.get(player_name) or {}
+        if not _career_has_active_season(career) or not _career_season_is_complete(career):
+            waiting.append(player_name)
+    return waiting
+
+
+def rivals_all_active_seasons_complete(save_name: str) -> bool:
+    save_data = load_save(save_name) or {}
+    all_players = _normalize_player_names(save_data.get("all_players") or save_data.get("players"), save_name)
+    if _career_mode(save_data.get("career_mode"), all_players) != "Rivals":
+        return False
+    careers = _normalized_player_careers(save_data.get("player_careers"), all_players)
+    return bool(all_players) and all(
+        _career_has_active_season(careers.get(player_name) or {})
+        and _career_season_is_complete(careers.get(player_name) or {})
+        for player_name in all_players
+    )
+
+
+def _season_outcome_for_player(state: dict[str, Any], player_names: list[str]) -> dict[str, Any]:
+    standings = list(state.get("standings") or [])
+    sorted_standings = sorted(standings, key=lambda driver: (driver["points"], driver["wins"]), reverse=True)
+    player_positions = []
+    for player_name in player_names:
+        for position, driver in enumerate(sorted_standings, 1):
+            if driver["name"] == player_name:
+                player_positions.append(position)
+                break
+
+    average_position = sum(player_positions) / len(player_positions) if player_positions else float("inf")
+    current_tier = int(state.get("tier", 1))
+    unlocked_tier = _normalize_unlocked_tier(
+        state.get("unlocked_tier", state.get("unlocked_tiers")),
+        current_tier,
+    )
+    max_tier = _max_available_tier()
+
+    if average_position <= 5:
+        new_tier = min(current_tier + 1, max_tier)
+        outcome = "promoted" if new_tier > current_tier else "stayed"
+    elif average_position <= 10:
+        new_tier = current_tier
+        outcome = "stayed"
+    else:
+        new_tier = max(current_tier - 1, 1)
+        outcome = "demoted" if new_tier < current_tier else "stayed"
+
+    return {
+        "average_position": average_position,
+        "player_positions": player_positions,
+        "old_tier": current_tier,
+        "new_tier": new_tier,
+        "old_unlocked_tier": unlocked_tier,
+        "new_unlocked_tier": max(unlocked_tier, new_tier),
+        "outcome": outcome,
+    }
 
 
 def _update_player_rivalry_perspectives(
@@ -2789,7 +3054,7 @@ def migrate_loaded_rivalry_state(save_data: dict[str, Any] | None) -> dict[str, 
 
     migrated = dict(save_data)
     changed = False
-    player_names = _normalize_player_names(migrated.get("players"), str(migrated.get("save_name", "")).strip())
+    player_names = _normalize_player_names(migrated.get("all_players") or migrated.get("players"), str(migrated.get("save_name", "")).strip())
     save_name = str(migrated.get("save_name", "")).strip()
     if save_name:
         sync_human_drivers(save_name, player_names)
@@ -2838,7 +3103,7 @@ def migrate_loaded_rivalry_state(save_data: dict[str, Any] | None) -> dict[str, 
                 "messages": migrated.get("messages", []),
             },
         )
-    return migrated
+    return hydrate_active_rivals_state(migrated)
 
 
 def _normalize_player_names(player_names: list[str] | None, save_name: str) -> list[str]:
@@ -2986,6 +3251,7 @@ def create_new_save(
     game: str = "iRacing",
     career_mode: str = "",
     player_profile_ids: list[str] | None = None,
+    career_path_id: str = "default",
 ) -> tuple[bool, str]:
     selected_profile_ids = [str(value).strip() for value in (player_profile_ids or []) if str(value).strip()]
     selected_profile_refs = profile_refs(selected_profile_ids)
@@ -3005,8 +3271,11 @@ def create_new_save(
         save_name,
         {
             "game": normalized_game,
+            "career_path_id": str(career_path_id).strip() or "default",
             "career_mode": normalized_mode,
             "players": normalized_players,
+            "all_players": normalized_players,
+            "player_careers": {player_name: {} for player_name in normalized_players} if normalized_mode == "Rivals" else {},
             "player_profiles": selected_profile_refs,
             "player_profile_ids": selected_profile_ids,
             "owned_content_snapshot": {
@@ -3048,7 +3317,14 @@ def start_championship(
 ) -> dict[str, Any]:
     save_data = load_save(save_name) or {}
     game = str(save_data.get("game", "iRacing"))
-    player_names = _normalize_player_names(player_names, save_name)
+    all_player_names = _normalize_player_names(save_data.get("players") or player_names, save_name)
+    career_mode = _career_mode(save_data.get("career_mode"), all_player_names)
+    if career_mode == "Rivals" and all_player_names:
+        active_player = _active_player_name(save_data.get("active_player_name"), all_player_names)
+        player_names = [active_player]
+    else:
+        active_player = _active_player_name(save_data.get("active_player_name"), all_player_names)
+        player_names = _normalize_player_names(player_names, save_name)
     num_races = int(championship.get("Num of Races", 4))
     tier = int(championship.get("Tier", 1))
     style = championship.get("Style", "")
@@ -3092,7 +3368,7 @@ def start_championship(
     schedule_tier = int(championship_for_state.get("_field_tier", tier) or tier)
 
     schedule = build_schedule(
-        load_tracks(style, schedule_tier, game, save_name),
+        load_tracks(style, schedule_tier, game, save_name, _custom_track_selection(championship_for_state)),
         num_races,
         game=game,
         championship_style=style,
@@ -3166,16 +3442,17 @@ def start_championship(
     existing_messages = list(existing_save_data.get("messages") or [])
     player_perspectives = _normalize_player_perspectives(
         existing_save_data.get("player_perspectives"),
-        player_names,
+        all_player_names if career_mode == "Rivals" else player_names,
         existing_save_data.get("rivalry_heat"),
     )
 
     state = {
         "save_name": save_name,
         "players": player_names,
+        "all_players": all_player_names,
         "game": game,
-        "career_mode": _career_mode(existing_save_data.get("career_mode"), player_names),
-        "active_player_name": _active_player_name(existing_save_data.get("active_player_name"), player_names),
+        "career_mode": career_mode,
+        "active_player_name": active_player if career_mode == "Rivals" else _active_player_name(existing_save_data.get("active_player_name"), player_names),
         "player_perspectives": player_perspectives,
         "starting_difficulty": _clamp_difficulty(starting_difficulty),
         "world_setup_complete": True,
@@ -3199,7 +3476,10 @@ def start_championship(
         "offseason_world_instances": [],
         "offseason_player_style_limits": {},
     }
-    update_save(save_name, state)
+    if career_mode == "Rivals":
+        update_save(save_name, _rivals_save_payload(state))
+    else:
+        update_save(save_name, state)
     return state
 
 
@@ -3215,7 +3495,7 @@ def reexport_championship_assets(state: dict[str, Any]) -> dict[str, Any]:
 
     save_data = load_save(save_name) or {}
     game = str(state.get("game") or save_data.get("game", "iRacing"))
-    player_names = _normalize_player_names(state.get("players"), save_name)
+    player_names = _career_player_names(state, save_name)
     player_car = state.get("player_car")
     starting_difficulty = _clamp_difficulty(int(state.get("starting_difficulty", 75)))
 
@@ -3249,15 +3529,18 @@ def reexport_championship_assets(state: dict[str, Any]) -> dict[str, Any]:
     if game.strip().casefold() == "ams2":
         updated_state["player_liveries"] = player_liveries
 
-    update_save(
-        save_name,
-        {
-            "game": game,
-            "player_liveries": updated_state.get("player_liveries", []),
-            "roster_path": str(roster_path),
-            "season_path": str(season_path),
-        },
-    )
+    if _career_mode(updated_state.get("career_mode"), _all_player_names(updated_state, save_name)) == "Rivals":
+        update_save(save_name, _rivals_save_payload(updated_state))
+    else:
+        update_save(
+            save_name,
+            {
+                "game": game,
+                "player_liveries": updated_state.get("player_liveries", []),
+                "roster_path": str(roster_path),
+                "season_path": str(season_path),
+            },
+        )
     return updated_state
 
 
@@ -3323,14 +3606,15 @@ def continue_or_initialize_season(
     unlocked_tier: int | None = None,
     world_sim_progress: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    save_data = load_save(save_name) or {}
+    save_data = hydrate_active_rivals_state(load_save(save_name) or {})
     current_game = str(save_data.get("game", "iRacing"))
-    normalized_players = _normalize_player_names(player_names, save_name)
+    all_players = _all_player_names(save_data, save_name)
+    normalized_players = _career_player_names(save_data, save_name) or _normalize_player_names(player_names, save_name)
     career_mode = _career_mode(save_data.get("career_mode"), normalized_players)
-    active_player_name = _active_player_name(save_data.get("active_player_name"), normalized_players)
+    active_player_name = _active_player_name(save_data.get("active_player_name"), all_players or normalized_players)
     player_perspectives = _normalize_player_perspectives(
         save_data.get("player_perspectives"),
-        normalized_players,
+        all_players or normalized_players,
         save_data.get("rivalry_heat"),
     )
     player_liveries = save_data.get("player_liveries", [])
@@ -3358,6 +3642,7 @@ def continue_or_initialize_season(
             "game": current_game,
             "career_mode": career_mode,
             "players": normalized_players,
+            "all_players": all_players or normalized_players,
             "active_player_name": active_player_name,
             "player_perspectives": player_perspectives,
             "starting_difficulty": _clamp_difficulty(starting_difficulty),
@@ -3391,6 +3676,11 @@ def continue_or_initialize_season(
 
 
 def _persist_active_state(state: dict[str, Any]) -> None:
+    save_name = str(state.get("save_name", "")).strip()
+    if _career_mode(state.get("career_mode"), _all_player_names(state, save_name)) == "Rivals":
+        update_save(save_name, _rivals_save_payload(state))
+        return
+
     update_save(
         state["save_name"],
         {
@@ -3500,7 +3790,7 @@ def simulate_race(state: dict[str, Any]) -> dict[str, Any]:
     if current_race >= len(schedule):
         return state
 
-    player_names = _normalize_player_names(state.get("players"), state["save_name"])
+    player_names = _career_player_names(state, state["save_name"])
     finish_order_names = world_simulated_finish_order(
         state["save_name"],
         standings,
@@ -3549,7 +3839,7 @@ def apply_manual_race_results(state: dict[str, Any], player_positions: dict[str,
         raise ValueError("Player finishing positions must be unique.")
 
     standings_by_name = {driver["name"]: index for index, driver in enumerate(standings)}
-    player_names = set(_normalize_player_names(state.get("players"), state["save_name"]))
+    player_names = set(_career_player_names(state, state["save_name"]))
 
     for player_name in player_positions:
         if player_name not in player_names or player_name not in standings_by_name:
@@ -3575,21 +3865,21 @@ def apply_manual_race_results(state: dict[str, Any], player_positions: dict[str,
     _update_player_rivalry_perspectives(
         state,
         result_rows,
-        _normalize_player_names(state.get("players"), state["save_name"]),
+        _career_player_names(state, state["save_name"]),
     )
 
     ordered_player_results = _player_class_results(
         result_rows,
-        _normalize_player_names(state.get("players"), state["save_name"]),
+        _career_player_names(state, state["save_name"]),
     )
     player_class_sizes = _player_class_sizes(
         result_rows,
-        _normalize_player_names(state.get("players"), state["save_name"]),
+        _career_player_names(state, state["save_name"]),
     )
     _add_team_post_race_message(
         state,
         result_rows,
-        _normalize_player_names(state.get("players"), state["save_name"]),
+        _career_player_names(state, state["save_name"]),
         ordered_player_results,
         player_class_sizes,
     )
@@ -3623,7 +3913,7 @@ def apply_finish_order(state: dict[str, Any], finish_order_names: list[str]) -> 
     if set(finish_order_names) != set(expected_names):
         raise ValueError("Finish order contains unknown or duplicate drivers.")
 
-    player_names = _normalize_player_names(state.get("players"), state["save_name"])
+    player_names = _career_player_names(state, state["save_name"])
     player_results: dict[str, int] = {}
     _, result_rows = apply_points_by_class(standings, finish_order_names)
     update_ratings_after_race(state["save_name"], state["championship"], standings, result_rows)
@@ -3711,7 +4001,7 @@ def import_ams2_results(state: dict[str, Any], json_path: str, name_map: dict[st
         if str(row.get("DriverLongName", "")).strip()
     ]
 
-    player_names = _normalize_player_names(state.get("players"), state["save_name"])
+    player_names = _career_player_names(state, state["save_name"])
     if len(player_names) <= 1:
         imported_names_in_order = all_imported_names
         if not imported_names_in_order:
@@ -3833,8 +4123,11 @@ def import_ams2_results(state: dict[str, Any], json_path: str, name_map: dict[st
 
 
 def finalize_season(state: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+    if _career_mode(state.get("career_mode"), _all_player_names(state, state["save_name"])) == "Rivals":
+        return finalize_rivals_seasons(state)
+
     standings = state["standings"]
-    player_names = _normalize_player_names(state.get("players"), state["save_name"])
+    player_names = _career_player_names(state, state["save_name"])
     player_championship = state.get("championship") or {}
     state = run_world_simulation_step(state, finish_remaining=True)
     world_simulation_summary = (state.get("world_sim_progress") or {}).get("summary", {})
@@ -3883,6 +4176,7 @@ def finalize_season(state: dict[str, Any]) -> tuple[dict[str, Any], dict[str, An
         "game": str(state.get("game", "iRacing") or "iRacing"),
         "career_mode": _career_mode(state.get("career_mode"), player_names),
         "players": player_names,
+        "all_players": _all_player_names(state, state["save_name"]) or player_names,
         "active_player_name": _active_player_name(state.get("active_player_name"), player_names),
         "player_perspectives": _normalize_player_perspectives(
             state.get("player_perspectives"),
@@ -3910,7 +4204,15 @@ def finalize_season(state: dict[str, Any]) -> tuple[dict[str, Any], dict[str, An
         "standings": [],
         "current_race": 0,
     }
-    update_save(state["save_name"], new_state)
+    if _career_mode(state.get("career_mode"), _all_player_names(state, state["save_name"]) or player_names) == "Rivals":
+        new_state["career_mode"] = "Rivals"
+        new_state["active_player_name"] = _active_player_name(
+            state.get("active_player_name"),
+            _all_player_names(state, state["save_name"]) or player_names,
+        )
+        update_save(state["save_name"], _rivals_save_payload(new_state))
+    else:
+        update_save(state["save_name"], new_state)
     summary = {
         "average_position": average_position,
         "player_positions": player_positions,
@@ -3930,3 +4232,148 @@ def finalize_season(state: dict[str, Any]) -> tuple[dict[str, Any], dict[str, An
         "driver_pool": driver_pool_summary,
     }
     return new_state, summary
+
+
+def finalize_rivals_seasons(state: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+    save_name = str(state.get("save_name", "")).strip()
+    save_data = load_save(save_name) or {}
+    all_players = _normalize_player_names(save_data.get("all_players") or save_data.get("players"), save_name)
+    if not all_players:
+        return state, {}
+
+    waiting = rivals_waiting_for_drivers(save_name)
+    if waiting:
+        raise ValueError("Rivals season cannot finalize until all drivers finish: " + ", ".join(waiting))
+
+    careers = _normalized_player_careers(save_data.get("player_careers"), all_players)
+    player_perspectives = _normalize_player_perspectives(
+        save_data.get("player_perspectives"),
+        all_players,
+        save_data.get("rivalry_heat"),
+    )
+    active_player = _active_player_name(state.get("active_player_name") or save_data.get("active_player_name"), all_players)
+    current_game = str(state.get("game") or save_data.get("game", "iRacing") or "iRacing")
+    messages = list(state.get("messages") or save_data.get("messages") or [])
+
+    combined_driver_pool_summary = _empty_world_sim_summary()
+    player_summaries: dict[str, dict[str, Any]] = {}
+    active_summary: dict[str, Any] = {}
+    active_final_standings: list[dict[str, Any]] = []
+    active_championship_name = "Season Recap"
+
+    for player_name in all_players:
+        career = dict(careers.get(player_name) or {})
+        career_state = {
+            **save_data,
+            **career,
+            "save_name": save_name,
+            "game": current_game,
+            "career_mode": "Rivals",
+            "players": [player_name],
+            "all_players": all_players,
+            "active_player_name": player_name,
+            "player_perspectives": player_perspectives,
+            "messages": messages,
+        }
+        player_names = [player_name]
+        standings = list(career_state.get("standings") or [])
+        player_championship = career_state.get("championship") or {}
+        career_state = run_world_simulation_step(career_state, finish_remaining=True)
+        world_simulation_summary = (career_state.get("world_sim_progress") or {}).get("summary", {})
+        for instance in (career_state.get("world_sim_progress") or {}).get("instances", []):
+            if instance.get("finalized"):
+                continue
+            instance_summary = finalize_driver_season(
+                save_name,
+                instance.get("championship") or {},
+                instance.get("standings") or [],
+                advance_world_year=False,
+            )
+            world_simulation_summary = _merge_world_sim_summary(world_simulation_summary, instance_summary)
+            instance["finalized"] = True
+
+        driver_pool_summary = finalize_driver_season(
+            save_name,
+            player_championship,
+            standings,
+            advance_world_year=False,
+        )
+        driver_pool_summary["world_simulation"] = world_simulation_summary
+        combined_driver_pool_summary = _merge_world_sim_summary(combined_driver_pool_summary, driver_pool_summary)
+        combined_driver_pool_summary = _merge_world_sim_summary(combined_driver_pool_summary, world_simulation_summary)
+
+        outcome = _season_outcome_for_player(career_state, player_names)
+        summary = {
+            **outcome,
+            "career_mode": "Rivals",
+            "active_player_name": player_name,
+            "player_team_offer": dict(career_state.get("player_team_offer") or {})
+            if isinstance(career_state.get("player_team_offer"), dict)
+            else {},
+            "player_perspectives": player_perspectives,
+            "driver_pool": driver_pool_summary,
+        }
+        player_summaries[player_name] = summary
+
+        new_career_state = {
+            "players": [player_name],
+            "starting_difficulty": career_state.get("starting_difficulty", save_data.get("starting_difficulty", 75)),
+            "tier": outcome["new_tier"],
+            "unlocked_tier": outcome["new_unlocked_tier"],
+            "score": career_state.get("score", 0),
+            "championship": None,
+            "player_car": None,
+            "player_team_offer": None,
+            "player_liveries": [],
+            "watch_drivers": [],
+            "rising_driver": None,
+            "schedule": [],
+            "standings": [],
+            "current_race": 0,
+            "world_sim_progress": None,
+        }
+        careers[player_name] = _rivals_career_snapshot(
+            {
+                **new_career_state,
+                "save_name": save_name,
+                "career_mode": "Rivals",
+                "all_players": all_players,
+                "active_player_name": player_name,
+            },
+            player_name,
+        )
+
+        if player_name == active_player:
+            active_summary = summary
+            active_final_standings = standings
+            active_championship_name = str(player_championship.get("Championship", "Season Recap"))
+
+    next_world_year = advance_world_year(save_name, 1)
+    combined_driver_pool_summary["next_world_year"] = next_world_year
+    if active_summary:
+        active_summary["driver_pool"] = {
+            **dict(active_summary.get("driver_pool") or {}),
+            "world_simulation": combined_driver_pool_summary,
+            "next_world_year": next_world_year,
+        }
+        active_summary["rivals_player_summaries"] = player_summaries
+
+    payload = {
+        "game": current_game,
+        "career_mode": "Rivals",
+        "players": all_players,
+        "all_players": all_players,
+        "active_player_name": active_player,
+        "player_careers": careers,
+        "player_perspectives": player_perspectives,
+        "rivalry_heat": _merged_perspective_rivalry_heat(player_perspectives),
+        "messages": messages,
+        "world_setup_complete": True,
+    }
+    hydrated_payload = hydrate_active_rivals_state({**save_data, **payload})
+    update_save(save_name, payload | {key: hydrated_payload.get(key) for key in CAREER_SNAPSHOT_KEYS if key != "players"})
+
+    new_state = hydrate_active_rivals_state(load_save(save_name) or {})
+    active_summary.setdefault("championship_name", active_championship_name)
+    active_summary.setdefault("final_standings", active_final_standings)
+    return new_state, active_summary

@@ -29,6 +29,8 @@ class ManualSetupBuilder:
         self.content = content
 
     def refresh(self, gameplay, title_label=None, subtitle_label=None, race_index: int | None = None) -> None:
+        if gameplay is not None and hasattr(gameplay, "reload_active_rivals_state"):
+            gameplay.reload_active_rivals_state()
         for widget in self.content.winfo_children():
             widget.destroy()
 

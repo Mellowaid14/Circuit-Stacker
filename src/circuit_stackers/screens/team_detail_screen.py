@@ -167,6 +167,7 @@ class TeamDetailScreen(ctk.CTkFrame):
 
         team = profile.get("team") or {}
         season_history = profile.get("season_history") or []
+        reputation_history = profile.get("reputation_history") or []
         decisions = profile.get("driver_decisions") or []
         ownership_history = profile.get("ownership_history") or []
         current_championships = current_team_championships(self.save_name, self.team_key)
@@ -191,14 +192,34 @@ class TeamDetailScreen(ctk.CTkFrame):
         self._info_row(self.summary_frame, "Stability:", str(team.get("team_stability", "-")))
         self._info_row(self.summary_frame, "Development:", str(team.get("team_development", "-")))
         self._info_row(self.summary_frame, "Financial Strength:", str(team.get("team_financial_strength", "-")))
+        self._info_row(
+            self.summary_frame,
+            "Team Capital:",
+            f"{team.get('team_capital', '-')} ({team.get('team_capital_band', '-')})",
+        )
+        self._info_row(
+            self.summary_frame,
+            "Sponsor Backing:",
+            f"{team.get('sponsor_backing', '-')} ({team.get('sponsor_backing_band', '-')})",
+        )
         self._info_row(self.summary_frame, "Pressure:", str(team.get("team_pressure", "-")))
         self._info_row(self.summary_frame, "Philosophy:", str(team.get("team_philosophy") or "-"))
+        self._info_row(self.summary_frame, "Program Goal:", self._program_goal(team))
         self._info_row(self.summary_frame, "Game:", str(team.get("game", "-")))
         self._info_row(self.summary_frame, "Last Style:", str(team.get("last_style") or "-"))
         self._info_row(self.summary_frame, "Last Series:", str(team.get("last_championship") or "-"))
         self._info_row(self.summary_frame, "Last Season Pts:", str(team.get("last_season_points", 0)))
         self._info_row(self.summary_frame, "Last Season Wins:", str(team.get("last_season_wins", 0)))
         self._info_row(self.summary_frame, "Last Season Titles:", str(team.get("last_season_titles", 0)))
+        if reputation_history:
+            latest_move = dict(reputation_history[0])
+            delta = int(latest_move.get("delta", 0) or 0)
+            delta_text = f"+{delta}" if delta > 0 else str(delta)
+            self._info_row(
+                self.summary_frame,
+                "Latest Move:",
+                f"{delta_text} to {latest_move.get('new_strength', '-')} in {latest_move.get('season_year', '-')}",
+            )
 
         self._section_label(self.summary_frame, "Career Totals")
         self._info_row(self.summary_frame, "Seasons:", str(team.get("seasons_completed", 0)))
@@ -266,6 +287,37 @@ class TeamDetailScreen(ctk.CTkFrame):
             ).pack(pady=(18 if not current_championships else 10))
             if not ownership_history:
                 return
+
+        if reputation_history:
+            self._section_label(self.history_frame, "Strength Movement")
+            move_header = ctk.CTkFrame(self.history_frame, fg_color="transparent")
+            move_header.pack(fill="x", pady=(0, 4))
+            for text, width in [("Year", 55), ("Championship", 170), ("From", 50), ("To", 50), ("Delta", 50), ("Trend", 90)]:
+                ctk.CTkLabel(
+                    move_header,
+                    text=text,
+                    width=width,
+                    anchor="w",
+                    font=ctk.CTkFont(size=10, weight="bold"),
+                    text_color="gray",
+                ).pack(side="left", padx=3)
+            for item in reputation_history[:12]:
+                row = ctk.CTkFrame(self.history_frame, fg_color=("gray80", "gray22"), corner_radius=6)
+                row.pack(fill="x", pady=2)
+                delta = int(item.get("delta", 0) or 0)
+                delta_text = f"+{delta}" if delta > 0 else str(delta)
+                values = [
+                    (str(item.get("season_year", "")), 55),
+                    (str(item.get("championship_name", "")), 170),
+                    (str(item.get("previous_strength", "")), 50),
+                    (str(item.get("new_strength", "")), 50),
+                    (delta_text, 50),
+                    (str(item.get("trajectory", "stable")).title(), 90),
+                ]
+                for value, width in values:
+                    ctk.CTkLabel(row, text=str(value), width=width, anchor="w", font=ctk.CTkFont(size=11)).pack(
+                        side="left", padx=3, pady=5
+                    )
 
         if ownership_history:
             self._section_label(self.history_frame, "Seat Ownership")
@@ -340,3 +392,28 @@ class TeamDetailScreen(ctk.CTkFrame):
             "moved": "Moved",
         }
         return labels.get(event_type.strip().casefold(), event_type.replace("_", " ").title() or "-")
+
+    @staticmethod
+    def _program_goal(team: dict) -> str:
+        strength = int(team.get("current_strength", team.get("reputation", 50)) or 50)
+        philosophy = str(team.get("team_philosophy", "Balanced")).strip()
+        trajectory = str(team.get("trajectory", "stable")).strip().casefold()
+        if strength >= 90:
+            goal = "Turn pace into wins and keep title pressure on every weekend."
+        elif strength >= 78:
+            goal = "Run near the front and stack podium-level weekends."
+        elif strength >= 62:
+            goal = "Lead the midfield with regular top-five pace."
+        elif strength >= 44:
+            goal = "Score consistently and keep the program moving upward."
+        else:
+            goal = "Develop the lineup, survive tough weekends, and build foundations."
+        if philosophy and philosophy.casefold() != "balanced":
+            goal += f" {philosophy} is the way this team wants to get there."
+        if trajectory == "rising":
+            goal += " The garage believes it is climbing."
+        elif trajectory == "falling":
+            goal += " The pressure is on to stop the slide."
+        elif trajectory == "rebuilding":
+            goal += " This project is being treated as a rebuild."
+        return goal

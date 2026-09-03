@@ -69,6 +69,23 @@ def test_profile_export_import_creates_portable_copy(tmp_path, monkeypatch) -> N
     assert player_profiles.profile_owned_assets(imported["id"], "iRacing") == (["3", "7"], ["Adelaide"])
 
 
+def test_profile_can_be_renamed_and_promoted(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(player_profiles, "PROFILES_PATH", tmp_path / "player_profiles.json")
+    original = player_profiles.list_player_profiles()[0]
+    success, _message, second = player_profiles.create_player_profile("Second Driver")
+    assert success is True
+    assert second is not None
+
+    renamed, _message = player_profiles.rename_player_profile(second["id"], "Team Mate")
+    promoted, _message = player_profiles.set_default_profile(second["id"])
+
+    assert renamed is True
+    assert promoted is True
+    assert player_profiles.default_profile_id() == second["id"]
+    assert player_profiles.get_player_profile(second["id"])["name"] == "Team Mate"
+    assert player_profiles.delete_player_profile(original["id"])[0] is True
+
+
 def test_invalid_settings_json_falls_back_to_defaults(tmp_path, monkeypatch) -> None:
     settings_path = tmp_path / "settings.json"
     settings_path.write_text("{broken", encoding="utf-8")

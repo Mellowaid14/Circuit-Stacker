@@ -10,6 +10,7 @@ from typing import Any
 from xml.etree import ElementTree as ET
 
 from .driver_pool import driver_profile_map, get_team_profile, get_team_snapshot_for_identity
+from .ams2_content_scanner import discover_roots
 from .paths import resource_path
 from .settings_manager import game_directory
 
@@ -19,6 +20,17 @@ AMS2_CARS_CSV = resource_path("data", "Cars.csv")
 _AMS2_LIVERY_ROWS_CACHE: list[dict[str, str]] | None = None
 _AMS2_CAR_ROWS_CACHE: list[dict[str, str]] | None = None
 _CUSTOM_LIVERY_ROWS_CACHE: dict[str, list[dict[str, str]]] = {}
+
+
+def _ams2_class_key(value: Any) -> str:
+    key = "".join(char for char in str(value).casefold() if char.isalnum())
+    if key in {"lmdh", "gtp", "lmdhgtp"}:
+        return "lmdhgtp"
+    return key
+
+
+def _compact_text(value: Any) -> str:
+    return "".join(char for char in str(value).casefold() if char.isalnum())
 
 
 @dataclass(frozen=True)
@@ -57,8 +69,9 @@ def _load_ams2_car_rows() -> list[dict[str, str]]:
 
 
 def _custom_livery_root() -> Path | None:
-    ams2_root = Path(game_directory("AMS2"))
-    if not str(ams2_root).strip():
+    roots = discover_roots(game_directory("AMS2"))
+    ams2_root = roots.install
+    if ams2_root is None:
         return None
     overrides = ams2_root / "Vehicles" / "Textures" / "CustomLiveries" / "Overrides"
     return overrides if overrides.exists() else None
@@ -73,8 +86,9 @@ def _add_unique_livery_name(names: list[str], seen: set[str], livery_name: str) 
 
 
 def _custom_ai_livery_names_for_roster(roster_name: str) -> list[str]:
-    ams2_root = Path(game_directory("AMS2"))
-    if not str(ams2_root).strip():
+    roots = discover_roots(game_directory("AMS2"))
+    ams2_root = roots.user_data or roots.install
+    if ams2_root is None:
         return []
     custom_ai_dir = ams2_root / "UserData" / "CustomAIDrivers"
     if not custom_ai_dir.exists():
@@ -128,12 +142,12 @@ def _custom_livery_names_for_folder(folder_name: str) -> list[str]:
 
 
 def _car_ids_for_class(class_name: str) -> set[str]:
-    normalized_class = str(class_name).strip().casefold()
+    normalized_class = _ams2_class_key(class_name)
     return {
         str(row.get("id", "")).strip()
         for row in _load_ams2_car_rows()
         if str(row.get("id", "")).strip()
-        and str(row.get("Car class", "")).strip().casefold() == normalized_class
+        and _ams2_class_key(row.get("Car class", "")) == normalized_class
     }
 
 
@@ -189,24 +203,20 @@ def _custom_livery_rows_for_class(class_name: str, default_rows: list[dict[str, 
 
 
 def _livery_rows_for_class(class_name: str) -> list[dict[str, str]]:
-    normalized_class = str(class_name).strip().casefold()
+    normalized_class = _ams2_class_key(class_name)
     rows = [
         row
         for row in _load_livery_rows()
-        if str(row.get("Car_Name", "")).strip().casefold() == normalized_class
+        if _ams2_class_key(row.get("Car_Name", "")) == normalized_class
     ]
     if rows:
         return _custom_livery_rows_for_class(class_name, rows) + rows
     class_rows = [
         row
         for row in _load_livery_rows()
-        if str(row.get("Class", "")).strip().casefold() == normalized_class
+        if _ams2_class_key(row.get("Class", "")) == normalized_class
     ]
     return _custom_livery_rows_for_class(class_name, class_rows) + class_rows
-
-
-def _compact_text(value: Any) -> str:
-    return "".join(ch for ch in str(value).casefold() if ch.isalnum())
 
 
 def _livery_rows_for_player_car(
@@ -474,6 +484,8 @@ def _team_bop_for_driver(
     pressure = int(team_profile.get("team_pressure", 50) or 50)
     stability = int(team_profile.get("team_stability", 50) or 50)
     financial_strength = int(team_profile.get("team_financial_strength", 50) or 50)
+    team_capital = int(team_profile.get("team_capital", 50) or 50)
+    sponsor_backing = int(team_profile.get("sponsor_backing", 50) or 50)
     philosophy = str(team_profile.get("team_philosophy", "Balanced")).strip().casefold()
     trajectory = str(team_profile.get("trajectory", "stable")).strip().casefold()
     team_seat = max(1, int(driver.get("team_seat", 1) or 1))
@@ -499,6 +511,14 @@ def _team_bop_for_driver(
     power_scalar = 1.0 + (strength_delta * 0.025)
     weight_scalar = 1.0 - (strength_delta * 0.020)
     drag_scalar = 1.0 - (strength_delta * 0.018)
+    capital_delta = (team_capital - 50) / 50.0
+    backing_delta = (sponsor_backing - 50) / 50.0
+
+    power_scalar += capital_delta * 0.008
+    weight_scalar -= capital_delta * 0.006
+    drag_scalar -= capital_delta * 0.005
+    power_scalar += backing_delta * 0.006
+    drag_scalar -= backing_delta * 0.004
 
     if trajectory == "rising":
         power_scalar += 0.006
@@ -526,6 +546,23 @@ def _team_bop_for_driver(
     elif philosophy == "rookie pipeline":
         power_scalar -= 0.003
         drag_scalar += 0.003
+
+    if philosophy == "technical excellence":
+        power_scalar += capital_delta * 0.004
+        drag_scalar -= capital_delta * 0.005
+    elif philosophy == "win now":
+        power_scalar += backing_delta * 0.005
+        weight_scalar -= backing_delta * 0.002
+    elif philosophy == "driver continuity":
+        weight_scalar -= capital_delta * 0.003
+    elif philosophy == "underdog grit":
+        if team_capital < 45:
+            power_scalar -= 0.002
+            drag_scalar += 0.002
+        else:
+            weight_scalar -= 0.002
+    elif philosophy == "rookie pipeline":
+        drag_scalar += max(0.0, (45 - team_capital) / 10000.0)
 
     pressure_drag = max(0.0, (pressure - 60) / 1000.0)
     power_scalar -= pressure_drag

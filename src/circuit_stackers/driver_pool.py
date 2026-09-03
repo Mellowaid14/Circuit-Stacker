@@ -58,6 +58,23 @@ COUNTRY_CODES = (
     "USA",
 )
 TEAMS_CSV = resource_path("data", "Teams.csv")
+TEAM_REPUTATION_MOVE_COLUMNS = """
+    team_name,
+    championship_name,
+    previous_strength,
+    new_strength,
+    delta,
+    previous_team_capital,
+    new_team_capital,
+    capital_delta,
+    previous_sponsor_backing,
+    new_sponsor_backing,
+    sponsor_backing_delta,
+    trajectory,
+    points,
+    wins,
+    titles
+"""
 
 
 def _now() -> str:
@@ -389,6 +406,8 @@ def initialize_driver_pool(save_name: str, world_year: int | None = None) -> Pat
                 team_stability INTEGER NOT NULL DEFAULT 50,
                 team_development INTEGER NOT NULL DEFAULT 50,
                 team_financial_strength INTEGER NOT NULL DEFAULT 50,
+                team_capital INTEGER NOT NULL DEFAULT 50,
+                sponsor_backing INTEGER NOT NULL DEFAULT 50,
                 team_pressure INTEGER NOT NULL DEFAULT 50,
                 team_philosophy TEXT NOT NULL DEFAULT 'Balanced',
                 trajectory TEXT NOT NULL DEFAULT 'stable',
@@ -442,6 +461,34 @@ def initialize_driver_pool(save_name: str, world_year: int | None = None) -> Pat
                 wins INTEGER NOT NULL DEFAULT 0,
                 podiums INTEGER NOT NULL DEFAULT 0,
                 championships INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS team_reputation_history (
+                id TEXT PRIMARY KEY,
+                team_key TEXT NOT NULL,
+                team_id TEXT NOT NULL,
+                team_name TEXT NOT NULL,
+                championship_id TEXT NOT NULL,
+                championship_name TEXT NOT NULL,
+                season_year INTEGER NOT NULL,
+                game TEXT NOT NULL,
+                previous_strength INTEGER NOT NULL DEFAULT 50,
+                new_strength INTEGER NOT NULL DEFAULT 50,
+                delta INTEGER NOT NULL DEFAULT 0,
+                previous_team_capital INTEGER NOT NULL DEFAULT 50,
+                new_team_capital INTEGER NOT NULL DEFAULT 50,
+                capital_delta INTEGER NOT NULL DEFAULT 0,
+                previous_sponsor_backing INTEGER NOT NULL DEFAULT 50,
+                new_sponsor_backing INTEGER NOT NULL DEFAULT 50,
+                sponsor_backing_delta INTEGER NOT NULL DEFAULT 0,
+                trajectory TEXT NOT NULL DEFAULT 'stable',
+                points INTEGER NOT NULL DEFAULT 0,
+                wins INTEGER NOT NULL DEFAULT 0,
+                titles INTEGER NOT NULL DEFAULT 0,
                 created_at TEXT NOT NULL
             )
             """
@@ -640,9 +687,17 @@ def initialize_driver_pool(save_name: str, world_year: int | None = None) -> Pat
         _ensure_column(connection, "team_reputations", "team_stability", "INTEGER NOT NULL DEFAULT 50")
         _ensure_column(connection, "team_reputations", "team_development", "INTEGER NOT NULL DEFAULT 50")
         _ensure_column(connection, "team_reputations", "team_financial_strength", "INTEGER NOT NULL DEFAULT 50")
+        _ensure_column(connection, "team_reputations", "team_capital", "INTEGER NOT NULL DEFAULT 50")
+        _ensure_column(connection, "team_reputations", "sponsor_backing", "INTEGER NOT NULL DEFAULT 50")
         _ensure_column(connection, "team_reputations", "team_pressure", "INTEGER NOT NULL DEFAULT 50")
         _ensure_column(connection, "team_reputations", "team_philosophy", "TEXT NOT NULL DEFAULT 'Balanced'")
         _ensure_column(connection, "team_reputations", "trajectory", "TEXT NOT NULL DEFAULT 'stable'")
+        _ensure_column(connection, "team_reputation_history", "previous_team_capital", "INTEGER NOT NULL DEFAULT 50")
+        _ensure_column(connection, "team_reputation_history", "new_team_capital", "INTEGER NOT NULL DEFAULT 50")
+        _ensure_column(connection, "team_reputation_history", "capital_delta", "INTEGER NOT NULL DEFAULT 0")
+        _ensure_column(connection, "team_reputation_history", "previous_sponsor_backing", "INTEGER NOT NULL DEFAULT 50")
+        _ensure_column(connection, "team_reputation_history", "new_sponsor_backing", "INTEGER NOT NULL DEFAULT 50")
+        _ensure_column(connection, "team_reputation_history", "sponsor_backing_delta", "INTEGER NOT NULL DEFAULT 0")
         _ensure_column(connection, "team_reputations", "last_season_points", "INTEGER NOT NULL DEFAULT 0")
         _ensure_column(connection, "team_reputations", "last_season_wins", "INTEGER NOT NULL DEFAULT 0")
         _ensure_column(connection, "team_reputations", "last_season_titles", "INTEGER NOT NULL DEFAULT 0")
@@ -1789,16 +1844,11 @@ def _ensure_world_rookies_available(
 
 def _available_world_ai_count(save_name: str, excluded_names: set[str]) -> int:
     with _connect(save_name) as connection:
-        rows = connection.execute(
-            """
-            SELECT name
-            FROM drivers
-            WHERE is_human = 0
-              AND status = 'active'
-              AND current_championship IS NULL
-            """
-        ).fetchall()
-    return sum(1 for row in rows if str(row["name"]) not in excluded_names)
+        return _active_ai_count_query(
+            connection,
+            extra_clauses=["current_championship IS NULL"],
+            excluded_names=excluded_names,
+        )
 
 
 def _build_ai_world_standings(
@@ -1889,6 +1939,8 @@ def _build_ai_world_standings(
                     "nationality": "AI",
                     "skill": _skill_from_rating(effective_mmr),
                     "mmr": int(row["mmr"]),
+                    "career_starts": _safe_int(row["career_starts"], 0),
+                    "seasons_completed": _safe_int(row["seasons_completed"], 0),
                     "points": 0,
                     "wins": 0,
                     "podiums": 0,
@@ -1940,6 +1992,8 @@ def _build_ai_world_standings(
                     "nationality": "AI",
                     "skill": _skill_from_rating(effective_mmr),
                     "mmr": int(row["mmr"]),
+                    "career_starts": _safe_int(row["career_starts"], 0),
+                    "seasons_completed": _safe_int(row["seasons_completed"], 0),
                     "points": 0,
                     "wins": 0,
                     "podiums": 0,
@@ -1958,6 +2012,8 @@ def _driver_row_to_world_standing(effective_mmr: int, row: sqlite3.Row, class_na
         "nationality": "AI",
         "skill": _skill_from_rating(effective_mmr),
         "mmr": int(row["mmr"]),
+        "career_starts": _safe_int(row["career_starts"], 0),
+        "seasons_completed": _safe_int(row["seasons_completed"], 0),
         "points": 0,
         "wins": 0,
         "podiums": 0,
@@ -2145,7 +2201,7 @@ def _active_world_ai_rows(save_name: str) -> list[sqlite3.Row]:
     with _connect(save_name) as connection:
         return connection.execute(
             """
-            SELECT id, name, primary_style, mmr, last_tier, last_style, last_series_id
+            SELECT id, name, primary_style, mmr, career_starts, seasons_completed, last_tier, last_style, last_series_id
             FROM drivers
             WHERE is_human = 0
               AND status = 'active'
@@ -2497,6 +2553,8 @@ def _update_team_reputations_for_season(
                 team_stability,
                 team_development,
                 team_financial_strength,
+                team_capital,
+                sponsor_backing,
                 team_pressure,
                 team_philosophy
             FROM team_reputations
@@ -2513,6 +2571,8 @@ def _update_team_reputations_for_season(
             stability = _safe_int(existing["team_stability"], seed_profile["team_stability"])
             development = _safe_int(existing["team_development"], seed_profile["team_development"])
             financial_strength = _safe_int(existing["team_financial_strength"], seed_profile["team_financial_strength"])
+            team_capital = _safe_int(existing["team_capital"], seed_profile["team_capital"])
+            sponsor_backing = _safe_int(existing["sponsor_backing"], seed_profile["sponsor_backing"])
             pressure = _safe_int(existing["team_pressure"], seed_profile["team_pressure"])
             philosophy = str(existing["team_philosophy"] or "").strip() or str(seed_profile["team_philosophy"])
         else:
@@ -2522,6 +2582,8 @@ def _update_team_reputations_for_season(
             stability = seed_profile["team_stability"]
             development = seed_profile["team_development"]
             financial_strength = seed_profile["team_financial_strength"]
+            team_capital = seed_profile["team_capital"]
+            sponsor_backing = seed_profile["sponsor_backing"]
             pressure = seed_profile["team_pressure"]
             philosophy = str(seed_profile["team_philosophy"])
 
@@ -2547,6 +2609,31 @@ def _update_team_reputations_for_season(
         new_form = _clamp_rating_stat(round((previous_form * 0.45) + delta), -12, 12)
         new_reputation = _clamp_rating_stat(current_reputation + delta, max(1, baseline_strength - 18), min(100, baseline_strength + 18))
         trajectory = _team_trajectory_for_strength(new_reputation, current_reputation, base_reputation, new_form)
+        sponsor_signal = (
+            titles * 6
+            + min(6, wins * 2)
+            + min(4, top_half)
+            - min(6, bottom_quarter * 2)
+            + max(-2, min(3, round((new_reputation - base_reputation) / 6)))
+        )
+        if points <= 0:
+            sponsor_signal -= 3
+        sponsor_signal += max(-2, min(3, round((stability - 50) / 14)))
+        sponsor_signal -= max(-2, min(3, round((pressure - 55) / 12)))
+        new_sponsor_backing = _clamp_rating_stat(sponsor_backing + sponsor_signal, 20, 100)
+
+        capital_signal = (
+            delta
+            + max(-2, min(4, round((financial_strength - 50) / 10)))
+            + max(-2, min(4, round((development - 50) / 10)))
+            + max(-2, min(3, round((new_sponsor_backing - sponsor_backing) / 8)))
+            - max(-2, min(3, round((pressure - 50) / 11)))
+        )
+        if titles:
+            capital_signal += 3
+        elif wins:
+            capital_signal += 1
+        new_team_capital = _clamp_rating_stat(team_capital + capital_signal, 15, 100)
 
         for class_name, class_stats in stats["classes"].items():
             driver_names = sorted(str(name) for name in class_stats["drivers"] if str(name).strip())
@@ -2596,6 +2683,60 @@ def _update_team_reputations_for_season(
 
         connection.execute(
             """
+            INSERT INTO team_reputation_history (
+                id,
+                team_key,
+                team_id,
+                team_name,
+                championship_id,
+                championship_name,
+                season_year,
+                game,
+                previous_strength,
+                new_strength,
+                delta,
+                previous_team_capital,
+                new_team_capital,
+                capital_delta,
+                previous_sponsor_backing,
+                new_sponsor_backing,
+                sponsor_backing_delta,
+                trajectory,
+                points,
+                wins,
+                titles,
+                created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                str(uuid.uuid4()),
+                key,
+                stats["team_id"],
+                stats["team_name"],
+                championship_id,
+                championship_name,
+                int(season_year),
+                game,
+                current_reputation,
+                new_reputation,
+                delta,
+                team_capital,
+                new_team_capital,
+                new_team_capital - team_capital,
+                sponsor_backing,
+                new_sponsor_backing,
+                new_sponsor_backing - sponsor_backing,
+                trajectory,
+                points,
+                wins,
+                titles,
+                now,
+            ),
+        )
+
+        connection.execute(
+            """
             INSERT INTO team_reputations (
                 team_key,
                 team_id,
@@ -2609,6 +2750,8 @@ def _update_team_reputations_for_season(
                 team_stability,
                 team_development,
                 team_financial_strength,
+                team_capital,
+                sponsor_backing,
                 team_pressure,
                 team_philosophy,
                 trajectory,
@@ -2623,7 +2766,7 @@ def _update_team_reputations_for_season(
                 last_style,
                 updated_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(team_key) DO UPDATE SET
                 team_name = excluded.team_name,
                 reputation = excluded.reputation,
@@ -2633,6 +2776,8 @@ def _update_team_reputations_for_season(
                 team_stability = excluded.team_stability,
                 team_development = excluded.team_development,
                 team_financial_strength = excluded.team_financial_strength,
+                team_capital = excluded.team_capital,
+                sponsor_backing = excluded.sponsor_backing,
                 team_pressure = excluded.team_pressure,
                 team_philosophy = excluded.team_philosophy,
                 trajectory = excluded.trajectory,
@@ -2660,12 +2805,15 @@ def _update_team_reputations_for_season(
                 stability,
                 development,
                 financial_strength,
+                new_team_capital,
+                new_sponsor_backing,
                 pressure,
                 philosophy,
                 trajectory,
                 points,
                 wins,
                 titles,
+                1,
                 int(stats["championships"]),
                 int(stats["wins"]),
                 int(stats["podiums"]),
@@ -2795,16 +2943,29 @@ def _safe_int(value: Any, fallback: int) -> int:
         return fallback
 
 
+def _active_ai_count_query(
+    connection: sqlite3.Connection,
+    extra_clauses: list[str] | None = None,
+    params: list[Any] | None = None,
+    excluded_names: set[str] | None = None,
+) -> int:
+    clauses = ["is_human = 0", "status = 'active'", *(extra_clauses or [])]
+    query_params = list(params or [])
+    cleaned_exclusions = sorted(str(name).strip() for name in (excluded_names or set()) if str(name).strip())
+    if cleaned_exclusions:
+        placeholders = ", ".join("?" for _name in cleaned_exclusions)
+        clauses.append(f"name NOT IN ({placeholders})")
+        query_params.extend(cleaned_exclusions)
+    row = connection.execute(
+        f"SELECT COUNT(*) AS total FROM drivers WHERE {' AND '.join(clauses)}",
+        query_params,
+    ).fetchone()
+    return _safe_int(row["total"] if row else None, 0)
+
+
 def _active_ai_count(save_name: str, excluded_names: set[str]) -> int:
     with _connect(save_name) as connection:
-        rows = connection.execute(
-            """
-            SELECT name FROM drivers
-            WHERE is_human = 0
-              AND status = 'active'
-            """
-        ).fetchall()
-    return sum(1 for row in rows if str(row["name"]) not in excluded_names)
+        return _active_ai_count_query(connection, excluded_names=excluded_names)
 
 
 def _all_driver_names(save_name: str) -> set[str]:
@@ -2847,6 +3008,8 @@ def _select_active_ai(
                 name,
                 primary_style,
                 mmr,
+                career_starts,
+                seasons_completed,
                 last_tier,
                 last_style,
                 last_series_id
@@ -2895,6 +3058,8 @@ def _select_active_ai(
             "wins": 0,
             "podiums": 0,
             "mmr": effective_mmr,
+            "career_starts": _safe_int(row["career_starts"], 0),
+            "seasons_completed": _safe_int(row["seasons_completed"], 0),
             "primary_style": str(row["primary_style"]),
         }
         for effective_mmr, _name, row in selected_drivers
@@ -3171,6 +3336,8 @@ def _team_seed_profile(team_id: str, team_name: str, game: str, base_prestige: i
         "team_stability": _seeded_team_rating(team_id, team_name, game, "team-stability", 35, 80),
         "team_development": _seeded_team_rating(team_id, team_name, game, "team-development", 35, 80),
         "team_financial_strength": _seeded_team_rating(team_id, team_name, game, "team-financial-strength", 35, 82),
+        "team_capital": _seeded_team_rating(team_id, team_name, game, "team-capital", 38, 68),
+        "sponsor_backing": _seeded_team_rating(team_id, team_name, game, "sponsor-backing", 34, 72),
         "team_pressure": _seeded_team_rating(team_id, team_name, game, "team-pressure", 30, 80),
         "team_philosophy": _team_philosophy_for_identity(team_id, team_name, game),
         "trajectory": "stable",
@@ -3178,6 +3345,81 @@ def _team_seed_profile(team_id: str, team_name: str, game: str, base_prestige: i
         "last_season_wins": 0,
         "last_season_titles": 0,
     }
+
+
+def _team_capital_band(value: Any) -> str:
+    capital = _safe_int(value, 50)
+    if capital >= 82:
+        return "surging"
+    if capital >= 64:
+        return "strong"
+    if capital >= 44:
+        return "stable"
+    return "strapped"
+
+
+def _team_sponsor_backing_band(value: Any) -> str:
+    backing = _safe_int(value, 50)
+    if backing >= 84:
+        return "works-backed"
+    if backing >= 68:
+        return "major"
+    if backing >= 54:
+        return "national"
+    if backing >= 40:
+        return "growing"
+    return "local"
+
+
+def _add_team_resource_bands(team: dict[str, Any]) -> dict[str, Any]:
+    team["team_capital_band"] = _team_capital_band(team.get("team_capital", 50))
+    team["sponsor_backing_band"] = _team_sponsor_backing_band(team.get("sponsor_backing", 50))
+    return team
+
+
+def _seat_acquisition_capital_cost(championship: dict[str, Any], championship_counts: dict[str, int], team_key: str) -> int:
+    championship_prestige = _safe_int(championship.get("Prestige"), 1)
+    current_footprint = max(0, championship_counts.get(str(team_key), 0))
+    return max(10, 7 + (championship_prestige * 3) + (max(0, current_footprint - 1) * 2))
+
+
+def _adjust_team_capital(
+    connection: sqlite3.Connection,
+    team_key: str,
+    delta: int,
+    *,
+    now: str,
+    snapshot_cache: dict[tuple[str, str], dict[str, Any]] | None = None,
+) -> int | None:
+    cleaned_key = str(team_key).strip()
+    if not cleaned_key:
+        return None
+
+    row = connection.execute(
+        "SELECT team_capital, team_id, game FROM team_reputations WHERE team_key = ?",
+        (cleaned_key,),
+    ).fetchone()
+    if not row:
+        return None
+
+    old_value = _safe_int(row["team_capital"], 50)
+    new_value = _clamp_rating_stat(old_value + int(delta), 15, 100)
+    connection.execute(
+        """
+        UPDATE team_reputations
+        SET team_capital = ?,
+            updated_at = ?
+        WHERE team_key = ?
+        """,
+        (new_value, now, cleaned_key),
+    )
+    if snapshot_cache is not None:
+        cache_key = (str(row["team_id"]).strip(), str(row["game"]).strip() or "Any")
+        cached = snapshot_cache.get(cache_key)
+        if cached is not None:
+            cached["team_capital"] = new_value
+            snapshot_cache[cache_key] = cached
+    return new_value
 
 
 def _team_trajectory_for_strength(current_strength: int, previous_strength: int, base_prestige: int, form: int) -> str:
@@ -3275,6 +3517,8 @@ def _sync_team_reputations_from_csv(connection: sqlite3.Connection) -> None:
                 team_stability,
                 team_development,
                 team_financial_strength,
+                team_capital,
+                sponsor_backing,
                 team_pressure,
                 team_philosophy,
                 trajectory,
@@ -3283,7 +3527,7 @@ def _sync_team_reputations_from_csv(connection: sqlite3.Connection) -> None:
                 last_season_titles,
                 updated_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(team_key) DO UPDATE SET
                 team_name = excluded.team_name,
                 base_prestige = excluded.base_prestige,
@@ -3291,6 +3535,8 @@ def _sync_team_reputations_from_csv(connection: sqlite3.Connection) -> None:
                 team_stability = COALESCE(team_reputations.team_stability, excluded.team_stability),
                 team_development = COALESCE(team_reputations.team_development, excluded.team_development),
                 team_financial_strength = COALESCE(team_reputations.team_financial_strength, excluded.team_financial_strength),
+                team_capital = COALESCE(team_reputations.team_capital, excluded.team_capital),
+                sponsor_backing = COALESCE(team_reputations.sponsor_backing, excluded.sponsor_backing),
                 team_pressure = COALESCE(team_reputations.team_pressure, excluded.team_pressure),
                 team_philosophy = CASE
                     WHEN COALESCE(team_reputations.team_philosophy, '') = '' THEN excluded.team_philosophy
@@ -3310,6 +3556,8 @@ def _sync_team_reputations_from_csv(connection: sqlite3.Connection) -> None:
                 seed_profile["team_stability"],
                 seed_profile["team_development"],
                 seed_profile["team_financial_strength"],
+                seed_profile["team_capital"],
+                seed_profile["sponsor_backing"],
                 seed_profile["team_pressure"],
                 seed_profile["team_philosophy"],
                 seed_profile["trajectory"],
@@ -3360,6 +3608,8 @@ def _sync_team_totals_from_history(connection: sqlite3.Connection) -> None:
                 team_stability,
                 team_development,
                 team_financial_strength,
+                team_capital,
+                sponsor_backing,
                 team_pressure,
                 team_philosophy,
                 trajectory,
@@ -3388,6 +3638,8 @@ def _sync_team_totals_from_history(connection: sqlite3.Connection) -> None:
         stability = _safe_int(existing["team_stability"] if existing else None, seed_profile["team_stability"])
         development = _safe_int(existing["team_development"] if existing else None, seed_profile["team_development"])
         financial_strength = _safe_int(existing["team_financial_strength"] if existing else None, seed_profile["team_financial_strength"])
+        team_capital = _safe_int(existing["team_capital"] if existing else None, seed_profile["team_capital"])
+        sponsor_backing = _safe_int(existing["sponsor_backing"] if existing else None, seed_profile["sponsor_backing"])
         pressure = _safe_int(existing["team_pressure"] if existing else None, seed_profile["team_pressure"])
         philosophy = str(existing["team_philosophy"] if existing else seed_profile["team_philosophy"] or "").strip() or str(seed_profile["team_philosophy"])
         recent_rows = connection.execute(
@@ -3436,6 +3688,8 @@ def _sync_team_totals_from_history(connection: sqlite3.Connection) -> None:
                 team_stability,
                 team_development,
                 team_financial_strength,
+                team_capital,
+                sponsor_backing,
                 team_pressure,
                 team_philosophy,
                 trajectory,
@@ -3450,7 +3704,7 @@ def _sync_team_totals_from_history(connection: sqlite3.Connection) -> None:
                 last_style,
                 updated_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(team_key) DO UPDATE SET
                 team_name = excluded.team_name,
                 reputation = excluded.reputation,
@@ -3460,6 +3714,8 @@ def _sync_team_totals_from_history(connection: sqlite3.Connection) -> None:
                 team_stability = excluded.team_stability,
                 team_development = excluded.team_development,
                 team_financial_strength = excluded.team_financial_strength,
+                team_capital = excluded.team_capital,
+                sponsor_backing = excluded.sponsor_backing,
                 team_pressure = excluded.team_pressure,
                 team_philosophy = excluded.team_philosophy,
                 trajectory = excluded.trajectory,
@@ -3487,6 +3743,8 @@ def _sync_team_totals_from_history(connection: sqlite3.Connection) -> None:
                 stability,
                 development,
                 financial_strength,
+                team_capital,
+                sponsor_backing,
                 pressure,
                 philosophy,
                 trajectory,
@@ -3572,6 +3830,8 @@ def _team_progression_snapshot(
             team_stability,
             team_development,
             team_financial_strength,
+            team_capital,
+            sponsor_backing,
             team_pressure,
             team_philosophy,
             trajectory,
@@ -3625,6 +3885,8 @@ def _team_progression_snapshot(
         "team_stability": _safe_int(row["team_stability"], seed_profile["team_stability"]),
         "team_development": _safe_int(row["team_development"], seed_profile["team_development"]),
         "team_financial_strength": _safe_int(row["team_financial_strength"], seed_profile["team_financial_strength"]),
+        "team_capital": _safe_int(row["team_capital"], seed_profile["team_capital"]),
+        "sponsor_backing": _safe_int(row["sponsor_backing"], seed_profile["sponsor_backing"]),
         "team_pressure": _safe_int(row["team_pressure"], seed_profile["team_pressure"]),
         "team_philosophy": str(row["team_philosophy"] or seed_profile["team_philosophy"]).strip() or str(seed_profile["team_philosophy"]),
         "trajectory": str(row["trajectory"] or seed_profile["trajectory"]).strip() or str(seed_profile["trajectory"]),
@@ -3654,9 +3916,18 @@ def _team_phase2_score_components(team_snapshot: dict[str, Any]) -> tuple[int, i
 def _team_market_aggression(team_snapshot: dict[str, Any]) -> int:
     ambition = _safe_int(team_snapshot.get("team_ambition"), 50)
     financial_strength = _safe_int(team_snapshot.get("team_financial_strength"), 50)
+    team_capital = _safe_int(team_snapshot.get("team_capital"), 50)
+    sponsor_backing = _safe_int(team_snapshot.get("sponsor_backing"), 50)
     pressure = _safe_int(team_snapshot.get("team_pressure"), 50)
     form = _safe_int(team_snapshot.get("team_form"), 0)
-    return round((ambition - 50) / 6) + round((financial_strength - 50) / 8) + round((pressure - 50) / 10) + round(form / 4)
+    return (
+        round((ambition - 50) / 6)
+        + round((financial_strength - 50) / 8)
+        + round((team_capital - 50) / 7)
+        + round((sponsor_backing - 50) / 10)
+        + round((pressure - 50) / 10)
+        + round(form / 4)
+    )
 
 
 def _team_trajectory_adjustment(team_snapshot: dict[str, Any]) -> int:
@@ -4204,7 +4475,12 @@ def _candidate_team_for_open_seat(
         prestige_fit = max(0, 100 - abs((championship_prestige * 10) - team_reputation))
         continuity_bonus, ambition_bonus, pressure_adjustment = _team_phase2_score_components(team_snapshot)
         aggression = _team_market_aggression(team_snapshot)
+        team_capital = _safe_int(team_snapshot.get("team_capital"), 50)
+        sponsor_backing = _safe_int(team_snapshot.get("sponsor_backing"), 50)
         philosophy = str(team_snapshot.get("team_philosophy", "Balanced")).strip().casefold()
+        expansion_cost = _seat_acquisition_capital_cost(championship, championship_counts, team_key)
+        if team_capital < expansion_cost:
+            continue
         philosophy_bonus = 0
         if philosophy == "win now":
             philosophy_bonus += 5
@@ -4218,6 +4494,8 @@ def _candidate_team_for_open_seat(
             + ambition_bonus
             + continuity_bonus
             + aggression
+            + round((team_capital - 50) / 4)
+            + round((sponsor_backing - 50) / 6)
             + philosophy_bonus
             - pressure_adjustment
             + random.randint(0, 10)
@@ -4236,6 +4514,11 @@ def _candidate_team_for_open_seat(
                     "team_stability": _safe_int(team_snapshot.get("team_stability"), 50),
                     "team_development": _safe_int(team_snapshot.get("team_development"), 50),
                     "team_financial_strength": _safe_int(team_snapshot.get("team_financial_strength"), 50),
+                    "team_capital": _safe_int(team_snapshot.get("team_capital"), 50),
+                    "sponsor_backing": _safe_int(team_snapshot.get("sponsor_backing"), 50),
+                    "team_capital_band": _team_capital_band(team_snapshot.get("team_capital", 50)),
+                    "sponsor_backing_band": _team_sponsor_backing_band(team_snapshot.get("sponsor_backing", 50)),
+                    "seat_acquisition_cost": expansion_cost,
                     "team_pressure": _safe_int(team_snapshot.get("team_pressure"), 50),
                     "team_philosophy": str(team_snapshot.get("team_philosophy", "Balanced")),
                     "trajectory": str(team_snapshot.get("trajectory", "stable")),
@@ -4341,7 +4624,30 @@ def run_offseason_team_seat_market(
                 continue
 
             event_type = "sold" if _safe_int(buyer.get("team_reputation"), 50) >= _safe_int(seat["team_prestige"], 50) else "lost"
-            old_reason = "Seat sold after weak recent performance" if event_type == "sold" else "Seat lost after weak recent performance"
+            acquisition_cost = _safe_int(
+                buyer.get("seat_acquisition_cost"),
+                _seat_acquisition_capital_cost(championship, championship_counts, str(buyer.get("team_key", ""))),
+            )
+            buyer_capital_after = _adjust_team_capital(
+                connection,
+                str(buyer["team_key"]),
+                -acquisition_cost,
+                now=now,
+                snapshot_cache=team_snapshot_cache,
+            )
+            seller_capital_delta = max(2, round(acquisition_cost * (0.45 if event_type == "sold" else 0.2)))
+            _adjust_team_capital(
+                connection,
+                old_team_key,
+                seller_capital_delta,
+                now=now,
+                snapshot_cache=team_snapshot_cache,
+            )
+            old_reason = (
+                f"Seat sold after weak recent performance and capital reset (+{seller_capital_delta})"
+                if event_type == "sold"
+                else f"Seat lost after weak recent performance; recovery capital added (+{seller_capital_delta})"
+            )
             _record_team_seat_history(
                 connection,
                 team_key=old_team_key,
@@ -4371,7 +4677,10 @@ def run_offseason_team_seat_market(
                 team_seat=team_seat,
                 event_type="acquired",
                 season_year=season_year,
-                reason=f"Acquired seat from {old_team_name}",
+                reason=(
+                    f"Acquired seat from {old_team_name} for {acquisition_cost} capital"
+                    + (f"; resources now {buyer_capital_after}" if buyer_capital_after is not None else "")
+                ),
                 now=now,
             )
             connection.execute(
@@ -4934,6 +5243,51 @@ def _team_seat_offers_for_championship(
     return selected_offers
 
 
+def _driver_team_market_score(
+    driver: dict[str, Any],
+    team_snapshot: dict[str, Any] | None,
+    seat_quality: int,
+) -> int:
+    score = _safe_int(driver.get("mmr"), BASELINE_MMR)
+    career_starts = _safe_int(driver.get("career_starts"), 0)
+    seasons_completed = _safe_int(driver.get("seasons_completed"), 0)
+    wins = _safe_int(driver.get("wins"), 0)
+    podiums = _safe_int(driver.get("podiums"), 0)
+    team_snapshot = dict(team_snapshot or {})
+    philosophy = str(team_snapshot.get("team_philosophy", "Balanced")).strip().casefold()
+    pressure = _safe_int(team_snapshot.get("team_pressure"), 50)
+    current_strength = _safe_int(team_snapshot.get("current_strength"), _safe_int(team_snapshot.get("reputation"), 50))
+
+    if career_starts <= 0:
+        rookie_penalty = 12
+        if philosophy == "win now":
+            rookie_penalty += 18
+        elif philosophy == "technical excellence":
+            rookie_penalty += 10
+        elif philosophy == "driver continuity":
+            rookie_penalty += 8
+        elif philosophy == "rookie pipeline":
+            rookie_penalty -= 10
+        elif philosophy == "underdog grit":
+            rookie_penalty -= 4
+        if seat_quality >= 75:
+            rookie_penalty += 8
+        if pressure >= 65:
+            rookie_penalty += 6
+        if current_strength >= 60:
+            rookie_penalty += 5
+        return score - max(4, rookie_penalty)
+
+    experience_bonus = min(18, (career_starts // 4) + (seasons_completed * 2) + (wins * 3) + podiums)
+    if philosophy == "win now":
+        experience_bonus += min(8, career_starts // 6 + wins * 2)
+    elif philosophy == "driver continuity":
+        experience_bonus += min(6, seasons_completed * 2)
+    elif philosophy == "rookie pipeline":
+        experience_bonus = max(0, experience_bonus - 4)
+    return score + experience_bonus
+
+
 def assign_teams_to_standings(
     standings: list[dict[str, Any]],
     championship: dict[str, Any],
@@ -4958,14 +5312,8 @@ def assign_teams_to_standings(
 
     remaining_indices = list(missing_indices)
     remaining_seats = [dict(seat) for seat in seat_plan]
-    ordered_remaining_indices = sorted(
-        remaining_indices,
-        key=lambda index: (
-            -_safe_int(standings[index].get("mmr"), BASELINE_MMR),
-            str(standings[index].get("name", "")),
-        ),
-    )
     seat_quality_by_identity: dict[tuple[str, int], int] = {}
+    team_snapshot_by_identity: dict[tuple[str, int], dict[str, Any]] = {}
     if save_name:
         try:
             with _connect(save_name) as connection:
@@ -4992,7 +5340,8 @@ def assign_teams_to_standings(
                         team_key=team_key,
                         snapshot_cache=snapshot_cache,
                     )
-                    seat_quality_by_identity[(team_key or team_id or team_name, _safe_int(seat.get("team_seat"), 1))] = _team_seat_quality_score(
+                    identity = (team_key or team_id or team_name, _safe_int(seat.get("team_seat"), 1))
+                    seat_quality_by_identity[identity] = _team_seat_quality_score(
                         team_snapshot,
                         team_prestige=team_prestige,
                         team_reputation=_safe_int(team_snapshot.get("current_strength"), team_prestige),
@@ -5000,8 +5349,10 @@ def assign_teams_to_standings(
                         team_seat=_safe_int(seat.get("team_seat"), 1),
                         team_size=seat_team_size,
                     )
+                    team_snapshot_by_identity[identity] = team_snapshot
         except Exception:
             seat_quality_by_identity = {}
+            team_snapshot_by_identity = {}
     ordered_remaining_seats = sorted(
         remaining_seats,
         key=lambda seat: (
@@ -5020,7 +5371,26 @@ def assign_teams_to_standings(
         ),
     )
 
-    for index, seat in zip(ordered_remaining_indices, ordered_remaining_seats):
+    for seat in ordered_remaining_seats:
+        if not remaining_indices:
+            break
+        identity = (
+            str(seat.get("team_key", "")).strip()
+            or str(seat.get("team_id", "")).strip()
+            or str(seat.get("team_name", "")).strip(),
+            _safe_int(seat.get("team_seat"), 1),
+        )
+        seat_quality = seat_quality_by_identity.get(identity, _safe_int(seat.get("team_prestige"), 50))
+        team_snapshot = team_snapshot_by_identity.get(identity, {})
+        index = max(
+            remaining_indices,
+            key=lambda candidate_index: (
+                _driver_team_market_score(standings[candidate_index], team_snapshot, seat_quality),
+                _safe_int(standings[candidate_index].get("mmr"), BASELINE_MMR),
+                str(standings[candidate_index].get("name", "")),
+            ),
+        )
+        remaining_indices.remove(index)
         standings[index]["team_id"] = seat["team_id"]
         standings[index]["team_key"] = seat["team_key"]
         standings[index]["team_name"] = seat["team_name"]
@@ -5251,6 +5621,10 @@ def team_offers_for_player(
                     "team_stability": _safe_int(team_snapshot.get("team_stability"), 50),
                     "team_development": _safe_int(team_snapshot.get("team_development"), 50),
                     "team_financial_strength": _safe_int(team_snapshot.get("team_financial_strength"), 50),
+                    "team_capital": team_capital,
+                    "sponsor_backing": sponsor_backing,
+                    "team_capital_band": _team_capital_band(team_capital),
+                    "sponsor_backing_band": _team_sponsor_backing_band(sponsor_backing),
                     "team_pressure": _safe_int(team_snapshot.get("team_pressure"), 50),
                     "team_philosophy": str(team_snapshot.get("team_philosophy", "Balanced")),
                     "trajectory": str(team_snapshot.get("trajectory", "stable")),
@@ -5371,6 +5745,10 @@ def current_team_offer_for_championship(
         "team_stability": _safe_int(team_snapshot.get("team_stability"), 50),
         "team_development": _safe_int(team_snapshot.get("team_development"), 50),
         "team_financial_strength": _safe_int(team_snapshot.get("team_financial_strength"), 50),
+        "team_capital": _safe_int(team_snapshot.get("team_capital"), 50),
+        "sponsor_backing": _safe_int(team_snapshot.get("sponsor_backing"), 50),
+        "team_capital_band": _team_capital_band(team_snapshot.get("team_capital", 50)),
+        "sponsor_backing_band": _team_sponsor_backing_band(team_snapshot.get("sponsor_backing", 50)),
         "team_pressure": _safe_int(team_snapshot.get("team_pressure"), 50),
         "team_philosophy": str(team_snapshot.get("team_philosophy", "Balanced")),
         "trajectory": str(team_snapshot.get("trajectory", "stable")),
@@ -5746,6 +6124,8 @@ def list_teams_page(
                 team_stability,
                 team_development,
                 team_financial_strength,
+                team_capital,
+                sponsor_backing,
                 team_pressure,
                 team_philosophy,
                 trajectory,
@@ -5789,8 +6169,44 @@ def list_teams_page(
                 selected_rows[group_key] = item
 
     teams = list(selected_rows.values())
+    team_keys = [str(team.get("team_key", "")).strip() for team in teams if str(team.get("team_key", "")).strip()]
+    latest_moves_by_key: dict[str, dict[str, Any]] = {}
+    if team_keys:
+        placeholders = ",".join("?" for _ in team_keys)
+        with _connect(save_name) as connection:
+            history_rows = connection.execute(
+                f"""
+                SELECT team_key, season_year, championship_name, previous_strength, new_strength, delta
+                FROM (
+                    SELECT
+                        team_key,
+                        season_year,
+                        championship_name,
+                        previous_strength,
+                        new_strength,
+                        delta,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY team_key
+                            ORDER BY season_year DESC, created_at DESC
+                        ) AS move_rank
+                    FROM team_reputation_history
+                    WHERE team_key IN ({placeholders})
+                )
+                WHERE move_rank = 1
+                """,
+                team_keys,
+            ).fetchall()
+        for row in history_rows:
+            team_key = str(row["team_key"] or "").strip()
+            if team_key and team_key not in latest_moves_by_key:
+                latest_moves_by_key[team_key] = dict(row)
     for team in teams:
         team["game"] = _team_display_game(team.get("game", ""), target_game)
+        _add_team_resource_bands(team)
+        latest_move = latest_moves_by_key.get(str(team.get("team_key", "")).strip(), {})
+        team["latest_strength_delta"] = _safe_int(latest_move.get("delta"), 0)
+        team["latest_strength_year"] = _safe_int(latest_move.get("season_year"), 0)
+        team["latest_strength_championship"] = str(latest_move.get("championship_name", "")).strip()
     if cleaned_search:
         search_value = cleaned_search.casefold()
         teams = [
@@ -5850,6 +6266,8 @@ def get_team_profile(save_name: str, team_key: str) -> dict[str, Any] | None:
                 team_stability,
                 team_development,
                 team_financial_strength,
+                team_capital,
+                sponsor_backing,
                 team_pressure,
                 team_philosophy,
                 trajectory,
@@ -5946,9 +6364,22 @@ def get_team_profile(save_name: str, team_key: str) -> dict[str, Any] | None:
             """,
             (cleaned_key,),
         ).fetchall()
+        reputation_history_rows = connection.execute(
+            f"""
+            SELECT
+                season_year,
+                {TEAM_REPUTATION_MOVE_COLUMNS}
+            FROM team_reputation_history
+            WHERE team_key = ?
+            ORDER BY season_year DESC, created_at DESC
+            LIMIT 30
+            """,
+            (cleaned_key,),
+        ).fetchall()
 
     team = dict(team_row)
     team["game"] = _team_display_game(team.get("game", ""), target_game)
+    _add_team_resource_bands(team)
     team["team_colors"] = _team_colors_for_identity(
         str(team.get("team_id", "")),
         str(team.get("team_name", "")),
@@ -5957,6 +6388,7 @@ def get_team_profile(save_name: str, team_key: str) -> dict[str, Any] | None:
     return {
         "team": team,
         "season_history": [dict(row) for row in season_rows],
+        "reputation_history": [dict(row) for row in reputation_history_rows],
         "driver_decisions": [dict(row) for row in decision_rows],
         "ownership_history": [dict(row) for row in ownership_rows],
     }
@@ -6014,6 +6446,10 @@ def rename_team(save_name: str, team_key: str, new_name: str) -> tuple[bool, str
         )
         connection.execute(
             "UPDATE team_season_results SET team_name = ? WHERE team_key = ?",
+            (cleaned_new_name, cleaned_team_key),
+        )
+        connection.execute(
+            "UPDATE team_reputation_history SET team_name = ? WHERE team_key = ?",
             (cleaned_new_name, cleaned_team_key),
         )
         connection.execute(
@@ -6084,6 +6520,57 @@ def recent_team_seat_storylines(save_name: str, season_year: int, limit: int = 8
             (int(season_year), max(1, int(limit))),
         ).fetchall()
     return [dict(row) for row in rows]
+
+
+def recent_team_reputation_moves(
+    save_name: str,
+    season_year: int,
+    *,
+    direction: str = "rise",
+    limit: int = 5,
+) -> list[dict[str, Any]]:
+    initialize_driver_pool(save_name)
+    normalized_direction = str(direction).strip().casefold()
+    order_clause = "delta DESC, new_strength DESC, team_name ASC"
+    comparison_clause = "delta > 0"
+    if normalized_direction in {"fall", "drop", "falling"}:
+        order_clause = "delta ASC, new_strength ASC, team_name ASC"
+        comparison_clause = "delta < 0"
+    with _connect(save_name) as connection:
+        rows = connection.execute(
+            f"""
+            SELECT
+                {TEAM_REPUTATION_MOVE_COLUMNS}
+            FROM team_reputation_history
+            WHERE season_year = ?
+              AND {comparison_clause}
+            ORDER BY {order_clause}
+            LIMIT ?
+            """,
+            (int(season_year), max(1, int(limit))),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def latest_team_reputation_move_for_year(save_name: str, team_key: str, season_year: int) -> dict[str, Any] | None:
+    initialize_driver_pool(save_name)
+    cleaned_key = str(team_key).strip()
+    if not cleaned_key or int(season_year) <= 0:
+        return None
+    with _connect(save_name) as connection:
+        row = connection.execute(
+            f"""
+            SELECT
+                {TEAM_REPUTATION_MOVE_COLUMNS}
+            FROM team_reputation_history
+            WHERE team_key = ?
+              AND season_year = ?
+            ORDER BY created_at DESC
+            LIMIT 1
+            """,
+            (cleaned_key, int(season_year)),
+        ).fetchone()
+    return dict(row) if row else None
 
 
 def championship_storyline_drivers(

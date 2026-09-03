@@ -153,6 +153,18 @@ def default_profile_id() -> str:
     return str(_load_payload()["default_profile_id"])
 
 
+def set_default_profile(profile_id: str) -> tuple[bool, str]:
+    target = str(profile_id).strip()
+    payload = _load_payload()
+    if target not in {profile["id"] for profile in payload["profiles"]}:
+        return False, "Profile not found."
+    if target == payload["default_profile_id"]:
+        return True, "Profile is already the default."
+    payload["default_profile_id"] = target
+    _write_profiles(payload["profiles"], target)
+    return True, "Default profile updated."
+
+
 def get_player_profile(profile_id: str) -> dict[str, Any] | None:
     target = str(profile_id).strip()
     return next((profile for profile in list_player_profiles() if profile["id"] == target), None)

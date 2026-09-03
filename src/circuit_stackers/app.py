@@ -7,6 +7,7 @@ import customtkinter as ctk
 
 from .screens.championship_screen import ChampionshipScreen
 from .screens.custom_championship_manage_screen import CustomChampionshipManageScreen
+from .screens.career_path_editor_screen import CareerPathEditorScreen
 from .screens.custom_championship_screen import CustomChampionshipScreen
 from .screens.driver_pool_screen import DriverPoolScreen
 from .screens.driver_detail_screen import DriverDetailScreen
@@ -48,6 +49,7 @@ MENU_MUSIC_PATH = resource_path("assets", "Circuit Stacker Splash Screen Loop.mp
 SETTINGS_CHILD_SCREENS = {
     "CustomChampionshipScreen",
     "CustomChampionshipManageScreen",
+    "CareerPathEditorScreen",
     "OwnershipScreen",
     "PlayerProfilesScreen",
 }
@@ -233,6 +235,7 @@ class App(ctk.CTk):
             ChampionshipScreen,
             CustomChampionshipScreen,
             CustomChampionshipManageScreen,
+            CareerPathEditorScreen,
             GameplayScreen,
             DriverPoolScreen,
             DriverDetailScreen,
@@ -401,6 +404,13 @@ class App(ctk.CTk):
     def _mark_window_change_complete(self) -> None:
         self._window_changing = False
         self._window_change_after_id = None
+        # Windows/DWM can occasionally leave a Tk window visually translucent
+        # after a move or resize. The main application window should always be
+        # opaque; restore that state once the Configure-event burst settles.
+        try:
+            self.attributes("-alpha", 1.0)
+        except Exception:
+            pass
 
     def toggle_mode(self) -> None:
         mode = ctk.get_appearance_mode()

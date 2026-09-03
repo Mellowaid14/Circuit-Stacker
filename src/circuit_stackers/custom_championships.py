@@ -5,6 +5,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from .paths import resource_path, user_data_dir
+from .career_paths import DEFAULT_CAREER_PATH_ID, load_career_path
 
 
 CHAMPIONSHIP_FIELDNAMES = [
@@ -12,6 +13,7 @@ CHAMPIONSHIP_FIELDNAMES = [
     "Tier",
     "Championship",
     "Sub_Champ",
+    "Class_Name",
     "Championship_ID",
     "Car_Class",
     "Car_ID",
@@ -23,6 +25,7 @@ CHAMPIONSHIP_FIELDNAMES = [
     "Min_Opp",
     "Start_Type",
     "Prestige",
+    "Track_Selection",
 ]
 
 CUSTOM_CHAMPIONSHIPS_CSV = user_data_dir() / "custom_championships.csv"
@@ -43,8 +46,16 @@ def custom_championship_rows(game: str | None = None) -> list[dict[str, str]]:
     return _filter_rows_for_game(_read_csv(CUSTOM_CHAMPIONSHIPS_CSV), game)
 
 
-def championship_rows(game: str | None = None) -> list[dict[str, str]]:
-    return built_in_championship_rows(game) + custom_championship_rows(game)
+def championship_rows(game: str | None = None, career_path_id: str | None = None) -> list[dict[str, str]]:
+    rows = built_in_championship_rows(game) + custom_championship_rows(game)
+    if not career_path_id or career_path_id == DEFAULT_CAREER_PATH_ID:
+        return rows
+    selected_ids = {
+        str(value).strip()
+        for value in load_career_path(career_path_id, game).get("championship_ids", [])
+        if str(value).strip()
+    }
+    return [row for row in rows if str(row.get("Championship_ID", "") or row.get("id", "")).strip() in selected_ids]
 
 
 def infer_tier_for_car(car: dict[str, str], game: str | None = None) -> str:

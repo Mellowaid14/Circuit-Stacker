@@ -20,10 +20,10 @@ from ..driver_pool import (
     team_reputation_map,
     team_offers_for_player,
 )
-from ..game_logic import get_eligible_player_cars
+from ..game_logic import get_eligible_player_cars, hydrate_active_rivals_state
 from ..paths import resource_path
 from ..roster_exporter import team_color_set
-from ..save_manager import load_save
+from ..save_manager import load_save, update_save
 
 
 STYLE_ORDER = ["Sports Car", "Open Wheel", "Oval", "Rallycross"]
@@ -95,11 +95,18 @@ def _merge_player_championship_rows(rows: list[dict[str, str]], all_rows: list[d
         ] or [_public_championship_row(display_row)]
         player_entry_rows = [_public_championship_row(candidate) for candidate in group_rows]
         if len(player_entry_rows) > 1:
-            display_row["Sub_Champ"] = " / ".join(
-                str(candidate.get("Sub_Champ", "")).strip()
-                for candidate in player_entry_rows
-                if str(candidate.get("Sub_Champ", "")).strip()
-            )
+            # A multiclass/custom championship has one row per car. Show each
+            # distinct class once instead of repeating the class for every car.
+            class_labels: list[str] = []
+            seen_class_labels: set[str] = set()
+            for candidate in player_entry_rows:
+                class_label = str(candidate.get("Sub_Champ", "")).strip()
+                normalized_label = class_label.casefold()
+                if class_label and normalized_label not in seen_class_labels:
+                    seen_class_labels.add(normalized_label)
+                    class_labels.append(class_label)
+            if class_labels:
+                display_row["Sub_Champ"] = " / ".join(class_labels)
         display_row["_entry_rows"] = full_group_rows
         display_row["_player_entry_rows"] = player_entry_rows
         merged_rows.append(display_row)
@@ -144,9 +151,11 @@ def load_championships(
     championships = []
     style_prestige_limits: dict[str, int] = {}
     saved_style_limits: dict[str, int] = {}
+    fresh_rookies = False
     if save_name and player_names:
         save_data = load_save(save_name) or {}
-        ignore_saved_limits = players_are_fresh_rookies(save_name, player_names)
+        fresh_rookies = players_are_fresh_rookies(save_name, player_names)
+        ignore_saved_limits = fresh_rookies
         raw_limits = {} if ignore_saved_limits else save_data.get("offseason_player_style_limits")
         if isinstance(raw_limits, dict):
             for raw_style, raw_limit in raw_limits.items():
@@ -154,7 +163,17 @@ def load_championships(
                     saved_style_limits[_display_style(str(raw_style))] = int(raw_limit)
                 except (TypeError, ValueError):
                     continue
-    rows = championship_rows(game)
+    career_path_id = str((save_data if "save_data" in locals() else {}).get("career_path_id", "default"))
+    rows = championship_rows(game, career_path_id)
+    minimum_prestige_by_group: dict[str, int] = {}
+    for row in rows:
+        group_key = _championship_group_key(row)
+        row_prestige = int(row.get("Prestige", 0) or 0)
+        if group_key:
+            minimum_prestige_by_group[group_key] = min(
+                minimum_prestige_by_group.get(group_key, row_prestige),
+                row_prestige,
+            )
     if save_name and player_names and not saved_style_limits:
         saved_style_limits = _style_limits_from_reserved_world(
             rows,
@@ -165,6 +184,12 @@ def load_championships(
         row["_player_entry_rows"] = _player_entry_rows_from_loaded_rows(row, rows)
         row_prestige = int(row.get("Prestige", 0) or 0)
         style_name = _display_style(str(row.get("Style", "")).strip())
+        if (
+            fresh_rookies
+            and row_prestige > minimum_prestige_by_group.get(_championship_group_key(row), row_prestige)
+            and row_prestige != 1
+        ):
+            continue
         if save_name and player_names:
             if style_name not in style_prestige_limits:
                 calculated_limit = player_entry_prestige_for_style(
@@ -230,6 +255,8 @@ class ChampionshipScreen(ctk.CTkFrame):
         self.starting_difficulty = 75
         self.save_game = "iRacing"
         self.current_team_offer: dict | None = None
+        self.rivals_driver_var = ctk.StringVar(value="")
+        self.rivals_driver_selector: ctk.CTkOptionMenu | None = None
         self.current_championship_prestige = 0
         self.season_summary_message = ""
         self.season_summary_color = "gray"
@@ -268,6 +295,15 @@ class ChampionshipScreen(ctk.CTkFrame):
         self.tier_label.pack(anchor="e")
         self.mmr_label = ctk.CTkLabel(summary_stack, text="", font=ctk.CTkFont(size=11), text_color=MUTED, anchor="e")
         self.mmr_label.pack(anchor="e", pady=(4, 0))
+        self.rivals_driver_selector = ctk.CTkOptionMenu(
+            summary_stack,
+            values=[],
+            variable=self.rivals_driver_var,
+            command=self._select_rivals_driver,
+            width=180,
+            height=30,
+            font=ctk.CTkFont(size=11, weight="bold"),
+        )
 
         self.list_frame = ctk.CTkScrollableFrame(self, width=1120, height=550, fg_color=("gray90", "gray14"))
         self.list_frame.pack(fill="both", expand=True, padx=18, pady=(0, 8))
@@ -310,7 +346,9 @@ class ChampionshipScreen(ctk.CTkFrame):
         self.selected = None
         self.start_btn.configure(state="disabled", text="Start Championship")
         if self.save_name:
-            save_data = load_save(self.save_name) or {}
+            save_data = hydrate_active_rivals_state(load_save(self.save_name) or {})
+            all_players = save_data.get("all_players") or save_data.get("players", self.player_names)
+            career_mode = str(save_data.get("career_mode", "")).strip()
             self.player_names = save_data.get("players", self.player_names)
             self.current_tier = self._normalize_unlocked_tier(
                 save_data.get("unlocked_tier", save_data.get("unlocked_tiers")),
@@ -321,6 +359,13 @@ class ChampionshipScreen(ctk.CTkFrame):
             self.current_team_offer = save_data.get("player_team_offer") if isinstance(save_data.get("player_team_offer"), dict) else None
             current_championship = save_data.get("championship") if isinstance(save_data.get("championship"), dict) else {}
             self.current_championship_prestige = int(current_championship.get("Prestige", 0) or 0)
+            if career_mode == "Rivals" and len(all_players) > 1 and self.rivals_driver_selector is not None:
+                self.rivals_driver_selector.configure(values=all_players)
+                self.rivals_driver_var.set(str(save_data.get("active_player_name", self.player_names[0] if self.player_names else "")))
+                if not self.rivals_driver_selector.winfo_ismapped():
+                    self.rivals_driver_selector.pack(anchor="e", pady=(8, 0))
+            elif self.rivals_driver_selector is not None and self.rivals_driver_selector.winfo_ismapped():
+                self.rivals_driver_selector.pack_forget()
         if self.save_name:
             self.subtitle.configure(
                 text=f"Save: {self.save_name} | Game: {self.save_game} | Drivers: {', '.join(self.player_names) or self.save_name}"
@@ -330,9 +375,28 @@ class ChampionshipScreen(ctk.CTkFrame):
         self.mmr_label.configure(text=self._effective_mmr_summary_text())
         cache_key = self._current_offer_cache_key()
         rebuild = cache_key != self.offer_rows_cache_key
+        if self.save_name and players_are_fresh_rookies(self.save_name, self.player_names):
+            rebuild = True
         if str(self.save_game).strip().casefold() == "iracing" and self.offer_rows:
             rebuild = rebuild or any(not str(offer.get("_offer_team_colors", "")).strip() for offer in self.offer_rows)
         self.refresh_list(rebuild=rebuild)
+
+    def _select_rivals_driver(self, player_name: str) -> None:
+        if not self.save_name:
+            return
+        cleaned = str(player_name).strip()
+        if not cleaned:
+            return
+        update_save(self.save_name, {"active_player_name": cleaned})
+        save_data = hydrate_active_rivals_state(load_save(self.save_name) or {})
+        if save_data.get("championship"):
+            gameplay = self.parent.screens["GameplayScreen"]
+            gameplay.load_state(save_data)
+            self.show_screen("GameplayScreen")
+            return
+        self.offer_rows = []
+        self.offer_rows_cache_key = None
+        self.on_show()
 
     def _fit_cell_text(self, value: str, max_chars: int) -> str:
         text = str(value)
@@ -656,6 +720,8 @@ class ChampionshipScreen(ctk.CTkFrame):
                 font=ctk.CTkFont(size=11),
                 text_color=MUTED,
                 anchor="w",
+                justify="left",
+                wraplength=760,
             ).pack(anchor="w", pady=(2, 0))
 
             count_stack = ctk.CTkFrame(card, fg_color="transparent")
@@ -1075,9 +1141,10 @@ class ChampionshipScreen(ctk.CTkFrame):
     def _effective_mmr_summary_text(self) -> str:
         if not self.save_name or not self.player_names:
             return "Effective MMR: -"
+        style_order = self._active_style_order()
         parts = [
             f"{style}: {self._effective_mmr_for_style(style)}"
-            for style in STYLE_ORDER
+            for style in style_order
         ]
         return "Effective MMR: " + " | ".join(parts)
 
@@ -1185,7 +1252,7 @@ class ChampionshipScreen(ctk.CTkFrame):
         return f"{philosophy} philosophy, {trajectory.lower()} trajectory, and {pressure_band} team pressure shape this offer."
 
     def _current_offer_cache_key(self) -> tuple:
-        mmr_values = tuple((style, self._effective_mmr_for_style(style)) for style in STYLE_ORDER)
+        mmr_values = tuple((style, self._effective_mmr_for_style(style)) for style in self._active_style_order())
         world_year = get_world_year(self.save_name) if self.save_name else 0
         current_team_key = ""
         if isinstance(self.current_team_offer, dict):
@@ -1214,6 +1281,22 @@ class ChampionshipScreen(ctk.CTkFrame):
                 style,
             ),
         )
+
+    def _active_style_order(self) -> list[str]:
+        if self.offer_rows:
+            styles = {str(row.get("_offer_style", "")).strip() for row in self.offer_rows if str(row.get("_offer_style", "")).strip()}
+            if styles:
+                return self._sorted_styles(styles)
+        save_data = load_save(self.save_name) if self.save_name else {}
+        career_path_id = str((save_data or {}).get("career_path_id", "default"))
+        styles = {
+            _display_style(str(row.get("Style", "")).strip())
+            for row in championship_rows(self.save_game, career_path_id)
+            if str(row.get("Style", "")).strip()
+        }
+        if styles:
+            return self._sorted_styles(styles)
+        return list(STYLE_ORDER)
 
     @staticmethod
     def _normalize_unlocked_tier(value, fallback: int = 1) -> int:

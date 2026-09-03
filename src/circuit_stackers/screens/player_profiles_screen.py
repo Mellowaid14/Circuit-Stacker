@@ -16,6 +16,7 @@ from ..player_profiles import (
     list_player_profiles,
     profile_owned_assets,
     rename_player_profile,
+    set_default_profile,
 )
 
 
@@ -74,6 +75,15 @@ class PlayerProfilesScreen(ctk.CTkFrame):
         profile_actions.pack(anchor="w", padx=20, pady=(14, 0))
         self.rename_btn = ctk.CTkButton(profile_actions, text="Rename", command=self._rename_profile, width=110, fg_color="gray30", hover_color="gray40")
         self.rename_btn.pack(side="left")
+        self.default_btn = ctk.CTkButton(
+            profile_actions,
+            text="Make Default",
+            command=self._make_default,
+            width=125,
+            fg_color="gray30",
+            hover_color="gray40",
+        )
+        self.default_btn.pack(side="left", padx=(10, 0))
         self.delete_btn = ctk.CTkButton(profile_actions, text="Delete", command=self._delete_profile, width=110, fg_color="#9f2f2f", hover_color="#7d2525")
         self.delete_btn.pack(side="left", padx=(10, 0))
         self.export_btn = ctk.CTkButton(
@@ -131,7 +141,7 @@ class PlayerProfilesScreen(ctk.CTkFrame):
     def _show_selected(self) -> None:
         profile = next((item for item in list_player_profiles() if item["id"] == self.selected_profile_id), None)
         enabled = "normal" if profile else "disabled"
-        for button in (self.iracing_btn, self.ams2_btn, self.rename_btn, self.delete_btn, self.export_btn):
+        for button in (self.iracing_btn, self.ams2_btn, self.rename_btn, self.default_btn, self.delete_btn, self.export_btn):
             button.configure(state=enabled)
         if not profile:
             self.name_label.configure(text="Select a profile")
@@ -147,6 +157,10 @@ class PlayerProfilesScreen(ctk.CTkFrame):
             )
         )
         self.delete_btn.configure(state="disabled" if profile["id"] == default_profile_id() else "normal")
+        self.default_btn.configure(
+            state="disabled" if profile["id"] == default_profile_id() else "normal",
+            text="Default Profile" if profile["id"] == default_profile_id() else "Make Default",
+        )
 
     def _prompt_name(self, title: str, text: str) -> str:
         dialog = ctk.CTkInputDialog(title=title, text=text)
@@ -175,6 +189,13 @@ class PlayerProfilesScreen(ctk.CTkFrame):
         self.status_label.configure(text=message, text_color="#43b86b" if success else "#ff5c5c")
         if success:
             self.selected_profile_id = default_profile_id()
+        self._refresh(self.selected_profile_id)
+
+    def _make_default(self) -> None:
+        if not self.selected_profile_id:
+            return
+        success, message = set_default_profile(self.selected_profile_id)
+        self.status_label.configure(text=message, text_color="#43b86b" if success else "#ff5c5c")
         self._refresh(self.selected_profile_id)
 
     def _export_profile(self) -> None:

@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from tkinter import filedialog
 import webbrowser
+import threading
 
 import customtkinter as ctk
 
@@ -14,9 +15,13 @@ from ..settings_manager import (
     update_custom_overlay_enabled,
     update_iracing_directory,
 )
-from ..player_profiles import default_profile_id
+from ..player_profiles import default_profile_id, get_player_profile
 from ..update_checker import update_check_configured
 from ..version import APP_VERSION
+from ..ams2_catalog import update_metadata_files
+from ..ams2_tracks_catalog import update_track_metadata
+from ..ams2_content_scanner import discover_roots
+from ..paths import user_data_dir
 
 
 class OverlayLayoutEditor(ctk.CTkToplevel):
@@ -162,6 +167,16 @@ class SettingsScreen(ctk.CTkFrame):
             save_command=lambda: self.save_path(self.ams2_path_entry, "AMS2"),
             ownership_command=lambda: self.open_ownership("AMS2"),
         )
+        ctk.CTkButton(
+            ams2_box,
+            text="Refresh AMS2 Metadata",
+            command=self.refresh_ams2_metadata,
+            height=34,
+            width=230,
+            font=ctk.CTkFont(size=12),
+            fg_color="gray30",
+            hover_color="gray40",
+        ).pack(pady=(0, 18))
         self.ams2_warning_label = self._build_path_warning(ams2_box)
         self.ams2_path_entry.bind("<KeyRelease>", lambda _event: self.validate_path_entry("AMS2"))
 
@@ -178,14 +193,18 @@ class SettingsScreen(ctk.CTkFrame):
             font=ctk.CTkFont(size=11),
             text_color="gray",
         ).pack(anchor="w", padx=18, pady=(0, 10))
+        profile_actions = ctk.CTkFrame(profiles_box, fg_color="transparent")
+        profile_actions.pack(anchor="w", padx=18, pady=(0, 16))
         ctk.CTkButton(
-            profiles_box,
+            profile_actions,
             text="Manage Player Profiles",
             command=lambda: self.show_screen("PlayerProfilesScreen"),
             height=34,
             width=210,
             font=ctk.CTkFont(size=12, weight="bold"),
-        ).pack(anchor="w", padx=18, pady=(0, 16))
+        ).pack(side="left")
+        self.default_profile_label = ctk.CTkLabel(profile_actions, text="", text_color="gray", font=ctk.CTkFont(size=11))
+        self.default_profile_label.pack(side="left", padx=(12, 0))
 
         custom_box = ctk.CTkFrame(body, fg_color=("gray90", "gray15"), corner_radius=12)
         custom_box.pack(fill="x", padx=120, pady=(0, 16))
@@ -204,18 +223,18 @@ class SettingsScreen(ctk.CTkFrame):
         custom_actions.pack(anchor="w", padx=18, pady=(0, 16))
         ctk.CTkButton(
             custom_actions,
-            text="Custom Championship Builder",
-            command=lambda: self.show_screen("CustomChampionshipScreen"),
+            text="Manage Championships",
+            command=lambda: self.show_screen("CustomChampionshipManageScreen"),
             height=34,
             width=210,
             font=ctk.CTkFont(size=12, weight="bold"),
         ).pack(side="left")
         ctk.CTkButton(
             custom_actions,
-            text="Manage Championships",
-            command=lambda: self.show_screen("CustomChampionshipManageScreen"),
+            text="Edit Career Paths",
+            command=lambda: self.show_screen("CareerPathEditorScreen"),
             height=34,
-            width=190,
+            width=160,
             fg_color="gray30",
             hover_color="gray40",
             font=ctk.CTkFont(size=12, weight="bold"),
@@ -436,6 +455,9 @@ class SettingsScreen(ctk.CTkFrame):
         self.overlay_geometry_label.configure(
             text=f"AMS2 leaderboard: {settings.get('ams2_leaderboard_overlay_geometry', '520x520+80+80')}"
         )
+        default_profile = get_player_profile(default_profile_id())
+        default_name = str((default_profile or {}).get("name", "Default Player")).strip() or "Default Player"
+        self.default_profile_label.configure(text=f"Default: {default_name}")
         self.validate_path_entry("iRacing")
         self.validate_path_entry("AMS2")
         self.status_label.configure(text="")
@@ -447,6 +469,29 @@ class SettingsScreen(ctk.CTkFrame):
         else:
             update_iracing_directory(entry.get())
         self.status_label.configure(text=f"{game} folder saved." if not warning else f"{game} folder saved with warning.")
+
+    def refresh_ams2_metadata(self) -> None:
+        self.status_label.configure(text="Refreshing AMS2 car and track metadata...")
+
+        def worker() -> None:
+            try:
+                roots = discover_roots(self.ams2_path_entry.get())
+                _report_path, _metadata_path, source, failed_count = update_metadata_files(
+                    roots.install, user_data_dir() / "ams2_metadata"
+                )
+                _track_report, track_source, track_failed = update_track_metadata(
+                    user_data_dir() / "ams2_metadata", roots.install
+                )
+                total_failed = failed_count + track_failed
+                message = f"AMS2 metadata refreshed (cars: {source}, tracks: {track_source}). {total_failed} source failures."
+                if total_failed:
+                    message += " Review the catalog report."
+                self.after(0, lambda: self.status_label.configure(text=message))
+            except Exception as error:
+                message = f"AMS2 metadata refresh failed: {error}"
+                self.after(0, lambda: self.status_label.configure(text=message))
+
+        threading.Thread(target=worker, daemon=True).start()
 
     def browse_for_path(self, entry: ctk.CTkEntry, game: str) -> None:
         selected_path = filedialog.askdirectory(initialdir=entry.get() or None)

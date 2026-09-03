@@ -38,6 +38,8 @@ class ScheduleScreen(ctk.CTkFrame):
         self.gameplay_screen = gameplay_screen
 
     def on_show(self) -> None:
+        if self.gameplay_screen is not None and hasattr(self.gameplay_screen, "reload_active_rivals_state"):
+            self.gameplay_screen.reload_active_rivals_state()
         for widget in self.table_frame.winfo_children():
             widget.destroy()
 

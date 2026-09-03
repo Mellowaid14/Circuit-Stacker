@@ -9,9 +9,17 @@ from uuid import uuid4
 from PIL import Image, ImageOps
 
 from ..driver_pool import get_world_year, list_drivers, team_reputation_map
-from ..game_logic import build_world_news_items, continue_or_initialize_season, finalize_season, reexport_championship_assets
+from ..game_logic import (
+    build_world_news_items,
+    continue_or_initialize_season,
+    finalize_season,
+    hydrate_active_rivals_state,
+    migrate_loaded_rivalry_state,
+    reexport_championship_assets,
+    rivals_waiting_for_drivers,
+)
 from ..paths import resource_path
-from ..save_manager import update_save
+from ..save_manager import load_save, update_save
 from ..season_exporter import iracing_skill_spread_for_prestige
 from ..weather import display_weather
 from .manual_setup_screen import RaceSetupPopup
@@ -47,12 +55,14 @@ class GameplayScreen(ctk.CTkFrame):
         self.game = "iRacing"
         self.career_mode = "Solo"
         self.player_names: list[str] = []
+        self.all_player_names: list[str] = []
         self.active_player_name = ""
         self.player_perspectives: dict[str, dict] = {}
         self.championship: dict | None = None
         self.player_car: dict | None = None
         self.player_team_offer: dict | None = None
         self.player_liveries: list[dict] = []
+        self.player_careers: dict[str, dict] = {}
         self.watch_drivers: list[str] = []
         self.rising_driver: str | None = None
         self.rivalry_heat: dict[str, int] = {}
@@ -87,6 +97,7 @@ class GameplayScreen(ctk.CTkFrame):
         self.save_name = state.get("save_name")
         self.game = str(state.get("game", "iRacing"))
         self.player_names = state.get("players", [self.save_name] if self.save_name else [])
+        self.all_player_names = state.get("all_players") or self.player_names
         self.career_mode = self._career_mode(state.get("career_mode"))
         self.active_player_name = self._active_player_name(state.get("active_player_name"))
         self.player_perspectives = self._normalize_player_perspectives(
@@ -97,6 +108,11 @@ class GameplayScreen(ctk.CTkFrame):
         self.player_car = state.get("player_car")
         self.player_team_offer = state.get("player_team_offer")
         self.player_liveries = state.get("player_liveries", [])
+        self.player_careers = {
+            str(name): dict(career)
+            for name, career in dict(state.get("player_careers") or {}).items()
+            if isinstance(career, dict)
+        }
         self.watch_drivers = [str(name).strip() for name in (state.get("watch_drivers") or []) if str(name).strip()]
         rising_driver = str(state.get("rising_driver", "")).strip()
         self.rising_driver = rising_driver or None
@@ -119,6 +135,15 @@ class GameplayScreen(ctk.CTkFrame):
         self.world_sim_progress = state.get("world_sim_progress")
         self.season_complete_handled = False
 
+    def reload_active_rivals_state(self) -> bool:
+        if self.career_mode != "Rivals" or not self.save_name:
+            return False
+        state = hydrate_active_rivals_state(migrate_loaded_rivalry_state(load_save(self.save_name) or {}))
+        if not state:
+            return False
+        self.load_state(state)
+        return True
+
     def _career_mode(self, value: str | None = None) -> str:
         normalized = str(value or "").strip().casefold()
         if normalized == "rivals":
@@ -131,9 +156,19 @@ class GameplayScreen(ctk.CTkFrame):
 
     def _active_player_name(self, value: str | None = None) -> str:
         candidate = str(value or "").strip()
-        if candidate in self.player_names:
+        player_names = self.all_player_names if self.career_mode == "Rivals" else self.player_names
+        if candidate in player_names:
             return candidate
-        return self.player_names[0] if self.player_names else ""
+        return player_names[0] if player_names else ""
+
+    def _switch_player_names(self) -> list[str]:
+        return self.all_player_names if self.career_mode == "Rivals" else self.player_names
+
+    def _career_for_player(self, player_name: str) -> dict:
+        if self.career_mode != "Rivals":
+            return {}
+        career = self.player_careers.get(str(player_name).strip())
+        return dict(career) if isinstance(career, dict) else {}
 
     def _normalize_player_perspectives(self, value, fallback_heat=None) -> dict[str, dict]:
         raw = value if isinstance(value, dict) else {}
@@ -143,7 +178,8 @@ class GameplayScreen(ctk.CTkFrame):
             if str(name).strip() and str(stage).strip() in {"1", "2", "3"}
         }
         perspectives: dict[str, dict] = {}
-        for index, player_name in enumerate(self.player_names):
+        player_names = self.all_player_names if getattr(self, "career_mode", "") == "Rivals" else self.player_names
+        for index, player_name in enumerate(player_names):
             existing = raw.get(player_name) if isinstance(raw.get(player_name), dict) else {}
             heat = {
                 str(name).strip(): int(stage)
@@ -397,6 +433,16 @@ class GameplayScreen(ctk.CTkFrame):
         ).pack(side="left")
         ctk.CTkButton(
             header,
+            text="Race Weekend",
+            command=self.open_manual_results_editor,
+            width=115,
+            height=24,
+            font=ctk.CTkFont(size=10, weight="bold"),
+            fg_color=SUCCESS,
+            hover_color=SUCCESS_DARK,
+        ).pack(side="right")
+        ctk.CTkButton(
+            header,
             text="Manual Setup",
             command=self.open_manual_setup,
             width=105,
@@ -404,7 +450,7 @@ class GameplayScreen(ctk.CTkFrame):
             font=ctk.CTkFont(size=10, weight="bold"),
             fg_color=ACCENT_DARK,
             hover_color="#103d62",
-        ).pack(side="right")
+        ).pack(side="right", padx=(0, 6))
         return box
 
     def _make_standings_box(self, parent) -> ctk.CTkFrame:
@@ -520,7 +566,10 @@ class GameplayScreen(ctk.CTkFrame):
         return active_count, max(0, all_count - active_count)
 
     def on_show(self) -> None:
+        self.reload_active_rivals_state()
         if not self.championship or not self.save_name:
+            if self.save_name and self.career_mode == "Rivals":
+                self.after(0, self._open_active_rivals_championship_select)
             return
 
         state = continue_or_initialize_season(
@@ -556,6 +605,16 @@ class GameplayScreen(ctk.CTkFrame):
         self._refresh_standings()
         self._handle_season_completion()
 
+    def _open_active_rivals_championship_select(self) -> None:
+        if not self.save_name:
+            return
+        championship_screen = self.parent.screens["ChampionshipScreen"]
+        championship_screen.save_name = self.save_name
+        championship_screen.player_names = [self.active_player_name] if self.active_player_name else self.player_names
+        championship_screen.current_tier = self.unlocked_tier
+        championship_screen.starting_difficulty = self.starting_difficulty
+        self.show_screen("ChampionshipScreen")
+
     def on_hide(self) -> None:
         self._cancel_news_rotation()
         self._cancel_news_transition()
@@ -576,7 +635,7 @@ class GameplayScreen(ctk.CTkFrame):
         self._refresh_player_car_images()
         self._section_label(self.champ_info_frame, "Current Season")
         self._info_row(self.champ_info_frame, "Career Mode:", self.career_mode)
-        if len(self.player_names) > 1:
+        if len(self._switch_player_names()) > 1:
             self._info_row(self.champ_info_frame, "Viewing As:", self.active_player_name or "-")
         self._info_row(self.champ_info_frame, "Championship:", championship.get("Championship", ""))
         self._info_row(self.champ_info_frame, "Current Tier:", str(championship.get("Tier", "")))
@@ -586,6 +645,7 @@ class GameplayScreen(ctk.CTkFrame):
             self._info_row(self.champ_info_frame, "Player Team:", team_name)
             team_trajectory = str((self.player_team_offer or {}).get("team_trajectory", "")).strip()
             team_philosophy = str((self.player_team_offer or {}).get("team_philosophy", "")).strip()
+            team_expectation = str((self.player_team_offer or {}).get("team_expectation", "")).strip()
             team_offer_reason = str((self.player_team_offer or {}).get("team_offer_reason", "")).strip()
             if team_trajectory or team_philosophy:
                 identity_bits = []
@@ -594,6 +654,8 @@ class GameplayScreen(ctk.CTkFrame):
                 if team_philosophy:
                     identity_bits.append(f"{team_philosophy} philosophy")
                 self._info_row(self.champ_info_frame, "Team Identity:", " | ".join(identity_bits))
+            if team_expectation:
+                self._info_row(self.champ_info_frame, "Team Goal:", team_expectation)
             if team_offer_reason:
                 self._info_row(self.champ_info_frame, "Team Outlook:", team_offer_reason)
         if self.game.strip().casefold() == "ams2":
@@ -1067,10 +1129,16 @@ class GameplayScreen(ctk.CTkFrame):
         self._info_row(self.race_info_frame, "Start Type:", (self.championship or {}).get("Start_Type", ""))
 
     def _refresh_player_car_images(self) -> None:
-        if len(self.player_names) > 1:
+        switch_players = self._switch_player_names()
+        if len(switch_players) > 1:
+            mode_note = (
+                "Rivals Career: each driver has a separate season. Switch views to manage their career."
+                if self.career_mode == "Rivals"
+                else "Co-op Career: switch views for each driver's rivals and inbox. Season progress stays shared."
+            )
             ctk.CTkLabel(
                 self.champ_info_frame,
-                text="Co-op Career: switch views for each driver's rivals and inbox. Season progress stays shared.",
+                text=mode_note,
                 font=ctk.CTkFont(size=10),
                 text_color=MUTED,
                 anchor="w",
@@ -1081,12 +1149,37 @@ class GameplayScreen(ctk.CTkFrame):
                 str(livery.get("driver_name", "")).strip(): livery
                 for livery in self.player_liveries
                 if str(livery.get("driver_name", "")).strip()
-            }
+            } if self.career_mode != "Rivals" else {}
             row = ctk.CTkFrame(self.champ_info_frame, fg_color="transparent")
             row.pack(fill="x", pady=(0, 8))
-            for index, player_name in enumerate(self.player_names):
-                livery = livery_by_driver.get(player_name)
-                path = self._player_car_image_path(livery) if livery else self._player_car_image_path()
+            for index, player_name in enumerate(switch_players):
+                career = self._career_for_player(player_name)
+                career_liveries = list(career.get("player_liveries") or [])
+                career_livery_by_driver = {
+                    str(livery.get("driver_name", "")).strip(): livery
+                    for livery in career_liveries
+                    if str(livery.get("driver_name", "")).strip()
+                }
+                career_player_car = career.get("player_car") if isinstance(career.get("player_car"), dict) else None
+                career_championship = (
+                    career.get("championship")
+                    if isinstance(career.get("championship"), dict)
+                    else None
+                )
+                if self.career_mode == "Rivals":
+                    livery = career_livery_by_driver.get(player_name)
+                    path = self._player_car_image_path(
+                        livery,
+                        player_car=career_player_car or {},
+                        championship=career_championship or {},
+                        player_liveries=career_liveries,
+                        use_fallback=False,
+                    )
+                    car_label = self._career_car_label(career)
+                else:
+                    livery = livery_by_driver.get(player_name)
+                    path = self._player_car_image_path(livery) if livery else self._player_car_image_path()
+                    car_label = self._career_car_label({})
                 image = self._load_asset_image(path, (175, 72))
                 is_active = player_name == self.active_player_name
                 card = ctk.CTkFrame(row, fg_color=("gray86", "gray18"), corner_radius=10)
@@ -1099,6 +1192,15 @@ class GameplayScreen(ctk.CTkFrame):
                     font=ctk.CTkFont(size=10, weight="bold"),
                     anchor="center",
                 ).pack(fill="x", padx=6, pady=(0, 6))
+                if car_label:
+                    ctk.CTkLabel(
+                        card,
+                        text=car_label,
+                        font=ctk.CTkFont(size=9),
+                        text_color=MUTED,
+                        anchor="center",
+                        wraplength=150,
+                    ).pack(fill="x", padx=6, pady=(0, 6))
                 ctk.CTkButton(
                     card,
                     text="Viewing" if is_active else "View as",
@@ -1122,12 +1224,29 @@ class GameplayScreen(ctk.CTkFrame):
 
     def _set_active_player(self, player_name: str) -> None:
         cleaned = str(player_name).strip()
-        if cleaned not in self.player_names or cleaned == self.active_player_name:
+        if cleaned not in self._switch_player_names() or cleaned == self.active_player_name:
             return
         self.active_player_name = cleaned
         if self.save_name:
             update_save(self.save_name, {"active_player_name": self.active_player_name})
+            if self.career_mode == "Rivals":
+                state = hydrate_active_rivals_state(migrate_loaded_rivalry_state(load_save(self.save_name) or {}))
+                if state.get("championship"):
+                    self.load_state(state)
+                else:
+                    championship_screen = self.parent.screens["ChampionshipScreen"]
+                    championship_screen.save_name = self.save_name
+                    championship_screen.player_names = [cleaned]
+                    championship_screen.current_tier = self._normalize_unlocked_tier(
+                        state.get("unlocked_tier", state.get("unlocked_tiers")),
+                        state.get("tier", 1),
+                    )
+                    championship_screen.starting_difficulty = int(state.get("starting_difficulty", self.starting_difficulty))
+                    self.show_screen("ChampionshipScreen")
+                    return
         self._refresh_champ_info()
+        self._refresh_current_race()
+        self._refresh_world_news()
         self._refresh_standings()
         self._refresh_message_button()
         self.header_meta_label.configure(
@@ -1191,9 +1310,38 @@ class GameplayScreen(ctk.CTkFrame):
         if changed:
             self._refresh_message_button()
 
-    def _player_car_image_path(self, livery: dict | None = None) -> Path | None:
+    def _career_car_label(self, career: dict) -> str:
+        if self.career_mode == "Rivals":
+            player_car = career.get("player_car") if isinstance(career.get("player_car"), dict) else None
+            championship = career.get("championship") if isinstance(career.get("championship"), dict) else None
+        else:
+            player_car = career.get("player_car") if isinstance(career.get("player_car"), dict) else self.player_car
+            championship = (
+                career.get("championship")
+                if isinstance(career.get("championship"), dict)
+                else self.championship
+            )
+        car_name = str((player_car or {}).get("Car", "")).strip()
+        class_name = (
+            str((player_car or {}).get("Car class", "")).strip()
+            or str((championship or {}).get("_player_class_name", "")).strip()
+            or str((championship or {}).get("Car", "")).strip()
+        )
+        if car_name and class_name and car_name.casefold() != class_name.casefold():
+            return f"{car_name} | {class_name}"
+        return car_name or class_name
+
+    def _player_car_image_path(
+        self,
+        livery: dict | None = None,
+        *,
+        player_car: dict | None = None,
+        championship: dict | None = None,
+        player_liveries: list[dict] | None = None,
+        use_fallback: bool = True,
+    ) -> Path | None:
         candidates: list[str] = []
-        livery_rows = [livery] if livery else list(self.player_liveries or [])
+        livery_rows = [livery] if livery else list(player_liveries if player_liveries is not None else self.player_liveries or [])
         for livery_row in livery_rows:
             candidates.extend(
                 [
@@ -1204,14 +1352,22 @@ class GameplayScreen(ctk.CTkFrame):
                     str(livery_row.get("class_name", "")).strip(),
                 ]
             )
-        player_car = self.player_car or {}
+        if player_car is None and use_fallback:
+            player_car = self.player_car
+        if championship is None and use_fallback:
+            championship = self.championship
+        player_car = player_car or {}
+        championship = championship or {}
         candidates.extend(
             [
                 str(player_car.get("image file", "")).strip(),
                 str(player_car.get("Car", "")).strip(),
+                str(player_car.get("Car class", "")).strip(),
+                str(player_car.get("Car_Class_ID", "")).strip(),
                 str(player_car.get("FILEPATH", "")).strip(),
                 str(player_car.get("ams2_livery_folder", "")).strip(),
-                str((self.championship or {}).get("Car", "")).strip(),
+                str(championship.get("_player_class_name", "")).strip(),
+                str(championship.get("Car", "")).strip(),
             ]
         )
         return self._best_asset_image("Cars", candidates)
@@ -1557,6 +1713,7 @@ class GameplayScreen(ctk.CTkFrame):
         return counts
 
     def open_manual_results_editor(self) -> None:
+        self.reload_active_rivals_state()
         if not self.championship or not self.save_name:
             return
         if self.race_status_label is not None:
@@ -1564,6 +1721,7 @@ class GameplayScreen(ctk.CTkFrame):
         self.show_screen("RaceWeekendScreen")
 
     def open_manual_setup(self) -> None:
+        self.reload_active_rivals_state()
         if not self.championship or not self.save_name:
             return
         if self.race_status_label is not None:
@@ -1578,6 +1736,7 @@ class GameplayScreen(ctk.CTkFrame):
                 {
                     "save_name": self.save_name,
                     "players": self.player_names,
+                    "all_players": self.all_player_names,
                     "game": self.game,
                     "career_mode": self.career_mode,
                     "active_player_name": self.active_player_name,
@@ -1703,11 +1862,29 @@ class GameplayScreen(ctk.CTkFrame):
         if not self._world_sim_complete():
             self.show_screen("SimProgressScreen")
             return
+        if self.career_mode == "Rivals":
+            waiting = [
+                name
+                for name in rivals_waiting_for_drivers(self.save_name)
+                if name != self.active_player_name
+            ]
+            if waiting:
+                self.season_complete_handled = True
+                if self.race_status_label is not None:
+                    self.race_status_label.configure(
+                        text=(
+                            f"{self.active_player_name} has finished the season. "
+                            f"Waiting for {', '.join(waiting)} to finish before offseason offers open."
+                        ),
+                        text_color="#ffb347",
+                    )
+                return
 
         new_state, summary = finalize_season(
             {
                 "save_name": self.save_name,
                 "players": self.player_names,
+                "all_players": self.all_player_names,
                 "game": self.game,
                 "career_mode": self.career_mode,
                 "active_player_name": self.active_player_name,

@@ -37,13 +37,14 @@ class CustomChampionshipManageScreen(ctk.CTkFrame):
         content = ctk.CTkFrame(self, fg_color="transparent")
         content.pack(fill="both", expand=True, padx=18, pady=(0, 8))
         content.grid_columnconfigure(0, weight=1)
-        content.grid_columnconfigure(1, weight=2)
+        content.grid_columnconfigure(1, weight=0)
         content.grid_rowconfigure(0, weight=1)
 
         self.list_frame = ctk.CTkScrollableFrame(content, fg_color=("gray90", "gray15"), corner_radius=14)
-        self.list_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 8))
+        self.list_frame.grid(row=0, column=0, columnspan=2, sticky="nsew")
         self.edit_frame = ctk.CTkScrollableFrame(content, fg_color=("gray90", "gray15"), corner_radius=14)
         self.edit_frame.grid(row=0, column=1, sticky="nsew", padx=(8, 0))
+        self.edit_frame.grid_remove()
 
         self.status_label = ctk.CTkLabel(self, text="", font=ctk.CTkFont(size=11), text_color="gray")
         self.status_label.pack(pady=(0, 8))
@@ -61,7 +62,7 @@ class CustomChampionshipManageScreen(ctk.CTkFrame):
         ctk.CTkButton(
             actions,
             text="Create New",
-            command=lambda: self.show_screen("CustomChampionshipScreen"),
+            command=self._create_new,
             width=130,
             height=36,
         ).pack(side="left", padx=(10, 0))
@@ -119,11 +120,20 @@ class CustomChampionshipManageScreen(ctk.CTkFrame):
             ).pack(anchor="w")
             ctk.CTkButton(
                 row,
-                text="Edit",
-                command=lambda value=group_id: self._select_group(value),
-                width=60,
+                text="Open Builder",
+                command=lambda value=group_id: self._open_group(value),
+                width=110,
                 height=28,
-            ).pack(side="right", padx=8)
+            ).pack(side="right", padx=(4, 8))
+            ctk.CTkButton(
+                row,
+                text="Delete",
+                command=lambda value=group_id: self._delete_from_list(value),
+                width=72,
+                height=28,
+                fg_color="#8c2f2f",
+                hover_color="#6c2323",
+            ).pack(side="right", padx=(4, 0))
 
     def _render_editor(self) -> None:
         for widget in self.edit_frame.winfo_children():
@@ -237,6 +247,25 @@ class CustomChampionshipManageScreen(ctk.CTkFrame):
         self._render_list()
         self._render_editor()
         self.status_label.configure(text="")
+
+    def _open_group(self, group_id: str) -> None:
+        group = next((item for item in self.groups if str(item.get("championship_id", "")) == group_id), None)
+        if not group:
+            return
+        builder = self.parent.screens["CustomChampionshipScreen"]
+        builder.edit_group(group)
+        self.show_screen("CustomChampionshipScreen")
+
+    def _create_new(self) -> None:
+        builder = self.parent.screens["CustomChampionshipScreen"]
+        builder.start_new()
+        self.show_screen("CustomChampionshipScreen")
+
+    def _delete_from_list(self, group_id: str) -> None:
+        self.selected_group_id = group_id
+        self._render_list()
+        self._render_editor()
+        self.delete_selected()
 
     def _selected_group(self) -> dict[str, object] | None:
         return next((group for group in self.groups if str(group.get("championship_id", "")) == self.selected_group_id), None)
