@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.6.1
+
+### Championship Class Assignment
+
+- Fixed player class assignment so IMSA and other championships use the championship’s class name instead of the car catalog category.
+- Custom class names now consistently apply to both the player and AI in single-class and multiclass championships.
+- Added editable custom class names and prestige values directly in the championship builder.
+
 ## 1.6.0
 
 ### Custom Championship and Career Path Updates

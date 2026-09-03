@@ -25,6 +25,7 @@ class CustomChampionshipScreen(ctk.CTkFrame):
         self.parent = parent
         self.show_screen = show_screen
         self.selected_cars: list[dict[str, str]] = []
+        self.class_header_vars: dict[str, tuple[ctk.StringVar, ctk.StringVar]] = {}
         self.car_options: list[tuple[str, dict[str, str]]] = []
         self.car_by_label: dict[str, dict[str, str]] = {}
         self._tier_autofill_enabled = True
@@ -184,6 +185,15 @@ class CustomChampionshipScreen(ctk.CTkFrame):
             width=120,
             height=32,
         ).grid(row=1, column=1, padx=(8, 0), pady=(8, 0))
+        ctk.CTkButton(
+            cars_box,
+            text="Add All From Tier",
+            command=self._add_all_tracks_from_tier,
+            width=160,
+            height=30,
+            fg_color="gray30",
+            hover_color="gray40",
+        ).pack(anchor="w", padx=14, pady=(0, 8))
         ctk.CTkLabel(
             cars_box,
             text="Tracks in Championship",
@@ -426,6 +436,32 @@ class CustomChampionshipScreen(ctk.CTkFrame):
         self._refresh_selected_tracks()
         self.status_label.configure(text=f"Added {track.get('Track', 'track')} to the championship.", text_color="gray")
 
+    def _add_all_tracks_from_tier(self) -> None:
+        tier_filter = self.track_tier_filter_var.get().strip()
+        if tier_filter == "All Tiers":
+            self.status_label.configure(text="Choose a specific Tier filter before adding all tracks.", text_color="#ff7777")
+            return
+        try:
+            selected_tier = tier_filter.rsplit(" ", 1)[-1]
+            int(selected_tier)
+        except ValueError:
+            self.status_label.configure(text="Choose a valid Tier filter before adding all tracks.", text_color="#ff7777")
+            return
+
+        added = 0
+        for key, track in self.track_catalog.items():
+            tiers = {value.strip() for value in str(track.get("My_Tiers", "")).split(".") if value.strip()}
+            if selected_tier not in tiers or key in self._selected_track_keys:
+                continue
+            self._selected_track_keys.add(key)
+            self._selected_track_order.append(key)
+            added += 1
+        self._refresh_selected_tracks()
+        self.status_label.configure(
+            text=f"Added {added} track(s) from Tier {selected_tier}." if added else f"All Tier {selected_tier} tracks are already added.",
+            text_color="gray",
+        )
+
     def _refresh_selected_tracks(self) -> None:
         for widget in self.selected_tracks_frame.winfo_children():
             widget.destroy()
@@ -527,8 +563,10 @@ class CustomChampionshipScreen(ctk.CTkFrame):
         self.status_label.configure(text="Car list cleared.", text_color="gray")
 
     def _refresh_selected_cars(self) -> None:
+        self._sync_class_header_edits()
         for widget in self.selected_cars_frame.winfo_children():
             widget.destroy()
+        self.class_header_vars = {}
         if not self.selected_cars:
             ctk.CTkLabel(
                 self.selected_cars_frame,
@@ -542,15 +580,23 @@ class CustomChampionshipScreen(ctk.CTkFrame):
             class_number = str(car.get("_custom_class", "1"))
             class_name = str(car.get("_custom_class_name", "")).strip() or f"Class {class_number}"
             class_prestige = str(car.get("_custom_class_prestige", "1")).strip() or "1"
-            if class_name != current_class:
+            if class_number != current_class:
+                header = ctk.CTkFrame(self.selected_cars_frame, fg_color="transparent")
+                header.pack(fill="x", padx=12, pady=(8, 2))
                 ctk.CTkLabel(
-                    self.selected_cars_frame,
-                    text=f"Class {class_number}: {class_name} (Prestige {class_prestige})",
+                    header,
+                    text=f"Class {class_number}",
                     font=ctk.CTkFont(size=12, weight="bold"),
                     text_color="#4da6ff",
-                    anchor="w",
-                ).pack(fill="x", padx=12, pady=(8, 2))
-                current_class = class_name
+                ).pack(side="left", padx=(0, 8))
+                ctk.CTkLabel(header, text="Name", text_color="gray").pack(side="left", padx=(0, 4))
+                name_var = ctk.StringVar(value=class_name)
+                ctk.CTkEntry(header, textvariable=name_var, width=150, height=28).pack(side="left", padx=(0, 10))
+                ctk.CTkLabel(header, text="Prestige", text_color="gray").pack(side="left", padx=(0, 4))
+                prestige_var = ctk.StringVar(value=class_prestige)
+                ctk.CTkEntry(header, textvariable=prestige_var, width=65, height=28).pack(side="left")
+                self.class_header_vars[class_number] = (name_var, prestige_var)
+                current_class = class_number
             row = ctk.CTkFrame(self.selected_cars_frame, fg_color="transparent")
             row.pack(fill="x", padx=8, pady=3)
             text = f"{index}. {car.get('Car', '')}  |  {car.get('Car class', '')}"
@@ -575,6 +621,15 @@ class CustomChampionshipScreen(ctk.CTkFrame):
             text_color="gray",
         )
 
+    def _sync_class_header_edits(self) -> None:
+        for class_number, (name_var, prestige_var) in self.class_header_vars.items():
+            class_name = name_var.get().strip() or f"Class {class_number}"
+            class_prestige = prestige_var.get().strip() or "1"
+            for car in self.selected_cars:
+                if str(car.get("_custom_class", "1")) == class_number:
+                    car["_custom_class_name"] = class_name
+                    car["_custom_class_prestige"] = class_prestige
+
     def _tier_changed(self, *_args) -> None:
         self._mark_tier_manual()
         self._refresh_track_options(self._current_track_selection())
@@ -596,6 +651,7 @@ class CustomChampionshipScreen(ctk.CTkFrame):
         return "||".join(self._selected_track_order)
 
     def save_custom_championship(self) -> None:
+        self._sync_class_header_edits()
         name = self.name_entry.get().strip()
         if not name:
             self.status_label.configure(text="Championship name is required.", text_color="#ff7777")

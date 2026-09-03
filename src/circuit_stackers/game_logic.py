@@ -250,11 +250,29 @@ def _class_names_for_rows(rows: list[dict[str, str]], game: str = "iRacing") -> 
         custom_name = str(row.get("Class_Name", "")).strip()
         matching_cars = _cars_for_championship_rows([row], game)
         fallback = str(matching_cars[0].get("Car class", "")) if matching_cars else ""
-        class_name = custom_name or fallback or str(row.get("Sub_Champ", "")).strip() or "Overall"
+        sub_champ = str(row.get("Sub_Champ", "")).strip()
+        if sub_champ.casefold().startswith("class ") and ":" in sub_champ:
+            sub_champ = sub_champ.split(":", 1)[1].strip()
+        class_name = custom_name or sub_champ or fallback or "Overall"
         if class_name and class_name.casefold() not in seen:
             seen.add(class_name.casefold())
             class_names.append(class_name)
     return class_names
+
+
+def _class_name_for_car_rows(
+    rows: list[dict[str, str]], player_car: dict[str, str], game: str = "iRacing"
+) -> str:
+    """Resolve a player's class from the championship entry, not the catalog label."""
+    player_id = str(player_car.get("id", "")).strip()
+    player_class_id = str(player_car.get("Car_Class_ID", "")).strip()
+    matching_rows = []
+    for row in rows:
+        row_car_id = str(row.get("Car_ID", "")).strip()
+        row_class_id = str(row.get("Car_Class", "")).strip()
+        if (row_car_id and row_car_id == player_id) or (row_class_id and row_class_id == player_class_id):
+            matching_rows.append(row)
+    return (_class_names_for_rows(matching_rows, game) or _class_names_for_rows(rows, game)[:1] or [""])[0]
 
 
 def _build_world_championship_group(rows: list[dict[str, str]], game: str = "iRacing") -> dict[str, Any]:
@@ -1966,14 +1984,10 @@ def championship_cars(championship: dict[str, Any], game: str = "iRacing") -> li
 
 
 def championship_classes(championship: dict[str, Any], game: str = "iRacing") -> list[str]:
-    classes = []
-    seen: set[str] = set()
-    for car in championship_cars(championship, game):
-        class_name = str(car.get("Car class", "")).strip() or str(car.get("Car", "")).strip()
-        if class_name and class_name.casefold() not in seen:
-            seen.add(class_name.casefold())
-            classes.append(class_name)
-    return classes
+    configured_classes = championship.get("_class_names")
+    if isinstance(configured_classes, list) and configured_classes:
+        return [str(class_name).strip() for class_name in configured_classes if str(class_name).strip()]
+    return _class_names_for_rows(_championship_group_rows(championship, game), game)
 
 
 def driver_class_name(driver: dict[str, Any]) -> str:
@@ -2208,7 +2222,7 @@ def assign_driver_classes(
 ) -> list[dict[str, Any]]:
     multiclass = str(championship.get("Multiclass", "no")).strip().casefold() == "yes"
     if not multiclass:
-        class_name = str(player_car.get("Car class", "")).strip() or str(player_car.get("Car", "")).strip() or "Overall"
+        class_name = str(championship.get("_player_class_name", "")).strip() or str(player_car.get("Car class", "")).strip() or str(player_car.get("Car", "")).strip() or "Overall"
         for driver in standings:
             driver["class_name"] = class_name
         return standings
@@ -3359,7 +3373,9 @@ def start_championship(
     championship_for_state["_field_prestige"] = max(int(str(row.get("Prestige", "0")).strip() or 0) for row in championship_group_rows)
     championship_for_state["_schedule_style"] = str(championship.get("Style", "")).strip()
     championship_for_state["Style"] = _championship_discipline_style(str(championship.get("Style", "")))
-    championship_for_state["_player_class_name"] = str(player_car.get("Car class", "")).strip() or str(player_car.get("Car", "")).strip()
+    championship_for_state["_player_class_name"] = _class_name_for_car_rows(
+        championship_group_rows, player_car, game
+    ) or str(player_car.get("Car class", "")).strip() or str(player_car.get("Car", "")).strip()
     player_team_offer = championship.get("player_team_offer")
     if isinstance(player_team_offer, dict):
         championship_for_state["player_team_offer"] = dict(player_team_offer)
