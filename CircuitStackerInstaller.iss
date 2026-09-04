@@ -1,5 +1,5 @@
 #define MyAppName "Circuit Stacker"
-#define MyAppVersion "1.6.2"
+#define MyAppVersion "1.6.3"
 #define MyAppPublisher "Circuit Stacker"
 #define MyAppExeName "CircuitStackers.exe"
 

@@ -188,15 +188,18 @@ def load_championships(
         fresh_rookies = players_are_fresh_rookies(save_name, player_names)
     career_path_id = str((save_data if "save_data" in locals() else {}).get("career_path_id", "default"))
     rows = championship_rows(game, career_path_id)
-    minimum_prestige_by_group: dict[str, int] = {}
+    # A fresh rookie should begin at the lowest prestige championship in each
+    # discipline. Group-level checks allow every single-class series through
+    # because each series is its own group, which makes the default path feel
+    # almost completely unlocked at the start.
+    minimum_prestige_by_style: dict[str, int] = {}
     for row in rows:
-        group_key = _championship_group_key(row)
+        style_name = _display_style(str(row.get("Style", "")).strip())
         row_prestige = int(row.get("Prestige", 0) or 0)
-        if group_key:
-            minimum_prestige_by_group[group_key] = min(
-                minimum_prestige_by_group.get(group_key, row_prestige),
-                row_prestige,
-            )
+        minimum_prestige_by_style[style_name] = min(
+            minimum_prestige_by_style.get(style_name, row_prestige),
+            row_prestige,
+        )
     candidate_rows: list[dict[str, str]] = []
     for row in rows:
         row["_player_entry_rows"] = _player_entry_rows_from_loaded_rows(row, rows)
@@ -204,7 +207,7 @@ def load_championships(
         style_name = _display_style(str(row.get("Style", "")).strip())
         if (
             fresh_rookies
-            and row_prestige > minimum_prestige_by_group.get(_championship_group_key(row), row_prestige)
+            and row_prestige > minimum_prestige_by_style.get(style_name, row_prestige)
             and row_prestige != 1
         ):
             continue
