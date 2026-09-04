@@ -48,9 +48,13 @@ def custom_championship_rows(game: str | None = None) -> list[dict[str, str]]:
 
 
 def championship_rows(game: str | None = None, career_path_id: str | None = None) -> list[dict[str, str]]:
-    rows = built_in_championship_rows(game) + custom_championship_rows(game)
+    built_in_rows = built_in_championship_rows(game)
     if not career_path_id or career_path_id == DEFAULT_CAREER_PATH_ID:
-        return rows
+        # The built-in path is intentionally stable. User-created
+        # championships belong to an explicitly saved custom career path and
+        # must not silently appear in the default progression.
+        return built_in_rows
+    rows = built_in_rows + custom_championship_rows(game)
     selected_ids = {
         str(value).strip()
         for value in load_career_path(career_path_id, game).get("championship_ids", [])

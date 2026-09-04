@@ -72,6 +72,48 @@ def _championship_cars(championship: dict[str, Any]) -> list[dict[str, str]]:
     return [car for car in list_all_cars() if str(car.get("id", "")).strip() in car_ids]
 
 
+def _championship_cars_by_class(championship: dict[str, Any]) -> dict[str, set[str]]:
+    """Map the championship's display classes to its actual iRacing cars.
+
+    Custom championships can use names such as ``LMP2`` or ``GT3`` while the
+    catalog uses more specific labels (for example, ``LMP2 Gen 2``). Matching
+    by the catalog's display label therefore sends every unmatched class to
+    the fallback pool. The championship entry rows are the authoritative
+    class-to-car mapping.
+    """
+    rows = championship.get("_entry_rows") or championship.get("_player_entry_rows")
+    if not isinstance(rows, list):
+        return {}
+
+    cars = {str(car.get("id", "")).strip(): car for car in list_all_cars()}
+    mapping: dict[str, set[str]] = {}
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        class_name = str(row.get("Class_Name", "")).strip()
+        if not class_name:
+            class_name = str(row.get("Sub_Champ", "")).strip()
+            if class_name.casefold().startswith("class ") and ":" in class_name:
+                class_name = class_name.split(":", 1)[1].strip()
+        if not class_name:
+            continue
+
+        car_ids: set[str] = set()
+        car_id = str(row.get("Car_ID", "")).strip()
+        if car_id and car_id in cars:
+            car_ids.add(car_id)
+        class_id = str(row.get("Car_Class", "")).strip()
+        if class_id:
+            car_ids.update(
+                candidate_id
+                for candidate_id, car in cars.items()
+                if str(car.get("Car_Class_ID", "")).strip() == class_id
+            )
+        if car_ids:
+            mapping.setdefault(class_name.casefold(), set()).update(car_ids)
+    return mapping
+
+
 def _car_for_driver(
     driver: dict[str, Any], championship: dict[str, Any], player_car: dict[str, str] | None
 ) -> dict[str, str] | None:
@@ -79,10 +121,17 @@ def _car_for_driver(
         return player_car
 
     class_name = _driver_class_name(driver)
-    eligible = []
-    for car in _championship_cars(championship):
+    championship_cars = _championship_cars(championship)
+    class_car_ids = _championship_cars_by_class(championship).get(class_name.casefold(), set())
+    eligible = [
+        car for car in championship_cars
+        if str(car.get("id", "")).strip() in class_car_ids
+    ]
+    if not eligible:
+        eligible = []
+    for car in championship_cars:
         car_class = str(car.get("Car class", "")).strip() or str(car.get("Car", "")).strip()
-        if car_class.casefold() == class_name.casefold():
+        if not class_car_ids and car_class.casefold() == class_name.casefold():
             eligible.append(car)
 
     if eligible:
