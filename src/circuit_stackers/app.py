@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import threading
 import webbrowser
+from tkinter import TclError
 
 import customtkinter as ctk
 
@@ -314,6 +315,20 @@ class App(ctk.CTk):
         self.current_screen_name = name
         if hasattr(target, "on_show"):
             target.on_show()
+        # Screens are kept alive between visits, so their scrollable frames
+        # otherwise remember the position from the previous visit. Reset
+        # after the show handler has rebuilt any dynamic content.
+        self.after_idle(lambda screen=target: self._reset_scroll_positions(screen))
+
+    def _reset_scroll_positions(self, widget) -> None:
+        """Start every scrollable frame on a newly shown screen at the top."""
+        if hasattr(widget, "_parent_canvas"):
+            try:
+                widget._parent_canvas.yview_moveto(0.0)
+            except (AttributeError, RuntimeError, TclError):
+                pass
+        for child in widget.winfo_children():
+            self._reset_scroll_positions(child)
 
     def open_settings(self) -> None:
         self.show_screen("SettingsScreen")

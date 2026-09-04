@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-APP_VERSION = "1.6.1"
+APP_VERSION = "1.6.2"
 
 # Fill these in once the GitHub repository is created.
 # Example:

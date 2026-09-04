@@ -296,14 +296,23 @@ def _build_world_championship_group(rows: list[dict[str, str]], game: str = "iRa
     championship["_class_names"] = class_names
     class_tiers: dict[str, int] = {}
     class_prestiges: dict[str, int] = {}
+    class_car_counts: dict[str, int] = {}
     for row in rows:
         row_tier = int(str(row.get("Tier", "1")).strip() or 1)
         row_prestige = int(str(row.get("Prestige", "0")).strip() or 0)
         for class_name in _class_names_for_rows([row], game):
             class_tiers[class_name] = row_tier
             class_prestiges[class_name] = row_prestige
+            try:
+                class_cars = int(str(row.get("Class_Cars", "")).strip())
+            except (TypeError, ValueError):
+                class_cars = 0
+            if class_cars > 0:
+                class_car_counts[class_name] = class_cars
     championship["_class_tiers"] = class_tiers
     championship["_class_prestiges"] = class_prestiges
+    if class_car_counts:
+        championship["_class_car_counts"] = class_car_counts
     championship["_headline_class_name"] = (
         _class_names_for_rows([highest_prestige_row], game)[:1] or _class_names_for_rows([highest_tier_row], game)[:1] or class_names[:1] or [""]
     )[0]
@@ -2244,7 +2253,13 @@ def assign_driver_classes(
         all_classes.insert(0, player_class)
 
     player_set = set(player_names)
-    class_targets = _random_multiclass_class_targets(all_classes, len(standings), player_class, len(player_set))
+    class_targets = _random_multiclass_class_targets(
+        all_classes,
+        len(standings),
+        player_class,
+        len(player_set),
+        championship.get("_class_car_counts"),
+    )
     class_slots: list[str] = []
     for class_name in all_classes:
         human_count = len(player_set) if class_name == player_class else 0
@@ -2266,6 +2281,7 @@ def _random_multiclass_class_targets(
     total_drivers: int,
     player_class: str,
     player_count: int,
+    class_car_counts: dict[str, Any] | None = None,
 ) -> dict[str, int]:
     unique_classes = []
     seen: set[str] = set()
@@ -2277,6 +2293,29 @@ def _random_multiclass_class_targets(
 
     if not unique_classes:
         return {player_class or "Overall": total_drivers}
+
+    configured_targets = {
+        class_name: int(class_car_counts.get(class_name, 0) or 0)
+        for class_name in unique_classes
+        if isinstance(class_car_counts, dict) and int(class_car_counts.get(class_name, 0) or 0) > 0
+    }
+    if configured_targets:
+        targets = {class_name: max(0, configured_targets.get(class_name, 0)) for class_name in unique_classes}
+        if player_class:
+            matching_player_class = next(
+                (class_name for class_name in unique_classes if class_name.casefold() == player_class.casefold()),
+                player_class,
+            )
+            targets[matching_player_class] = max(targets.get(matching_player_class, 0), player_count)
+        assigned = sum(targets.values())
+        while assigned > total_drivers:
+            reducible = [class_name for class_name, count in targets.items() if count > 1 and count > player_count]
+            if not reducible:
+                break
+            class_name = max(reducible, key=lambda name: targets[name])
+            targets[class_name] -= 1
+            assigned -= 1
+        return targets
 
     class_count = len(unique_classes)
     minimum_per_class = 8 if total_drivers >= class_count * 8 else max(1, total_drivers // class_count)
@@ -2316,6 +2355,15 @@ def _opponent_count_for_championship(
     player_car: dict[str, str],
 ) -> int:
     player_count = len([name for name in player_names if str(name).strip()])
+    class_car_counts = championship.get("_class_car_counts")
+    if isinstance(class_car_counts, dict):
+        configured_total = sum(
+            max(0, int(value or 0))
+            for value in class_car_counts.values()
+            if str(value).strip().lstrip("-").isdigit()
+        )
+        if configured_total > 0:
+            return max(0, min(40, max(player_count, configured_total)) - player_count)
     try:
         max_grid_size = int(championship.get("Max_Opp", 4))
     except (TypeError, ValueError):
@@ -3368,6 +3416,17 @@ def start_championship(
     championship_for_state["_class_names"] = _class_names_for_rows(championship_group_rows, game)
     championship_for_state["_class_tiers"] = class_tiers
     championship_for_state["_class_prestiges"] = class_prestiges
+    class_car_counts: dict[str, int] = {}
+    for row in championship_group_rows:
+        try:
+            class_cars = int(str(row.get("Class_Cars", "")).strip())
+        except (TypeError, ValueError):
+            class_cars = 0
+        if class_cars > 0:
+            for class_name in _class_names_for_rows([row], game):
+                class_car_counts[class_name] = class_cars
+    if class_car_counts:
+        championship_for_state["_class_car_counts"] = class_car_counts
     championship_for_state["Multiclass"] = "yes" if len(championship_for_state["_class_names"]) > 1 else "no"
     championship_for_state["_field_tier"] = max(int(str(row.get("Tier", "1")).strip() or 1) for row in championship_group_rows)
     championship_for_state["_field_prestige"] = max(int(str(row.get("Prestige", "0")).strip() or 0) for row in championship_group_rows)

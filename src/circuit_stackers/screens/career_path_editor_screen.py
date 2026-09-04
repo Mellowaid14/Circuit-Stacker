@@ -52,7 +52,7 @@ class CareerPathEditorScreen(ctk.CTkFrame):
         self.game_menu = ctk.CTkOptionMenu(editor, variable=self.game_var, values=["iRacing", "AMS2"], command=lambda _value: self._refresh_available())
         self.game_menu.pack(fill="x", padx=14, pady=(0, 12))
 
-        ctk.CTkLabel(editor, text="Available Championships", font=ctk.CTkFont(size=14, weight="bold")).pack(anchor="w", padx=14, pady=(4, 6))
+        ctk.CTkLabel(editor, text="Available Custom Championships", font=ctk.CTkFont(size=14, weight="bold")).pack(anchor="w", padx=14, pady=(4, 6))
         self.championship_search_entry = ctk.CTkEntry(
             editor,
             textvariable=self.championship_search_var,
@@ -143,20 +143,22 @@ class CareerPathEditorScreen(ctk.CTkFrame):
     def _refresh_available(self) -> None:
         game = self.game_var.get()
         search_terms = [term for term in self.championship_search_var.get().strip().casefold().split() if term]
+        custom_rows = [
+            row
+            for group in grouped_custom_championships()
+            for row in group.get("rows", [])
+            if isinstance(row, dict) and str(row.get("Game", "")).casefold() == game.casefold()
+        ]
+        metadata_rows = built_in_championship_rows(game) + custom_rows
         groups: dict[str, str] = {}
-        for row in built_in_championship_rows(game) + [row for group in grouped_custom_championships() for row in group.get("rows", []) if isinstance(row, dict) and str(row.get("Game", "")).casefold() == game.casefold()]:
+        for row in custom_rows:
             group_id = str(row.get("Championship_ID", "") or row.get("id", "")).strip()
             if group_id:
                 groups[group_id] = str(row.get("Championship", "")).strip() or group_id
         self.stage_labels = groups
         self.stage_styles = {}
         self.stage_prestiges = {}
-        for row in built_in_championship_rows(game) + [
-            row
-            for group in grouped_custom_championships()
-            for row in group.get("rows", [])
-            if isinstance(row, dict) and str(row.get("Game", "")).casefold() == game.casefold()
-        ]:
+        for row in metadata_rows:
             group_id = str(row.get("Championship_ID", "") or row.get("id", "")).strip()
             if group_id:
                 self.stage_styles[group_id] = str(row.get("Style", "")).strip() or "Unclassified"

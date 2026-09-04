@@ -1344,6 +1344,7 @@ def build_standings_from_pool(
             len(standings) + num_opponents,
             player_class_name,
             len(player_names),
+            championship.get("_class_car_counts"),
         )
         excluded_names = set(player_set)
         ai_drivers: list[dict[str, Any]] = []
@@ -1873,6 +1874,7 @@ def _build_ai_world_standings(
         class_targets = _multiclass_target_counts(
             [str(name).strip() for name in class_tiers.keys() if str(name).strip()],
             field_size,
+            class_counts=championship.get("_class_car_counts"),
         )
         reserved_driver_ids = set(used_driver_ids)
         reserved_driver_names = set(used_driver_names)
@@ -2046,6 +2048,7 @@ def _fill_world_instance_for_prestige(
         class_targets = _multiclass_target_counts(
             [str(name).strip() for name in class_tiers.keys() if str(name).strip()],
             field_size,
+            class_counts=championship.get("_class_car_counts"),
         )
         active_classes = sorted(
             [
@@ -2250,6 +2253,7 @@ def _multiclass_target_counts(
     total_drivers: int,
     player_class: str = "",
     player_count: int = 0,
+    class_counts: dict[str, Any] | None = None,
 ) -> dict[str, int]:
     unique_classes: list[str] = []
     seen: set[str] = set()
@@ -2261,6 +2265,29 @@ def _multiclass_target_counts(
 
     if not unique_classes:
         return {player_class or "Overall": total_drivers}
+
+    configured_targets = {
+        class_name: int(class_counts.get(class_name, 0) or 0)
+        for class_name in unique_classes
+        if isinstance(class_counts, dict) and int(class_counts.get(class_name, 0) or 0) > 0
+    }
+    if configured_targets:
+        targets = {class_name: max(0, configured_targets.get(class_name, 0)) for class_name in unique_classes}
+        if player_class:
+            matching_player_class = next(
+                (class_name for class_name in unique_classes if class_name.casefold() == player_class.casefold()),
+                player_class,
+            )
+            targets[matching_player_class] = max(targets.get(matching_player_class, 0), player_count)
+        assigned = sum(targets.values())
+        while assigned > total_drivers:
+            reducible = [class_name for class_name, count in targets.items() if count > 1 and count > player_count]
+            if not reducible:
+                break
+            class_name = max(reducible, key=lambda name: targets[name])
+            targets[class_name] -= 1
+            assigned -= 1
+        return targets
 
     class_count = len(unique_classes)
     minimum_per_class = 8 if total_drivers >= class_count * 8 else max(1, total_drivers // class_count)

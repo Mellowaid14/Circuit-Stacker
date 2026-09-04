@@ -14,6 +14,7 @@ CHAMPIONSHIP_FIELDNAMES = [
     "Championship",
     "Sub_Champ",
     "Class_Name",
+    "Class_Cars",
     "Championship_ID",
     "Car_Class",
     "Car_ID",

@@ -25,7 +25,7 @@ class CustomChampionshipScreen(ctk.CTkFrame):
         self.parent = parent
         self.show_screen = show_screen
         self.selected_cars: list[dict[str, str]] = []
-        self.class_header_vars: dict[str, tuple[ctk.StringVar, ctk.StringVar]] = {}
+        self.class_header_vars: dict[str, tuple[ctk.StringVar, ctk.StringVar, ctk.StringVar]] = {}
         self.car_options: list[tuple[str, dict[str, str]]] = []
         self.car_by_label: dict[str, dict[str, str]] = {}
         self._tier_autofill_enabled = True
@@ -133,6 +133,10 @@ class CustomChampionshipScreen(ctk.CTkFrame):
         self.class_prestige_entry = ctk.CTkEntry(car_controls, width=70, height=34)
         self.class_prestige_entry.grid(row=0, column=6, padx=(8, 0), sticky="w")
         self.class_prestige_entry.insert(0, "1")
+        ctk.CTkLabel(car_controls, text="Class cars", width=70, anchor="w").grid(row=1, column=2, padx=(8, 0), pady=(8, 0), sticky="w")
+        self.class_cars_entry = ctk.CTkEntry(car_controls, width=70, height=34)
+        self.class_cars_entry.grid(row=1, column=3, padx=(8, 0), pady=(8, 0), sticky="ew")
+        self.class_cars_entry.insert(0, "8")
         ctk.CTkButton(
             car_controls,
             text="Add Car",
@@ -261,8 +265,9 @@ class CustomChampionshipScreen(ctk.CTkFrame):
         for entry, value in ((self.race_count_entry, "4"), (self.race_time_entry, "15"), (self.max_opponents_entry, "20")):
             entry.delete(0, "end")
             entry.insert(0, value)
-        self.class_prestige_entry.delete(0, "end")
-        self.class_prestige_entry.insert(0, "1")
+        for entry, value in ((self.class_prestige_entry, "1"), (self.class_cars_entry, "8")):
+            entry.delete(0, "end")
+            entry.insert(0, value)
         self._refresh_car_options()
         self._refresh_selected_cars()
         self._set_class_name_entry("Class 1")
@@ -295,8 +300,15 @@ class CustomChampionshipScreen(ctk.CTkFrame):
         self._set_class_name_entry(str(first.get("Class_Name", "")).strip() or "Class 1")
         self.class_prestige_entry.delete(0, "end")
         self.class_prestige_entry.insert(0, str(first.get("Prestige", "1")))
+        self.class_cars_entry.delete(0, "end")
+        self.class_cars_entry.insert(0, str(first.get("Class_Cars", "8")))
         cars_by_id = {str(car.get("id", "")).strip(): car for _label, car in self.car_options}
         self.selected_cars = []
+        class_numbers = {
+            self._class_number_from_sub_champ(str(row.get("Sub_Champ", "")))
+            for row in rows
+        }
+        default_class_cars = max(1, int(str(first.get("Max_Opp", "20")) or 20) // max(1, len(class_numbers)))
         for row in rows:
             car = dict(cars_by_id.get(str(row.get("Car_ID", "")).strip(), {}))
             if not car:
@@ -304,6 +316,7 @@ class CustomChampionshipScreen(ctk.CTkFrame):
             car["_custom_class"] = self._class_number_from_sub_champ(str(row.get("Sub_Champ", "")))
             car["_custom_class_name"] = str(row.get("Class_Name", "")).strip() or f"Class {car['_custom_class']}"
             car["_custom_class_prestige"] = str(row.get("Prestige", "1")).strip() or "1"
+            car["_custom_class_cars"] = str(row.get("Class_Cars", "")).strip() or str(default_class_cars)
             self.selected_cars.append(car)
         self._refresh_selected_cars()
         self._refresh_track_options(str(first.get("Track_Selection", "")))
@@ -543,12 +556,24 @@ class CustomChampionshipScreen(ctk.CTkFrame):
         entry = dict(car)
         entry["_custom_class"] = self.class_var.get()
         entry["_custom_class_name"] = self.class_name_entry.get().strip() or f"Class {entry['_custom_class']}"
+        existing_class_car_counts = {
+            str(existing.get("_custom_class", "1")): str(existing.get("_custom_class_cars", "")).strip()
+            for existing in self.selected_cars
+            if str(existing.get("_custom_class", "1")) == entry["_custom_class"]
+        }
         try:
             class_prestige = self._parse_int(self.class_prestige_entry.get(), "Class prestige", 1, 100)
+            class_cars = self._parse_int(
+                existing_class_car_counts.get(entry["_custom_class"], self.class_cars_entry.get()),
+                "Class cars",
+                1,
+                self._parse_int(self.max_opponents_entry.get(), "Max Grid Size", 1, 80),
+            )
         except ValueError as error:
             self.status_label.configure(text=str(error), text_color="#ff7777")
             return
         entry["_custom_class_prestige"] = str(class_prestige)
+        entry["_custom_class_cars"] = str(class_cars)
         self.selected_cars.append(entry)
         if self._tier_autofill_enabled:
             self._set_tier_value(infer_tier_for_car(entry, self.game_var.get()))
@@ -580,6 +605,7 @@ class CustomChampionshipScreen(ctk.CTkFrame):
             class_number = str(car.get("_custom_class", "1"))
             class_name = str(car.get("_custom_class_name", "")).strip() or f"Class {class_number}"
             class_prestige = str(car.get("_custom_class_prestige", "1")).strip() or "1"
+            class_cars = str(car.get("_custom_class_cars", "8")).strip() or "8"
             if class_number != current_class:
                 header = ctk.CTkFrame(self.selected_cars_frame, fg_color="transparent")
                 header.pack(fill="x", padx=12, pady=(8, 2))
@@ -595,7 +621,10 @@ class CustomChampionshipScreen(ctk.CTkFrame):
                 ctk.CTkLabel(header, text="Prestige", text_color="gray").pack(side="left", padx=(0, 4))
                 prestige_var = ctk.StringVar(value=class_prestige)
                 ctk.CTkEntry(header, textvariable=prestige_var, width=65, height=28).pack(side="left")
-                self.class_header_vars[class_number] = (name_var, prestige_var)
+                ctk.CTkLabel(header, text="Cars", text_color="gray").pack(side="left", padx=(10, 4))
+                cars_var = ctk.StringVar(value=class_cars)
+                ctk.CTkEntry(header, textvariable=cars_var, width=65, height=28).pack(side="left")
+                self.class_header_vars[class_number] = (name_var, prestige_var, cars_var)
                 current_class = class_number
             row = ctk.CTkFrame(self.selected_cars_frame, fg_color="transparent")
             row.pack(fill="x", padx=8, pady=3)
@@ -622,13 +651,15 @@ class CustomChampionshipScreen(ctk.CTkFrame):
         )
 
     def _sync_class_header_edits(self) -> None:
-        for class_number, (name_var, prestige_var) in self.class_header_vars.items():
+        for class_number, (name_var, prestige_var, cars_var) in self.class_header_vars.items():
             class_name = name_var.get().strip() or f"Class {class_number}"
             class_prestige = prestige_var.get().strip() or "1"
+            class_cars = cars_var.get().strip() or "1"
             for car in self.selected_cars:
                 if str(car.get("_custom_class", "1")) == class_number:
                     car["_custom_class_name"] = class_name
                     car["_custom_class_prestige"] = class_prestige
+                    car["_custom_class_cars"] = class_cars
 
     def _tier_changed(self, *_args) -> None:
         self._mark_tier_manual()
@@ -679,8 +710,23 @@ class CustomChampionshipScreen(ctk.CTkFrame):
                 id(car): self._parse_int(car.get("_custom_class_prestige", "1"), "Class prestige", 1, 100)
                 for car in self.selected_cars
             }
+            class_cars = {
+                id(car): self._parse_int(car.get("_custom_class_cars", "1"), "Class cars", 1, max_opponents)
+                for car in self.selected_cars
+            }
         except ValueError as error:
             self.status_label.configure(text=str(error), text_color="#ff7777")
+            return
+        class_car_totals = {
+            str(car.get("_custom_class", "1")): class_cars[id(car)]
+            for car in self.selected_cars
+        }
+        total_class_cars = sum(class_car_totals.values())
+        if total_class_cars > max_opponents:
+            self.status_label.configure(
+                text=f"Class cars total {total_class_cars}, but Max Grid Size is only {max_opponents}.",
+                text_color="#ff7777",
+            )
             return
         rows: list[dict[str, str]] = []
         for index, car in enumerate(self.selected_cars, start=1):
@@ -694,6 +740,7 @@ class CustomChampionshipScreen(ctk.CTkFrame):
                     "Championship": name,
                     "Sub_Champ": f"Class {class_number}: {car_class}",
                     "Class_Name": str(car.get("_custom_class_name", "")).strip() or f"Class {class_number}",
+                    "Class_Cars": str(class_cars[id(car)]),
                     "Championship_ID": championship_id,
                     "Car_Class": "",
                     "Car_ID": str(car.get("id", "")).strip(),

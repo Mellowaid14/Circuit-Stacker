@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "circuit-stackers"
-version = "1.6.1"
+version = "1.6.2"
 description = "A persistent motorsport career simulator for iRacing and Automobilista 2."
 readme = "README.md"
 requires-python = ">=3.10"

@@ -1387,9 +1387,15 @@ class GameplayScreen(ctk.CTkFrame):
             return None
 
         root = resource_path("assets", asset_type, self._asset_game_folder())
+        iracing_car_assets = (
+            self._asset_game_folder().casefold() == "iracing"
+            and asset_type.casefold() == "cars"
+        )
         best_path: Path | None = None
         best_score = 0
         for path in self._asset_files(asset_type):
+            if iracing_car_assets and path.stem.casefold().endswith("_cutout"):
+                continue
             stem_key = self._asset_key(path.stem)
             cutout_stem_key = self._asset_key(path.stem.removesuffix("_cutout"))
             parent_key = self._asset_key(path.parent.name)

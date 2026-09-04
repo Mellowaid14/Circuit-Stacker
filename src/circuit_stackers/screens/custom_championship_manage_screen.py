@@ -15,6 +15,9 @@ class CustomChampionshipManageScreen(ctk.CTkFrame):
         self.selected_group_id = ""
         self.pending_delete_group_id = ""
         self.row_editors: list[dict[str, object]] = []
+        self.filter_game_var = ctk.StringVar(value="All Games")
+        self.filter_style_var = ctk.StringVar(value="All Styles")
+        self.filter_frame = None
 
         header = ctk.CTkFrame(self, fg_color=("gray88", "gray14"), corner_radius=18)
         header.pack(fill="x", padx=18, pady=(18, 10))
@@ -42,6 +45,27 @@ class CustomChampionshipManageScreen(ctk.CTkFrame):
 
         self.list_frame = ctk.CTkScrollableFrame(content, fg_color=("gray90", "gray15"), corner_radius=14)
         self.list_frame.grid(row=0, column=0, columnspan=2, sticky="nsew")
+        filters = ctk.CTkFrame(self.list_frame, fg_color="transparent")
+        filters.pack(fill="x", padx=12, pady=(12, 4))
+        self.filter_frame = filters
+        ctk.CTkLabel(filters, text="Game", text_color="gray").pack(side="left", padx=(0, 6))
+        ctk.CTkOptionMenu(
+            filters,
+            variable=self.filter_game_var,
+            values=["All Games", *GAME_OPTIONS],
+            command=self._filters_changed,
+            width=130,
+            height=30,
+        ).pack(side="left")
+        ctk.CTkLabel(filters, text="Style", text_color="gray").pack(side="left", padx=(14, 6))
+        ctk.CTkOptionMenu(
+            filters,
+            variable=self.filter_style_var,
+            values=["All Styles", *STYLE_OPTIONS],
+            command=self._filters_changed,
+            width=145,
+            height=30,
+        ).pack(side="left")
         self.edit_frame = ctk.CTkScrollableFrame(content, fg_color=("gray90", "gray15"), corner_radius=14)
         self.edit_frame.grid(row=0, column=1, sticky="nsew", padx=(8, 0))
         self.edit_frame.grid_remove()
@@ -81,20 +105,22 @@ class CustomChampionshipManageScreen(ctk.CTkFrame):
 
     def _render_list(self) -> None:
         for widget in self.list_frame.winfo_children():
-            widget.destroy()
+            if widget is not self.filter_frame:
+                widget.destroy()
+        filtered_groups = self._filtered_groups()
         ctk.CTkLabel(
             self.list_frame,
-            text=f"Custom Championships ({len(self.groups)})",
+            text=f"Custom Championships ({len(filtered_groups)} of {len(self.groups)})",
             font=ctk.CTkFont(size=15, weight="bold"),
         ).pack(anchor="w", padx=12, pady=(12, 8))
-        if not self.groups:
+        if not filtered_groups:
             ctk.CTkLabel(
                 self.list_frame,
-                text="No custom championships yet.",
+                text="No custom championships match the selected filters." if self.groups else "No custom championships yet.",
                 text_color="gray",
             ).pack(anchor="w", padx=12, pady=8)
             return
-        for group in self.groups:
+        for group in filtered_groups:
             group_id = str(group.get("championship_id", ""))
             selected = group_id == self.selected_group_id
             row = ctk.CTkFrame(
@@ -240,6 +266,24 @@ class CustomChampionshipManageScreen(ctk.CTkFrame):
             anchor="w", padx=10, pady=(0, 8)
         )
         self.row_editors.append({"row": dict(row), "class_var": class_var})
+
+    def _filtered_groups(self) -> list[dict[str, object]]:
+        selected_game = self.filter_game_var.get().casefold()
+        selected_style = self.filter_style_var.get().casefold()
+        return [
+            group
+            for group in self.groups
+            if (selected_game == "all games" or str(group.get("game", "")).casefold() == selected_game)
+            and (selected_style == "all styles" or str(group.get("style", "")).casefold() == selected_style)
+        ]
+
+    def _filters_changed(self, _value: str = "") -> None:
+        if self.selected_group_id and not any(
+            str(group.get("championship_id", "")) == self.selected_group_id for group in self._filtered_groups()
+        ):
+            self.selected_group_id = ""
+        self._render_list()
+        self._render_editor()
 
     def _select_group(self, group_id: str) -> None:
         self.selected_group_id = group_id

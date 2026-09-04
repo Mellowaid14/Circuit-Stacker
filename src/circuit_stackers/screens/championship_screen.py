@@ -15,7 +15,6 @@ from ..driver_pool import (
     current_team_offer_for_championship,
     get_world_year,
     player_effective_mmr_for_style,
-    player_entry_prestige_for_style,
     players_are_fresh_rookies,
     team_reputation_map,
     team_offers_for_player,
@@ -113,6 +112,40 @@ def _merge_player_championship_rows(rows: list[dict[str, str]], all_rows: list[d
     return merged_rows
 
 
+def _multiclass_offer_variants(championship: dict[str, str]) -> list[dict[str, str]]:
+    """Create one offer-evaluation row per eligible class in a multiclass series."""
+    entry_rows = championship.get("_player_entry_rows")
+    if not isinstance(entry_rows, list) or len(entry_rows) < 2:
+        return [championship]
+
+    class_groups: dict[str, list[dict[str, str]]] = {}
+    for row in entry_rows:
+        class_name = str(row.get("Class_Name", "")).strip()
+        if not class_name:
+            sub_champ = str(row.get("Sub_Champ", "")).strip()
+            class_name = sub_champ.split(":", 1)[-1].strip() if ":" in sub_champ else sub_champ
+        class_name = class_name or "Overall"
+        class_groups.setdefault(class_name.casefold(), []).append(dict(row))
+
+    if len(class_groups) <= 1:
+        return [championship]
+
+    variants: list[dict[str, str]] = []
+    for class_rows in class_groups.values():
+        variant = dict(championship)
+        class_name = str(class_rows[0].get("Class_Name", "")).strip()
+        if not class_name:
+            sub_champ = str(class_rows[0].get("Sub_Champ", "")).strip()
+            class_name = sub_champ.split(":", 1)[-1].strip() if ":" in sub_champ else sub_champ
+        variant["_player_entry_rows"] = class_rows
+        variant["Sub_Champ"] = str(class_rows[0].get("Sub_Champ", "")).strip() or class_name
+        variant["Class_Name"] = class_name
+        variant["Prestige"] = str(class_rows[0].get("Prestige", variant.get("Prestige", "0")))
+        variant["_offer_class_key"] = class_name
+        variants.append(variant)
+    return variants
+
+
 def _style_limits_from_reserved_world(
     rows: list[dict[str, str]],
     reserved_instances: list[dict],
@@ -149,20 +182,10 @@ def load_championships(
     eligible_cars_by_id: dict[str, list[dict[str, str]]] | None = None,
 ) -> list[dict[str, str]]:
     championships = []
-    style_prestige_limits: dict[str, int] = {}
-    saved_style_limits: dict[str, int] = {}
     fresh_rookies = False
     if save_name and player_names:
         save_data = load_save(save_name) or {}
         fresh_rookies = players_are_fresh_rookies(save_name, player_names)
-        ignore_saved_limits = fresh_rookies
-        raw_limits = {} if ignore_saved_limits else save_data.get("offseason_player_style_limits")
-        if isinstance(raw_limits, dict):
-            for raw_style, raw_limit in raw_limits.items():
-                try:
-                    saved_style_limits[_display_style(str(raw_style))] = int(raw_limit)
-                except (TypeError, ValueError):
-                    continue
     career_path_id = str((save_data if "save_data" in locals() else {}).get("career_path_id", "default"))
     rows = championship_rows(game, career_path_id)
     minimum_prestige_by_group: dict[str, int] = {}
@@ -174,11 +197,6 @@ def load_championships(
                 minimum_prestige_by_group.get(group_key, row_prestige),
                 row_prestige,
             )
-    if save_name and player_names and not saved_style_limits:
-        saved_style_limits = _style_limits_from_reserved_world(
-            rows,
-            list((save_data if "save_data" in locals() else {}).get("offseason_world_instances") or []),
-        )
     candidate_rows: list[dict[str, str]] = []
     for row in rows:
         row["_player_entry_rows"] = _player_entry_rows_from_loaded_rows(row, rows)
@@ -190,21 +208,6 @@ def load_championships(
             and row_prestige != 1
         ):
             continue
-        if save_name and player_names:
-            if style_name not in style_prestige_limits:
-                calculated_limit = player_entry_prestige_for_style(
-                    save_name,
-                    player_names,
-                    style_name,
-                    championship_rows=rows,
-                    game=game,
-                )
-                if style_name in saved_style_limits:
-                    style_prestige_limits[style_name] = max(saved_style_limits[style_name], calculated_limit)
-                else:
-                    style_prestige_limits[style_name] = calculated_limit
-            if row_prestige > style_prestige_limits[style_name] and row_prestige != 1:
-                continue
         row_id = str(row.get("id", "")).strip()
         eligible_cars = None
         if eligible_cars_by_id is not None and row_id:
@@ -446,7 +449,12 @@ class ChampionshipScreen(ctk.CTkFrame):
         reputations = team_reputation_map(self.save_name or "") if self.save_name else {}
         seen_offer_ids: set[str] = set()
         used_ams2_liveries_by_group: dict[str, set[str]] = {}
-        for championship in championships:
+        offer_championships = [
+            variant
+            for championship in championships
+            for variant in _multiclass_offer_variants(championship)
+        ]
+        for championship in offer_championships:
             eligible_cars = get_eligible_player_cars(championship, self.save_game, self.save_name)
             if not eligible_cars:
                 continue
@@ -490,7 +498,8 @@ class ChampionshipScreen(ctk.CTkFrame):
                 offers = offers[:5]
             for offer_index, offer in enumerate(offers, start=1):
                 offer_row = dict(championship)
-                offer_id = f"{str(championship['id']).strip()}|{str(offer.get('team_id', '')).strip()}|{offer_index}"
+                class_key = str(championship.get("_offer_class_key", "")).strip()
+                offer_id = f"{str(championship['id']).strip()}|{class_key}|{str(offer.get('team_id', '')).strip()}|{offer_index}"
                 if offer_id in seen_offer_ids:
                     continue
                 seen_offer_ids.add(offer_id)
@@ -501,7 +510,9 @@ class ChampionshipScreen(ctk.CTkFrame):
                     used_ams2_liveries_by_group.setdefault(championship_group_key, set()),
                 )
                 entry_label = (
-                    str(preview_car.get("Car class", "")).strip()
+                    str(championship.get("Class_Name", "")).strip()
+                    or class_key
+                    or str(preview_car.get("Car class", "")).strip()
                     or str(preview_car.get("Car", "")).strip()
                     or str(championship.get("Sub_Champ", "")).strip()
                     or "-"
@@ -1015,9 +1026,12 @@ class ChampionshipScreen(ctk.CTkFrame):
             return None
 
         root = resource_path("assets", "Cars", self._asset_game_folder())
+        iracing_assets = self._asset_game_folder().casefold() == "iracing"
         best_path: Path | None = None
         best_score = 0
         for path in self._car_asset_files():
+            if iracing_assets and path.stem.casefold().endswith("_cutout"):
+                continue
             stem_key = self._asset_key(path.stem)
             cutout_stem_key = self._asset_key(path.stem.removesuffix("_cutout"))
             parent_key = self._asset_key(path.parent.name)
