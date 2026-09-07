@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.6.5
+
+### Driver Drafting and Championship Access
+
+- Fixed championship access so players cannot select classes above their MMR-earned prestige.
+- Fixed Rivals selection to use the active driver’s MMR instead of averaging all rival drivers.
+- Removed AI MMR bands, crossover picks, and style-bucket ordering from driver selection.
+- Driver seats now draft from highest MMR downward, starting with the highest-prestige series.
+- Equal-prestige series alternate picks so one series cannot consume the entire top of the driver pool.
+
 ## 1.6.1
 
 ### Championship Class Assignment

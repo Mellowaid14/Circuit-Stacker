@@ -15,6 +15,7 @@ from ..driver_pool import (
     current_team_offer_for_championship,
     get_world_year,
     player_effective_mmr_for_style,
+    player_entry_prestige_for_style,
     players_are_fresh_rookies,
     team_reputation_map,
     team_offers_for_player,
@@ -188,10 +189,27 @@ def load_championships(
         fresh_rookies = players_are_fresh_rookies(save_name, player_names)
     career_path_id = str((save_data if "save_data" in locals() else {}).get("career_path_id", "default"))
     rows = championship_rows(game, career_path_id)
+    # The driver-pool draft is the source of truth for access. A previous
+    # implementation only used this calculation while preparing the AI world;
+    # the selection screen consequently exposed every owned series.
+    prestige_limit_by_style: dict[str, int] = {}
+    if save_name and player_names:
+        reputation_map = team_reputation_map(save_name)
+        prestige_limit_by_style = {
+            _display_style(style): player_entry_prestige_for_style(
+                save_name,
+                player_names,
+                style,
+                championship_rows=rows,
+                game=game,
+                reputation_map=reputation_map,
+            )
+            for style in STYLE_ORDER
+        }
+
     # A fresh rookie should begin at the lowest prestige championship in each
-    # discipline. Group-level checks allow every single-class series through
-    # because each series is its own group, which makes the default path feel
-    # almost completely unlocked at the start.
+    # discipline. The explicit rookie rule is retained as a safe fallback for
+    # saves created before driver-pool access data was introduced.
     minimum_prestige_by_style: dict[str, int] = {}
     for row in rows:
         style_name = _display_style(str(row.get("Style", "")).strip())
@@ -209,6 +227,12 @@ def load_championships(
             fresh_rookies
             and row_prestige > minimum_prestige_by_style.get(style_name, row_prestige)
             and row_prestige != 1
+        ):
+            continue
+        if (
+            save_name
+            and player_names
+            and row_prestige > prestige_limit_by_style.get(style_name, 0)
         ):
             continue
         row_id = str(row.get("id", "")).strip()
@@ -355,7 +379,13 @@ class ChampionshipScreen(ctk.CTkFrame):
             save_data = hydrate_active_rivals_state(load_save(self.save_name) or {})
             all_players = save_data.get("all_players") or save_data.get("players", self.player_names)
             career_mode = str(save_data.get("career_mode", "")).strip()
-            self.player_names = save_data.get("players", self.player_names)
+            if career_mode == "Rivals":
+                # The save stores all rivals in `players`, while the active
+                # career and its MMR are selected by active_player_name.
+                active_player = str(save_data.get("active_player_name", "")).strip()
+                self.player_names = [active_player] if active_player else list(save_data.get("players", self.player_names))[:1]
+            else:
+                self.player_names = save_data.get("players", self.player_names)
             self.current_tier = self._normalize_unlocked_tier(
                 save_data.get("unlocked_tier", save_data.get("unlocked_tiers")),
                 save_data.get("tier", self.current_tier),

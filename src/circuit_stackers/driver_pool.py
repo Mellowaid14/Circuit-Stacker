@@ -29,8 +29,6 @@ WORLD_SIM_MMR_WEIGHT = 0.72
 WORLD_SIM_SEASON_FORM_STDDEV = 130
 WORLD_SIM_RACE_STDDEV = 240
 LOWEST_PRESTIGE_FILL_BATCH_SIZE = 6
-STORYLINE_CROSSOVER_MIN_FIELD = 10
-STORYLINE_CROSSOVER_BONUS = 120
 COUNTRY_CODES = (
     "ARG",
     "AUS",
@@ -3093,112 +3091,6 @@ def _select_active_ai(
     ]
 
 
-def _tier_slice(
-    ranked_drivers: list[tuple[int, str, sqlite3.Row]],
-    tier: int,
-    count: int,
-) -> list[tuple[int, str, sqlite3.Row]]:
-    if count <= 0 or not ranked_drivers:
-        return []
-    return ranked_drivers[:count]
-
-
-def _tier_band_slice(
-    ranked_drivers: list[tuple[int, str, sqlite3.Row]],
-    tier: int,
-    count: int,
-) -> list[tuple[int, str, sqlite3.Row]]:
-    if count <= 0 or not ranked_drivers:
-        return []
-
-    normalized_tier = max(1, min(5, tier))
-    total = len(ranked_drivers)
-    band_size = max(count, total // 5, 1)
-    band_start = round((5 - normalized_tier) * total / 5)
-    band_end = min(total, band_start + band_size)
-    selected = ranked_drivers[band_start:band_end]
-
-    above = list(reversed(ranked_drivers[:band_start]))
-    below = ranked_drivers[band_end:]
-    while len(selected) < count and (above or below):
-        if below:
-            selected.append(below.pop(0))
-        if len(selected) >= count:
-            break
-        if above:
-            selected.append(above.pop(0))
-
-    return selected[:count]
-
-
-def _series_family_id(series_id: str) -> str:
-    cleaned = str(series_id).strip()
-    if not cleaned:
-        return ""
-    if "-AI-" in cleaned:
-        return cleaned.split("-AI-", 1)[0]
-    return cleaned
-
-
-def _movement_bonus(row: sqlite3.Row, target_style: str, target_tier: int, target_series_id: str) -> int:
-    bonus = 0
-    last_tier = _safe_int(row["last_tier"], 0) if "last_tier" in row.keys() else 0
-    last_style = _normalize_style(str(row["last_style"])) if str(row["last_style"] or "").strip() else ""
-    last_series_id = str(row["last_series_id"] or "").strip()
-    target_family = _series_family_id(target_series_id)
-    last_family = _series_family_id(last_series_id)
-
-    if last_tier > 0:
-        tier_gap = abs(target_tier - last_tier)
-        if tier_gap == 0:
-            bonus += 90
-        elif tier_gap == 1:
-            bonus += 35
-        else:
-            bonus -= 60 * (tier_gap - 1) + 25
-
-        if target_tier < last_tier:
-            bonus -= 10
-
-    if last_style:
-        if last_style == target_style:
-            bonus += 80
-        else:
-            bonus -= 55
-
-    if last_family and target_family:
-        if last_family == target_family:
-            bonus += 85
-            if last_series_id == target_series_id:
-                bonus += 25
-        elif last_tier == target_tier and last_style == target_style:
-            bonus += random.randint(-10, 20)
-
-    primary_style = str(row["primary_style"] or "").strip()
-    if primary_style == target_style:
-        bonus += 40
-    elif primary_style not in {"", "Unassigned"}:
-        bonus -= 10
-
-    return bonus
-
-
-def _crossover_candidate_score(
-    candidate: tuple[int, str, sqlite3.Row],
-    target_style: str,
-    target_tier: int,
-    target_series_id: str,
-) -> int:
-    effective_mmr, _name, row = candidate
-    score = effective_mmr + _movement_bonus(row, target_style, target_tier, target_series_id)
-    last_tier = _safe_int(row["last_tier"], 0) if "last_tier" in row.keys() else 0
-    if last_tier and abs(last_tier - target_tier) <= 1:
-        score += 40
-    if str(row["primary_style"] or "").strip() not in {"", "Unassigned", target_style}:
-        score += STORYLINE_CROSSOVER_BONUS
-    return score
-
-
 def _select_mixed_style_rows(
     preferred_rows: list[tuple[int, str, sqlite3.Row]],
     unassigned_rows: list[tuple[int, str, sqlite3.Row]],
@@ -3209,40 +3101,12 @@ def _select_mixed_style_rows(
     target_series_id: str,
     draft_mode: str = "world",
 ) -> list[tuple[int, str, sqlite3.Row]]:
-    slice_picker = _tier_slice if draft_mode == "world" else _tier_band_slice
-
-    def prepare(bucket: list[tuple[int, str, sqlite3.Row]]) -> list[tuple[int, str, sqlite3.Row]]:
-        random.shuffle(bucket)
-        bucket.sort(
-            key=lambda item: (
-                -item[0],
-                item[1],
-            )
-        )
-        return bucket
-
-    preferred_rows = prepare(preferred_rows)
-    unassigned_rows = prepare(unassigned_rows)
-    overflow_rows = prepare(overflow_rows)
-
-    selected: list[tuple[int, str, sqlite3.Row]] = []
-    selected.extend(slice_picker(preferred_rows, tier, count))
-    if len(selected) < count:
-        selected.extend(slice_picker(unassigned_rows, tier, count - len(selected)))
-
-    if len(selected) >= count and overflow_rows and count >= STORYLINE_CROSSOVER_MIN_FIELD:
-        crossover_chance = 0.30 if tier == 1 else 0.24 if tier in {2, 3} else 0.15
-        if random.random() < crossover_chance:
-            selected_ids = {str(row["id"]) for _score, _name, row in selected if "id" in row.keys()}
-            remaining_overflow = [item for item in overflow_rows if str(item[2]["id"]) not in selected_ids]
-            remaining_overflow.sort(
-                key=lambda item: -_crossover_candidate_score(item, target_style, tier, target_series_id)
-            )
-            crossover_pick = remaining_overflow[:1]
-            if crossover_pick:
-                selected = selected[: max(0, count - 1)] + crossover_pick
-
-    return selected[:count]
+    # MMR is one global ranking. Do not split it into tier bands or inject
+    # random crossover picks: the next team seat always receives the next
+    # highest-rated eligible driver.
+    candidates = list(preferred_rows) + list(unassigned_rows) + list(overflow_rows)
+    candidates.sort(key=lambda item: (-item[0], item[1]))
+    return candidates[:count]
 
 
 def _normalize_style(style: str) -> str:
@@ -7253,17 +7117,35 @@ def _draft_ordered_seat_entries(
                 existing_seats_by_championship=existing_seats_by_championship,
             )
         )
-    return sorted(
-        seats,
-        key=lambda seat: (
-            -_safe_int(seat.get("prestige"), 0),
-            -_safe_int(seat.get("team_reputation"), 50),
-            -_safe_int(seat.get("team_prestige"), 50),
-            str(seat.get("championship_name", "")),
-            str(seat.get("team_name", "")),
-            _safe_int(seat.get("seat_index"), 1),
+    # Higher-prestige series get first pick, while equal-prestige series take
+    # turns so one series cannot consume every top-rated driver.
+    grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for seat in seats:
+        series_key = str(seat.get("championship_id", "")).strip() or str(seat.get("championship_name", "")).strip()
+        grouped[series_key].append(seat)
+    ordered_groups = sorted(
+        grouped.values(),
+        key=lambda group: (
+            -max((_safe_int(seat.get("prestige"), 0) for seat in group), default=0),
+            str(group[0].get("championship_name", "")),
         ),
     )
+    for group in ordered_groups:
+        group.sort(
+            key=lambda seat: (
+                -_safe_int(seat.get("prestige"), 0),
+                -_safe_int(seat.get("team_reputation"), 50),
+                -_safe_int(seat.get("team_prestige"), 50),
+                str(seat.get("team_name", "")),
+                _safe_int(seat.get("seat_index"), 1),
+            )
+        )
+    ordered: list[dict[str, Any]] = []
+    while any(group for group in ordered_groups):
+        for group in ordered_groups:
+            if group:
+                ordered.append(group.pop(0))
+    return ordered
 
 
 def player_entry_prestige_for_style(
@@ -7307,7 +7189,11 @@ def player_entry_prestige_for_style(
             primary_style,
             normalized_style,
         )
-        if bool(row["is_human"]) and name in player_set:
+        if bool(row["is_human"]):
+            if name not in player_set:
+                # Rivals players share a world but do not compete for one
+                # another's individual championship access.
+                continue
             player_row_count += 1
             player_ratings.append(effective_mmr)
             player_buckets.append(_style_draft_bucket(primary_style, normalized_style))
@@ -7350,7 +7236,9 @@ def player_entry_prestige_for_style(
     draft_pool = sorted(
         [("player", "__player__", group_style_bucket, group_effective_mmr)]
         + [("ai", driver_name, bucket, rating) for bucket, rating, driver_name in ai_draft_rows],
-        key=lambda item: (item[2], -item[3], item[0], item[1]),
+        # The player is a real draft entry. MMR, rather than style buckets,
+        # decides when that entry is selected.
+        key=lambda item: (-item[3], item[0], item[1]),
     )
     player_pick_index = next(
         (index for index, row in enumerate(draft_pool) if row[0] == "player"),
