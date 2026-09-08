@@ -10,12 +10,10 @@ from PIL import Image, ImageOps
 from ..ams2_exporter import preview_player_livery_for_car
 from ..custom_championships import championship_rows
 from ..driver_pool import (
-    current_team_promotion_is_earned,
     championship_pool_display_name,
-    current_team_offer_for_championship,
     get_world_year,
     player_effective_mmr_for_style,
-    player_entry_prestige_for_style,
+    player_accessible_championship_ids_for_style,
     players_are_fresh_rookies,
     team_reputation_map,
     team_offers_for_player,
@@ -183,20 +181,17 @@ def load_championships(
     eligible_cars_by_id: dict[str, list[dict[str, str]]] | None = None,
 ) -> list[dict[str, str]]:
     championships = []
-    fresh_rookies = False
     if save_name and player_names:
         save_data = load_save(save_name) or {}
-        fresh_rookies = players_are_fresh_rookies(save_name, player_names)
     career_path_id = str((save_data if "save_data" in locals() else {}).get("career_path_id", "default"))
     rows = championship_rows(game, career_path_id)
-    # The driver-pool draft is the source of truth for access. A previous
-    # implementation only used this calculation while preparing the AI world;
-    # the selection screen consequently exposed every owned series.
-    prestige_limit_by_style: dict[str, int] = {}
+    # Access is determined by the player's direct position in the global MMR
+    # draft. Prestige only orders the seats before that position is applied.
+    accessible_ids_by_style: dict[str, set[str]] = {}
     if save_name and player_names:
         reputation_map = team_reputation_map(save_name)
-        prestige_limit_by_style = {
-            _display_style(style): player_entry_prestige_for_style(
+        accessible_ids_by_style = {
+            _display_style(style): player_accessible_championship_ids_for_style(
                 save_name,
                 player_names,
                 style,
@@ -207,33 +202,12 @@ def load_championships(
             for style in STYLE_ORDER
         }
 
-    # A fresh rookie should begin at the lowest prestige championship in each
-    # discipline. The explicit rookie rule is retained as a safe fallback for
-    # saves created before driver-pool access data was introduced.
-    minimum_prestige_by_style: dict[str, int] = {}
-    for row in rows:
-        style_name = _display_style(str(row.get("Style", "")).strip())
-        row_prestige = int(row.get("Prestige", 0) or 0)
-        minimum_prestige_by_style[style_name] = min(
-            minimum_prestige_by_style.get(style_name, row_prestige),
-            row_prestige,
-        )
     candidate_rows: list[dict[str, str]] = []
     for row in rows:
         row["_player_entry_rows"] = _player_entry_rows_from_loaded_rows(row, rows)
-        row_prestige = int(row.get("Prestige", 0) or 0)
         style_name = _display_style(str(row.get("Style", "")).strip())
-        if (
-            fresh_rookies
-            and row_prestige > minimum_prestige_by_style.get(style_name, row_prestige)
-            and row_prestige != 1
-        ):
-            continue
-        if (
-            save_name
-            and player_names
-            and row_prestige > prestige_limit_by_style.get(style_name, 0)
-        ):
+        championship_id = str(row.get("id", "")).strip()
+        if save_name and player_names and championship_id not in accessible_ids_by_style.get(style_name, set()):
             continue
         row_id = str(row.get("id", "")).strip()
         eligible_cars = None
@@ -500,35 +474,6 @@ class ChampionshipScreen(ctk.CTkFrame):
                 player_effective_mmr=self._effective_mmr_for_style(style_name),
                 reputation_map=reputations,
             ) or [{"team_id": "", "team_key": "", "team_name": "Independent", "team_prestige": 0, "team_reputation": 50}]
-            current_offer = current_team_offer_for_championship(
-                self.save_name or "",
-                self.current_team_offer,
-                championship,
-                reputation_map=reputations,
-            )
-            if current_offer:
-                current_offer = dict(current_offer)
-                championship_prestige = int(championship.get("Prestige", 0) or 0)
-                is_promotion = championship_prestige > self.current_championship_prestige
-                if is_promotion and not current_team_promotion_is_earned(
-                    self.save_name or "",
-                    self.player_names,
-                    self.current_team_offer,
-                ):
-                    current_offer = None
-            if current_offer:
-                championship_prestige = int(championship.get("Prestige", 0) or 0)
-                current_offer["offer_note"] = "Promotion" if championship_prestige > self.current_championship_prestige else "Current"
-                current_key = str(current_offer.get("team_key", "")).strip()
-                current_id = str(current_offer.get("team_id", "")).strip()
-                offers = [
-                    offer
-                    for offer in offers
-                    if str(offer.get("team_key", "")).strip() != current_key
-                    and str(offer.get("team_id", "")).strip() != current_id
-                ]
-                offers.insert(0, current_offer)
-                offers = offers[:5]
             for offer_index, offer in enumerate(offers, start=1):
                 offer_row = dict(championship)
                 class_key = str(championship.get("_offer_class_key", "")).strip()

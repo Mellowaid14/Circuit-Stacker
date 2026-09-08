@@ -13,10 +13,8 @@ from .driver_pool import (
     add_ai_drivers_from_standings,
     advance_world_year,
     active_driver_rows_for_selection,
-    active_world_ai_rows,
     assign_teams_to_standings,
     best_driver_in_world,
-    build_ai_world_standings,
     championship_storyline_drivers,
     championship_pool_display_name,
     build_world_championship_instances,
@@ -29,8 +27,10 @@ from .driver_pool import (
     latest_tier_champions,
     list_drivers,
     notable_retirements,
-    player_entry_prestige_for_style,
+    player_accessible_championship_ids_for_style,
     populate_world_sim_instances,
+    retire_unseated_ai,
+    release_preseason_reservations,
     recent_team_seat_storylines,
     recent_team_storylines,
     record_driver_race_results,
@@ -1699,11 +1699,10 @@ def prepare_offseason_championship_select(save_name: str, player_names: list[str
         market_summary = run_offseason_team_seat_market(save_name, championships, protected_team_keys=protected_team_keys)
         update_save(save_name, {"team_market_year": current_world_year, "team_market_summary": market_summary})
     selection_driver_rows = active_driver_rows_for_selection(save_name)
-    available_ai_rows = active_world_ai_rows(save_name)
     reputation_map = team_reputation_map(save_name)
     existing_seats = existing_team_seats_by_championship(save_name)
-    style_limits = {
-        style: player_entry_prestige_for_style(
+    accessible_championship_ids = {
+        style: player_accessible_championship_ids_for_style(
             save_name,
             player_names,
             style,
@@ -1715,65 +1714,18 @@ def prepare_offseason_championship_select(save_name: str, player_names: list[str
         )
         for style in ("Sports Car", "Oval", "Open Wheel", "Rallycross")
     }
+    serializable_accessible_championship_ids = {
+        style: sorted(championship_ids)
+        for style, championship_ids in accessible_championship_ids.items()
+    }
+    release_preseason_reservations(save_name, save_data.get("offseason_world_instances") or [])
     reserved_instances: list[dict[str, Any]] = []
-    used_driver_ids: set[str] = set()
-    used_driver_names: set[str] = set()
-
-    for instance in build_world_championship_instances(championships, ""):
-        championship = dict(instance)
-        style = str(championship.get("Style", "")).strip()
-        championship_prestige = int(championship.get("Prestige", 0) or 0)
-        player_limit = max(1, int(style_limits.get(style, 0) or 0))
-        if championship_prestige <= player_limit:
-            continue
-
-        tier = int(championship.get("Tier", 1) or 1)
-        schedule_style = str(championship.get("_schedule_style", style)).strip()
-        num_races = int(championship.get("Num of Races", 4) or 4)
-        field_size = world_championship_field_size(championship)
-        schedule = build_schedule(
-            load_tracks(
-                schedule_style,
-                tier,
-                game,
-                save_name,
-                _custom_track_selection(instance.get("championship") or instance),
-            ),
-            num_races,
-            game=game,
-            championship_style=schedule_style,
-            minimum_garages=field_size,
-        )
-        standings, generated_rookies = build_ai_world_standings(
-            save_name,
-            championship,
-            field_size,
-            used_driver_ids,
-            used_driver_names,
-            available_ai_rows,
-        )
-        if generated_rookies:
-            available_ai_rows = active_world_ai_rows(save_name)
-        standings = assign_teams_to_standings(standings, championship, save_name)
-        set_ai_primary_style_on_first_championship(save_name, standings, style)
-        set_current_championship_for_standings(save_name, standings, championship)
-        reserved_instances.append(
-            {
-                "championship": championship,
-                "schedule": schedule,
-                "standings": standings,
-                "current_race": 0,
-                "finalized": False,
-                "field_size": field_size,
-                "reserved_preseason": True,
-            }
-        )
 
     update_save(
         save_name,
         {
             "offseason_world_instances": reserved_instances,
-            "offseason_player_style_limits": style_limits,
+            "offseason_player_style_limits": serializable_accessible_championship_ids,
             "team_market_summary": market_summary,
         },
     )
@@ -1792,11 +1744,8 @@ def _populate_world_with_player_championship(
     excluded_id = str(player_championship.get("id", "")).strip()
     world_instances = build_world_championship_instances(load_world_championships(game, save_data.get("career_path_id")), excluded_id)
     progress_instances: list[dict[str, Any]] = []
-    preseason_reserved_instances = [
-        instance
-        for instance in list(save_data.get("offseason_world_instances") or [])
-        if str((instance.get("championship") or {}).get("id", "")).strip() != excluded_id
-    ]
+    release_preseason_reservations(save_name, save_data.get("offseason_world_instances") or [])
+    preseason_reserved_instances = []
     reserved_ids = {
         str((instance.get("championship") or {}).get("id", "")).strip()
         for instance in preseason_reserved_instances
@@ -1868,6 +1817,7 @@ def _populate_world_with_player_championship(
         if not instance.get("player_instance"):
             world_only_instances.append(instance)
 
+    summary["forced_retired"] += retire_unseated_ai(save_name)
     return player_result_standings, {
         "instances": world_only_instances,
         "complete": not world_only_instances,
@@ -4217,7 +4167,10 @@ def finalize_season(state: dict[str, Any]) -> tuple[dict[str, Any], dict[str, An
         )
         world_simulation_summary = _merge_world_sim_summary(world_simulation_summary, instance_summary)
         instance["finalized"] = True
+    season_year = get_world_year(state["save_name"])
     driver_pool_summary = finalize_driver_season(state["save_name"], player_championship, standings)
+    unseated_retired = retire_unseated_ai(state["save_name"], season_year)
+    driver_pool_summary["unseated_retired"] = unseated_retired
     driver_pool_summary["world_simulation"] = world_simulation_summary
     sorted_standings = sorted(standings, key=lambda driver: (driver["points"], driver["wins"]), reverse=True)
     player_positions = []
@@ -4423,6 +4376,8 @@ def finalize_rivals_seasons(state: dict[str, Any]) -> tuple[dict[str, Any], dict
             active_final_standings = standings
             active_championship_name = str(player_championship.get("Championship", "Season Recap"))
 
+    unseated_retired = retire_unseated_ai(save_name, get_world_year(save_name))
+    combined_driver_pool_summary["unseated_retired"] = unseated_retired
     next_world_year = advance_world_year(save_name, 1)
     combined_driver_pool_summary["next_world_year"] = next_world_year
     if active_summary:

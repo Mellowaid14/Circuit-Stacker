@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import math
 import re
 import random
 import sqlite3
@@ -17,9 +16,10 @@ from .paths import resource_path
 
 
 BASELINE_MMR = 1000
-RACE_K_FACTOR = 18.5
-RACE_RATING_CHANGE_CAP = 35
-NON_PRIMARY_STYLE_PENALTY = 90
+# Applied to each head-to-head result within a class race. A small value keeps
+# a full grid from immediately flattening several finishers at the race cap.
+RACE_K_FACTOR = 4.0
+RACE_RATING_CHANGE_CAP = 24
 SCHEMA_VERSION = "1"
 STYLES = ("Sports Car", "Oval", "Open Wheel", "Rallycross")
 _INITIALIZED_POOLS: set[str] = set()
@@ -590,6 +590,7 @@ def initialize_driver_pool(save_name: str, world_year: int | None = None) -> Pat
             ON team_seat_history(team_key, season_year DESC, created_at DESC)
             """
         )
+        had_mmr = any(row["name"] == "mmr" for row in connection.execute("PRAGMA table_info(drivers)"))
         _ensure_column(connection, "drivers", "mmr", "INTEGER NOT NULL DEFAULT 1000")
         connection.execute(
             """
@@ -598,18 +599,32 @@ def initialize_driver_pool(save_name: str, world_year: int | None = None) -> Pat
             WHERE mmr IS NULL
             """
         )
+        if not had_mmr:
+            connection.execute(
+                """
+                UPDATE drivers
+                SET mmr = MAX(sports_car_rating, oval_rating, open_wheel_rating)
+                WHERE mmr = ?
+                  AND (
+                    sports_car_rating != ?
+                    OR oval_rating != ?
+                    OR open_wheel_rating != ?
+                  )
+                """,
+                (BASELINE_MMR, BASELINE_MMR, BASELINE_MMR, BASELINE_MMR),
+            )
+        # A driver cannot have earned an MMR change before their first start.
+        # Normalize legacy saves where rookies were accidentally updated by a
+        # pre-season or cross-style rating path.
         connection.execute(
             """
             UPDATE drivers
-            SET mmr = MAX(sports_car_rating, oval_rating, open_wheel_rating)
-            WHERE mmr = ?
-              AND (
-                sports_car_rating != ?
-                OR oval_rating != ?
-                OR open_wheel_rating != ?
-              )
+            SET mmr = ?
+            WHERE is_human = 0
+              AND status = 'active'
+              AND career_starts = 0
             """,
-            (BASELINE_MMR, BASELINE_MMR, BASELINE_MMR, BASELINE_MMR),
+            (BASELINE_MMR,),
         )
         _ensure_column(connection, "drivers", "current_tier", "INTEGER")
         _ensure_column(connection, "drivers", "current_style", "TEXT")
@@ -842,6 +857,23 @@ def set_current_championship_for_standings(
 
     placeholders = ",".join("?" for _ in driver_ids)
     with _connect(save_name) as connection:
+        # A championship ID represents one field in a save. Rebuilding or
+        # resuming a season must release stale AI rows from that same field
+        # before assigning the replacement roster.
+        connection.execute(
+            f"""
+            UPDATE drivers
+            SET current_championship = NULL,
+                current_tier = NULL,
+                current_style = NULL,
+                updated_at = ?
+            WHERE is_human = 0
+              AND status = 'active'
+              AND last_series_id = ?
+              AND id NOT IN ({placeholders})
+            """,
+            [now, championship_id, *driver_ids],
+        )
         connection.execute(
             f"""
             UPDATE drivers
@@ -886,7 +918,9 @@ def finalize_driver_season(
     champions = _class_champions(standings)
     champion_ids = [str(driver.get("driver_id", "")).strip() for driver in champions if str(driver.get("driver_id", "")).strip()]
     participant_ids = [str(driver.get("driver_id", "")).strip() for driver in standings if str(driver.get("driver_id", "")).strip()]
-    forced_retire_ids = _forced_retirement_ids(standings, tier)
+    # Seat continuity is resolved once the complete season roster is known.
+    # Do not retire an arbitrary slice of each Tier 1 field here.
+    forced_retire_ids: list[str] = []
     season_results: list[tuple[str, str, int]] = []
     by_class: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for driver in standings:
@@ -1087,6 +1121,58 @@ def finalize_driver_season(
         "teams": int(team_summary.get("teams", 0)),
         "team_seasons": int(team_summary.get("team_seasons", 0)),
     }
+
+
+def release_preseason_reservations(save_name: str, instances: list[dict[str, Any]]) -> None:
+    driver_ids = {str(d.get("driver_id", "")) for i in instances for d in i.get("standings", [])}
+    if driver_ids:
+        with _connect(save_name) as connection:
+            connection.executemany(
+                "UPDATE drivers SET current_championship=NULL, current_style=NULL, current_tier=NULL WHERE id=? AND is_human=0",
+                [(driver_id,) for driver_id in driver_ids],
+            )
+
+
+def retire_unseated_ai(save_name: str, season_year: int | None = None) -> int:
+    """Retire unseated AI after allocation, while preserving every human."""
+    initialize_driver_pool(save_name)
+    target_year = _world_year(save_name) if season_year is None else int(season_year)
+    now = _now()
+    with _connect(save_name) as connection:
+        rows = connection.execute(
+            """
+            SELECT d.id
+            FROM drivers AS d
+            WHERE d.is_human = 0
+              AND d.status = 'active'
+              AND d.current_championship IS NULL
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM driver_season_results AS r
+                  WHERE r.driver_id = d.id
+                    AND r.season_year = ?
+              )
+            """,
+            (target_year,),
+        ).fetchall()
+        driver_ids = [str(row["id"]) for row in rows]
+        if driver_ids:
+            placeholders = ",".join("?" for _ in driver_ids)
+            connection.execute(
+                f"""
+                UPDATE drivers
+                SET status = 'retired',
+                    retired_year = ?,
+                    current_championship = NULL,
+                    current_tier = NULL,
+                    current_style = NULL,
+                    updated_at = ?
+                WHERE id IN ({placeholders})
+                """,
+                [target_year, now, *driver_ids],
+            )
+        connection.commit()
+    return len(driver_ids)
 
 
 def update_ratings_after_race(
@@ -1366,11 +1452,51 @@ def build_standings_from_pool(
                 excluded_names.add(str(driver.get("name", "")).strip())
         standings.extend(ai_drivers[:num_opponents])
     else:
-        ai_drivers = _select_active_ai(save_name, num_opponents, player_set, style, tier, championship)
+        # Tier 1 is the rookie entry point: reserve half of the AI field for
+        # drivers with no career starts, then fill the remaining seats by the
+        # global MMR draft order. Higher tiers remain pure MMR selection.
+        ai_drivers: list[dict[str, Any]] = []
+        rookie_count = num_opponents // 2 if tier == 1 else 0
+        if rookie_count:
+            with _connect(save_name) as connection:
+                available_rookies = _active_ai_count_query(
+                    connection,
+                    extra_clauses=["current_championship IS NULL", "career_starts = 0"],
+                    excluded_names=player_set,
+                )
+            if available_rookies < rookie_count:
+                _add_rookies(save_name, rookie_count - available_rookies, style, player_set)
+            rookie_drivers = _select_active_ai(
+                save_name,
+                rookie_count,
+                player_set,
+                style,
+                tier,
+                championship,
+                rookies_only=True,
+            )
+            ai_drivers.extend(rookie_drivers)
+            player_set.update(str(driver.get("name", "")).strip() for driver in rookie_drivers)
+
+        remaining_count = num_opponents - len(ai_drivers)
+        if remaining_count > 0:
+            _ensure_rookies_available(save_name, remaining_count, player_set, style)
+            ai_drivers.extend(
+                _select_active_ai(save_name, remaining_count, player_set, style, tier, championship)
+            )
         if len(ai_drivers) < num_opponents:
-            _ensure_rookies_available(save_name, num_opponents + max(1, num_opponents - len(ai_drivers)), player_set, style)
-            ai_drivers = _select_active_ai(save_name, num_opponents, player_set, style, tier, championship)
+            missing_count = num_opponents - len(ai_drivers)
+            _ensure_rookies_available(save_name, missing_count, player_set, style)
+            ai_drivers.extend(
+                _select_active_ai(save_name, missing_count, player_set, style, tier, championship)
+            )
         standings.extend(ai_drivers)
+        single_class_names = championship.get("_class_names", [])
+        if isinstance(single_class_names, list) and len(single_class_names) == 1:
+            class_name = str(single_class_names[0]).strip()
+            if class_name:
+                for driver in standings:
+                    driver["class_name"] = class_name
     return assign_teams_to_standings(standings, championship, save_name)
 
 
@@ -1394,7 +1520,15 @@ def simulate_ai_world_season(
         "team_seasons": 0,
     }
 
-    for championship in _world_championship_instances(championships, excluded_championship_id):
+    world_instances = _world_championship_instances(championships, excluded_championship_id)
+    lowest_prestige = min(
+        (_safe_int(instance.get("Prestige"), 0) for instance in world_instances),
+        default=0,
+    )
+    for championship in world_instances:
+        championship = dict(championship)
+        if _safe_int(championship.get("Prestige"), 0) == lowest_prestige:
+            championship["_rookie_field_quota"] = _world_field_size(championship) // 2
         field_size = _world_field_size(championship)
         standings, generated_rookies = _build_ai_world_standings(
             save_name,
@@ -1437,6 +1571,10 @@ def simulate_ai_world_chunk(
     """Simulate a saved slice of the AI world season."""
     initialize_driver_pool(save_name)
     instances = _world_championship_instances(championships, excluded_championship_id)
+    lowest_prestige = min(
+        (_safe_int(instance.get("Prestige"), 0) for instance in instances),
+        default=0,
+    )
     current_progress = _normalize_world_sim_progress(progress)
     current_progress["total_instances"] = len(instances)
 
@@ -1447,6 +1585,9 @@ def simulate_ai_world_chunk(
     summary = _empty_world_sim_summary()
 
     for championship in instances[start_index:end_index]:
+        championship = dict(championship)
+        if _safe_int(championship.get("Prestige"), 0) == lowest_prestige:
+            championship["_rookie_field_quota"] = _world_field_size(championship) // 2
         field_size = _world_field_size(championship)
         standings, generated_rookies = _build_ai_world_standings(
             save_name,
@@ -1525,74 +1666,138 @@ def populate_world_sim_instances(
     save_name: str,
     instances: list[dict[str, Any]],
 ) -> tuple[list[dict[str, Any]], dict[str, int]]:
-    used_driver_ids: set[str] = set()
-    used_driver_names: set[str] = set()
-    for instance in instances:
-        for driver in list(instance.get("standings") or []):
-            driver_id = str(driver.get("driver_id", "")).strip()
-            driver_name = str(driver.get("name", "")).strip()
-            if driver_id:
-                used_driver_ids.add(driver_id)
-            if driver_name:
-                used_driver_names.add(driver_name)
+    used_driver_ids = {str(d.get("driver_id", "")) for i in instances for d in i.get("standings", [])}
+    used_driver_names = {str(d.get("name", "")) for i in instances for d in i.get("standings", [])}
     summary = _empty_world_sim_summary()
-
-    prestige_bucket: set[int] = set()
+    groups = []
     for instance in instances:
         championship = instance.get("championship") or {}
-        prestige_bucket.add(_safe_int(championship.get("Prestige"), 0))
-        class_prestiges = (championship.get("_class_prestiges", {}) or {}).values()
-        for value in class_prestiges:
-            prestige_bucket.add(_safe_int(value, 0))
-    prestige_values = sorted(prestige_bucket, reverse=True)
-    if not prestige_values:
-        return instances, summary
+        standings = instance.setdefault("standings", [])
+        field_size = int(instance.get("field_size", 0) or 0)
+        classes = _world_class_names(championship)
+        targets = _multiclass_target_counts(classes, field_size, class_counts=championship.get("_class_car_counts"))
+        for class_name, target in targets.items():
+            prestige = _safe_int((championship.get("_class_prestiges") or {}).get(class_name),
+                                 _safe_int(championship.get("Prestige"), 0))
+            present = [d for d in standings if str(d.get("class_name", "Overall")) == class_name]
+            groups.append({"instance": instance, "class": class_name, "prestige": prestige,
+                           "target": target, "remaining": max(0, target - len(present))})
+    minimum = min((g["prestige"] for g in groups), default=0)
+    available = _active_world_ai_rows(save_name)
 
-    lowest_prestige = prestige_values[-1]
-    for world_prestige in prestige_values:
-        if world_prestige == lowest_prestige:
-            while True:
-                round_progress = False
-                for instance in instances:
-                    championship = instance.get("championship") or {}
-                    field_size = int(instance.get("field_size", 0) or 0)
-                    standings = list(instance.get("standings") or [])
-                    before_count = len(standings)
-                    updated_standings, rookies_added = _fill_world_instance_for_prestige(
-                        save_name,
-                        championship,
-                        field_size,
-                        world_prestige,
-                        standings,
-                        used_driver_ids,
-                        used_driver_names,
-                        max_new_drivers=LOWEST_PRESTIGE_FILL_BATCH_SIZE,
-                    )
-                    instance["standings"] = updated_standings
-                    summary["rookies_added"] += rookies_added
-                    if len(updated_standings) > before_count:
-                        round_progress = True
-                if not round_progress:
-                    break
-        else:
-            for instance in instances:
-                championship = instance.get("championship") or {}
-                field_size = int(instance.get("field_size", 0) or 0)
-                standings = list(instance.get("standings") or [])
-                updated_standings, rookies_added = _fill_world_instance_for_prestige(
-                    save_name,
-                    championship,
-                    field_size,
-                    world_prestige,
-                    standings,
-                    used_driver_ids,
-                    used_driver_names,
-                )
-                instance["standings"] = updated_standings
-                summary["rookies_added"] += rookies_added
+    def pick(group, rookie=False):
+        nonlocal available
+        championship = group["instance"]["championship"]
+        style = _normalize_style(str(championship.get("Style", "Sports Car")))
+        candidates = _select_world_ai_rows(save_name, 1, style, 1, championship,
+                                           used_driver_ids, used_driver_names, available, rookies_only=rookie)
+        if not candidates:
+            summary["rookies_added"] += _add_rookies(save_name, 1, style, used_driver_names)
+            available = _active_world_ai_rows(save_name)
+            candidates = _select_world_ai_rows(save_name, 1, style, 1, championship,
+                                               used_driver_ids, used_driver_names, available, rookies_only=rookie)
+        if not candidates:
+            raise RuntimeError("Unable to fill a draft seat")
+        rating, row = candidates[0]
+        used_driver_ids.add(str(row["id"]))
+        used_driver_names.add(str(row["name"]))
+        group["instance"]["standings"].append(_driver_row_to_world_standing(rating, row, group["class"]))
+        group["remaining"] -= 1
 
-    summary["drivers"] = sum(len(instance.get("standings") or []) for instance in instances)
+    regular_capacity = sum(g["target"] - (g["target"] // 2 if g["prestige"] == minimum else 0) for g in groups)
+    reserve_count = sum(g["target"] // 2 for g in groups if g["prestige"] == minimum)
+    reserved_rookies = [str(row["id"]) for row in sorted(available, key=lambda row: str(row["name"]))
+                        if _safe_int(row["career_starts"], 0) == 0]
+    reserved_rookies = set(reserved_rookies[:reserve_count])
+    def human_needs_fallback(driver):
+        if driver.get("nationality") != "Player":
+            return False
+        rating = _safe_int(driver.get("mmr"), BASELINE_MMR)
+        return sum(str(row["id"]) not in reserved_rookies and int(row["mmr"]) >= rating for row in available) >= regular_capacity
+
+    # Human fallback entries replace rookie intake seats, never force retirement.
+    for group in groups:
+        if group["prestige"] != minimum:
+            continue
+        present = [d for d in group["instance"]["standings"] if str(d.get("class_name", "Overall")) == group["class"]]
+        intake = sum((d.get("nationality") != "Player" and _safe_int(d.get("career_starts"), 0) == 0) or human_needs_fallback(d) for d in present)
+        for _ in range(min(group["remaining"], max(0, group["target"] // 2 - intake))):
+            pick(group, rookie=True)
+    for prestige in sorted({g["prestige"] for g in groups}, reverse=True):
+        peers = sorted([g for g in groups if g["prestige"] == prestige],
+                       key=lambda g: (str(g["instance"]["championship"].get("Championship", "")), g["class"]))
+        while any(g["remaining"] for g in peers):
+            for group in peers:
+                if group["remaining"]:
+                    pick(group)
+
+    _seed_initial_world_ratings(save_name, groups)
+    summary["drivers"] = sum(len(i.get("standings", [])) for i in instances)
     return instances, summary
+
+
+def _initial_mmr_for_prestige(prestige: int) -> int:
+    """Return the new-world MMR seed for a championship prestige band."""
+    return BASELINE_MMR + (max(0, int(prestige)) // 10) * 50
+
+
+def _seed_initial_world_ratings(save_name: str, groups: list[dict[str, Any]]) -> None:
+    """Seed fresh AI by their first assigned championship, once per world."""
+    if not world_db_path(save_name).exists():
+        # Lightweight draft callers (including unit tests) may supply an
+        # in-memory candidate list without creating a persisted world.
+        return
+    with _connect(save_name) as connection:
+        seeded = connection.execute(
+            "SELECT 1 FROM world_meta WHERE key = 'initial_mmr_seeded'"
+        ).fetchone()
+        established = connection.execute(
+            """
+            SELECT 1 FROM drivers
+            WHERE career_starts > 0 OR seasons_completed > 0
+            LIMIT 1
+            """
+        ).fetchone()
+        if seeded or established:
+            return
+
+        ratings_by_driver_id: dict[str, int] = {}
+        for group in groups:
+            rating = _initial_mmr_for_prestige(_safe_int(group.get("prestige"), 0))
+            class_name = str(group.get("class", "Overall"))
+            for driver in group["instance"].get("standings", []):
+                if driver.get("nationality") != "AI":
+                    continue
+                if str(driver.get("class_name", "Overall")) != class_name:
+                    continue
+                driver_id = str(driver.get("driver_id", "")).strip()
+                if driver_id:
+                    ratings_by_driver_id[driver_id] = rating
+
+        for driver_id, rating in ratings_by_driver_id.items():
+            connection.execute(
+                """
+                UPDATE drivers
+                SET mmr = ?
+                WHERE id = ?
+                  AND is_human = 0
+                  AND career_starts = 0
+                  AND seasons_completed = 0
+                """,
+                (rating, driver_id),
+            )
+        connection.execute(
+            "INSERT OR REPLACE INTO world_meta (key, value) VALUES ('initial_mmr_seeded', '1')"
+        )
+        connection.commit()
+
+    for group in groups:
+        rating = _initial_mmr_for_prestige(_safe_int(group.get("prestige"), 0))
+        class_name = str(group.get("class", "Overall"))
+        for driver in group["instance"].get("standings", []):
+            if driver.get("nationality") == "AI" and str(driver.get("class_name", "Overall")) == class_name:
+                driver["mmr"] = rating
+                driver["skill"] = _skill_from_rating(rating)
 
 
 def add_driver(
@@ -1748,7 +1953,13 @@ def _ensure_rookies_available(
     player_names: set[str],
     style: str,
 ) -> None:
-    current_count = _active_ai_count(save_name, player_names)
+    # Only unassigned drivers can be drafted into a newly built field.
+    with _connect(save_name) as connection:
+        current_count = _active_ai_count_query(
+            connection,
+            extra_clauses=["current_championship IS NULL"],
+            excluded_names=player_names,
+        )
     if current_count >= needed_ai_count:
         return
     _add_rookies(save_name, needed_ai_count - current_count, style, player_names)
@@ -1950,9 +2161,57 @@ def _build_ai_world_standings(
                 }
             )
     else:
+        # The lowest-prestige championships are the rookie intake. Reserve
+        # half of each such field for true rookies before the MMR draft fills
+        # the remaining seats.
+        rookie_target = _safe_int(championship.get("_rookie_field_quota"), 0)
+        current_rookies = sum(
+            1 for driver in standings if _safe_int(driver.get("career_starts"), 0) == 0
+        )
+        rookie_needed = max(0, rookie_target - current_rookies)
+        if rookie_needed:
+            available_rows = _active_world_ai_rows(save_name)
+            available_rookies = sum(
+                1
+                for row in available_rows
+                if str(row["id"]) not in used_driver_ids
+                and str(row["name"]) not in used_driver_names
+                and _safe_int(row["career_starts"], 0) == 0
+            )
+            if available_rookies < rookie_needed:
+                rookies_added += _add_rookies(
+                    save_name,
+                    rookie_needed - available_rookies,
+                    style,
+                    used_driver_names,
+                )
+                available_rows = _active_world_ai_rows(save_name)
+            rookie_rows = _select_world_ai_rows(
+                save_name,
+                rookie_needed,
+                style,
+                tier,
+                championship,
+                used_driver_ids,
+                used_driver_names,
+                available_rows,
+                rookies_only=True,
+            )
+            for effective_mmr, row in rookie_rows:
+                used_driver_ids.add(str(row["id"]))
+                used_driver_names.add(str(row["name"]))
+                standings.append(
+                    _driver_row_to_world_standing(
+                        effective_mmr,
+                        row,
+                        _world_class_names(championship)[0],
+                    )
+                )
+
+        remaining_needed = max(0, remaining_field_size - len(standings))
         selected_rows = _select_world_ai_rows(
             save_name,
-            remaining_field_size,
+            remaining_needed,
             style,
             tier,
             championship,
@@ -1960,17 +2219,17 @@ def _build_ai_world_standings(
             used_driver_names,
             available_ai_rows,
         )
-        if len(selected_rows) < remaining_field_size:
+        if len(selected_rows) < remaining_needed:
             rookies_added += _ensure_world_rookies_available(
                 save_name,
-                remaining_field_size + max(1, remaining_field_size - len(selected_rows)),
+                remaining_needed + max(1, remaining_needed - len(selected_rows)),
                 used_driver_names,
                 style,
             )
             available_ai_rows = _active_world_ai_rows(save_name)
             selected_rows = _select_world_ai_rows(
                 save_name,
-                remaining_field_size,
+                remaining_needed,
                 style,
                 tier,
                 championship,
@@ -1998,7 +2257,9 @@ def _build_ai_world_standings(
                     "wins": 0,
                     "podiums": 0,
                     "primary_style": str(row["primary_style"]),
-                    "class_name": class_assignments[index] if index < len(class_assignments) else "Overall",
+                    "class_name": class_assignments[index]
+                    if index < len(class_assignments)
+                    else _world_class_names(championship)[0],
                     "season_form": round(random.gauss(0, WORLD_SIM_SEASON_FORM_STDDEV)),
                 }
             )
@@ -2112,6 +2373,47 @@ def _fill_world_instance_for_prestige(
     needed = max(0, field_size - len(standings))
     if max_new_drivers is not None:
         needed = min(needed, max_new_drivers)
+    rookie_target = _safe_int(championship.get("_rookie_field_quota"), 0)
+    rookie_needed = min(needed, max(0, rookie_target - len(standings)))
+    if rookie_needed:
+        available_rows = _active_world_ai_rows(save_name)
+        available_rookies = sum(
+            1
+            for row in available_rows
+            if str(row["id"]) not in used_driver_ids
+            and str(row["name"]) not in used_driver_names
+            and _safe_int(row["career_starts"], 0) == 0
+        )
+        if available_rookies < rookie_needed:
+            rookies_added += _add_rookies(
+                save_name,
+                rookie_needed - available_rookies,
+                style,
+                used_driver_names,
+            )
+            available_rows = _active_world_ai_rows(save_name)
+        rookie_rows = _select_world_ai_rows(
+            save_name,
+            rookie_needed,
+            style,
+            championship_tier,
+            championship,
+            used_driver_ids,
+            used_driver_names,
+            available_rows,
+            rookies_only=True,
+        )
+        for effective_mmr, row in rookie_rows:
+            used_driver_ids.add(str(row["id"]))
+            used_driver_names.add(str(row["name"]))
+            standings.append(
+                _driver_row_to_world_standing(
+                    effective_mmr,
+                    row,
+                    _world_class_names(championship)[0],
+                )
+            )
+        needed = max(0, needed - len(rookie_rows))
     selected_rows = _select_world_ai_rows(
         save_name,
         needed,
@@ -2148,7 +2450,9 @@ def _fill_world_instance_for_prestige(
             _driver_row_to_world_standing(
                 effective_mmr,
                 row,
-                class_assignments[index] if index < len(class_assignments) else "Overall",
+                class_assignments[index]
+                if index < len(class_assignments)
+                else _world_class_names(championship)[0],
             )
         )
     return standings, rookies_added
@@ -2163,6 +2467,7 @@ def _select_world_ai_rows(
     excluded_ids: set[str],
     excluded_names: set[str],
     available_rows: list[sqlite3.Row] | None = None,
+    rookies_only: bool = False,
 ) -> list[tuple[int, sqlite3.Row]]:
     rows = available_rows if available_rows is not None else _active_world_ai_rows(save_name)
 
@@ -2174,6 +2479,8 @@ def _select_world_ai_rows(
         driver_name = str(row["name"])
         if driver_id in excluded_ids or driver_name in excluded_names:
             continue
+        if rookies_only and _safe_int(row["career_starts"], 0) != 0:
+            continue
         effective_mmr = int(row["mmr"])
         primary_style = str(row["primary_style"])
         candidate = (effective_mmr, driver_name, row)
@@ -2182,7 +2489,6 @@ def _select_world_ai_rows(
         elif primary_style in {"", "Unassigned"}:
             unassigned_rows.append(candidate)
         else:
-            effective_mmr -= NON_PRIMARY_STYLE_PENALTY
             overflow_rows.append((effective_mmr, driver_name, row))
 
     selected = _select_mixed_style_rows(
@@ -2890,30 +3196,34 @@ def _update_team_reputations_for_season(
 
 
 def _forced_retirement_ids(standings: list[dict[str, Any]], tier: int) -> list[str]:
+    """Return the bottom half of every Tier 1 class for forced retirement."""
     if tier != 1:
         return []
 
-    ai_drivers = [
-        driver
-        for driver in standings
-        if str(driver.get("nationality", "")).casefold() != "player"
-    ]
-    if not ai_drivers:
-        return []
-
-    max_forced_count = max(0, len(ai_drivers) // 2)
-    if max_forced_count <= 0:
-        return []
-    forced_count = min(max_forced_count, random.randint(6, 12))
-    sorted_drivers = sorted(
-        ai_drivers,
-        key=lambda driver: (int(driver.get("points", 0)), int(driver.get("wins", 0)), str(driver.get("name", ""))),
-    )
     forced_ids: list[str] = []
-    for driver in sorted_drivers[:forced_count]:
-        driver_id = str(driver.get("driver_id", "")).strip()
-        if driver_id:
-            forced_ids.append(driver_id)
+    class_groups: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for driver in standings:
+        if str(driver.get("nationality", "")).casefold() == "player":
+            continue
+        class_name = str(driver.get("class_name", "Overall")).strip() or "Overall"
+        class_groups[class_name].append(driver)
+
+    for drivers in class_groups.values():
+        # Keep at least half of each rookie class so multiclass fields do not
+        # lose an entire class disproportionately.
+        forced_count = len(drivers) // 2
+        sorted_drivers = sorted(
+            drivers,
+            key=lambda driver: (
+                int(driver.get("points", 0)),
+                int(driver.get("wins", 0)),
+                str(driver.get("name", "")),
+            ),
+        )
+        for driver in sorted_drivers[:forced_count]:
+            driver_id = str(driver.get("driver_id", "")).strip()
+            if driver_id:
+                forced_ids.append(driver_id)
     return forced_ids
 
 
@@ -3021,6 +3331,7 @@ def _select_active_ai(
     style: str,
     tier: int,
     championship: dict[str, Any],
+    rookies_only: bool = False,
 ) -> list[dict[str, Any]]:
     if count <= 0:
         return []
@@ -3041,6 +3352,7 @@ def _select_active_ai(
             FROM drivers
             WHERE is_human = 0
               AND status = 'active'
+              AND current_championship IS NULL
             """
         ).fetchall()
 
@@ -3051,6 +3363,8 @@ def _select_active_ai(
         name = str(row["name"])
         if name in excluded_names:
             continue
+        if rookies_only and _safe_int(row["career_starts"], 0) != 0:
+            continue
         rating = int(row["mmr"])
         effective_mmr = rating
         primary_style = str(row["primary_style"])
@@ -3060,7 +3374,6 @@ def _select_active_ai(
         elif primary_style in {"", "Unassigned"}:
             unassigned_rows.append(candidate)
         else:
-            effective_mmr -= NON_PRIMARY_STYLE_PENALTY
             overflow_rows.append((effective_mmr, name, row))
 
     selected_drivers = _select_mixed_style_rows(
@@ -4338,7 +4651,6 @@ def _candidate_team_for_open_seat(
     eligible_teams: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any] | None:
     championship_game = str(championship.get("Game", "") or "Any").strip() or "Any"
-    championship_id = str(championship.get("id", "")).strip() or str(championship.get("Championship", "")).strip()
     championship_prestige = _safe_int(championship.get("Prestige"), 1)
     candidates: list[tuple[int, dict[str, Any]]] = []
     championship_team_keys = occupied_team_keys if occupied_team_keys is not None else set()
@@ -5139,44 +5451,7 @@ def _driver_team_market_score(
     team_snapshot: dict[str, Any] | None,
     seat_quality: int,
 ) -> int:
-    score = _safe_int(driver.get("mmr"), BASELINE_MMR)
-    career_starts = _safe_int(driver.get("career_starts"), 0)
-    seasons_completed = _safe_int(driver.get("seasons_completed"), 0)
-    wins = _safe_int(driver.get("wins"), 0)
-    podiums = _safe_int(driver.get("podiums"), 0)
-    team_snapshot = dict(team_snapshot or {})
-    philosophy = str(team_snapshot.get("team_philosophy", "Balanced")).strip().casefold()
-    pressure = _safe_int(team_snapshot.get("team_pressure"), 50)
-    current_strength = _safe_int(team_snapshot.get("current_strength"), _safe_int(team_snapshot.get("reputation"), 50))
-
-    if career_starts <= 0:
-        rookie_penalty = 12
-        if philosophy == "win now":
-            rookie_penalty += 18
-        elif philosophy == "technical excellence":
-            rookie_penalty += 10
-        elif philosophy == "driver continuity":
-            rookie_penalty += 8
-        elif philosophy == "rookie pipeline":
-            rookie_penalty -= 10
-        elif philosophy == "underdog grit":
-            rookie_penalty -= 4
-        if seat_quality >= 75:
-            rookie_penalty += 8
-        if pressure >= 65:
-            rookie_penalty += 6
-        if current_strength >= 60:
-            rookie_penalty += 5
-        return score - max(4, rookie_penalty)
-
-    experience_bonus = min(18, (career_starts // 4) + (seasons_completed * 2) + (wins * 3) + podiums)
-    if philosophy == "win now":
-        experience_bonus += min(8, career_starts // 6 + wins * 2)
-    elif philosophy == "driver continuity":
-        experience_bonus += min(6, seasons_completed * 2)
-    elif philosophy == "rookie pipeline":
-        experience_bonus = max(0, experience_bonus - 4)
-    return score + experience_bonus
+    return _safe_int(driver.get("mmr"), BASELINE_MMR)
 
 
 def assign_teams_to_standings(
@@ -5195,98 +5470,25 @@ def assign_teams_to_standings(
         return standings
 
     if save_name:
-        seat_plan = _build_persistent_team_seat_plan(save_name, len(missing_indices), championship)
+        seat_plan = _build_persistent_team_seat_plan(save_name, len(standings), championship)
     else:
-        seat_plan = _build_team_seat_plan(len(missing_indices), championship)
-    if not seat_plan:
-        return standings
-
-    remaining_indices = list(missing_indices)
-    remaining_seats = [dict(seat) for seat in seat_plan]
-    seat_quality_by_identity: dict[tuple[str, int], int] = {}
-    team_snapshot_by_identity: dict[tuple[str, int], dict[str, Any]] = {}
-    if save_name:
-        try:
-            with _connect(save_name) as connection:
-                snapshot_cache: dict[tuple[str, str], dict[str, Any]] = {}
-                team_sizes: dict[str, int] = defaultdict(int)
-                for seat in remaining_seats:
-                    team_sizes[
-                        str(seat.get("team_key", "")).strip()
-                        or str(seat.get("team_id", "")).strip()
-                        or str(seat.get("team_name", "")).strip()
-                    ] += 1
-                for seat in remaining_seats:
-                    team_key = str(seat.get("team_key", "")).strip()
-                    team_name = str(seat.get("team_name", "")).strip() or "Independent"
-                    team_id = str(seat.get("team_id", "")).strip()
-                    team_prestige = _safe_int(seat.get("team_prestige"), 50)
-                    seat_team_size = team_sizes.get(team_key or team_id or team_name, 1)
-                    team_snapshot = _team_progression_snapshot(
-                        connection,
-                        team_id=team_id,
-                        team_name=team_name,
-                        game=str(championship.get("Game", "")).strip() or "Any",
-                        fallback_prestige=team_prestige,
-                        team_key=team_key,
-                        snapshot_cache=snapshot_cache,
-                    )
-                    identity = (team_key or team_id or team_name, _safe_int(seat.get("team_seat"), 1))
-                    seat_quality_by_identity[identity] = _team_seat_quality_score(
-                        team_snapshot,
-                        team_prestige=team_prestige,
-                        team_reputation=_safe_int(team_snapshot.get("current_strength"), team_prestige),
-                        championship_prestige=_safe_int(championship.get("Prestige"), 1),
-                        team_seat=_safe_int(seat.get("team_seat"), 1),
-                        team_size=seat_team_size,
-                    )
-                    team_snapshot_by_identity[identity] = team_snapshot
-        except Exception:
-            seat_quality_by_identity = {}
-            team_snapshot_by_identity = {}
-    ordered_remaining_seats = sorted(
-        remaining_seats,
-        key=lambda seat: (
-            -seat_quality_by_identity.get(
-                (
-                    str(seat.get("team_key", "")).strip()
-                    or str(seat.get("team_id", "")).strip()
-                    or str(seat.get("team_name", "")).strip(),
-                    _safe_int(seat.get("team_seat"), 1),
-                ),
-                _safe_int(seat.get("team_prestige"), 50),
-            ),
-            -_safe_int(seat.get("team_prestige"), 50),
-            str(seat.get("team_name", "")),
-            _safe_int(seat.get("team_seat"), 1),
-        ),
-    )
-
-    for seat in ordered_remaining_seats:
-        if not remaining_indices:
-            break
-        identity = (
-            str(seat.get("team_key", "")).strip()
-            or str(seat.get("team_id", "")).strip()
-            or str(seat.get("team_name", "")).strip(),
-            _safe_int(seat.get("team_seat"), 1),
-        )
-        seat_quality = seat_quality_by_identity.get(identity, _safe_int(seat.get("team_prestige"), 50))
-        team_snapshot = team_snapshot_by_identity.get(identity, {})
-        index = max(
-            remaining_indices,
-            key=lambda candidate_index: (
-                _driver_team_market_score(standings[candidate_index], team_snapshot, seat_quality),
-                _safe_int(standings[candidate_index].get("mmr"), BASELINE_MMR),
-                str(standings[candidate_index].get("name", "")),
-            ),
-        )
-        remaining_indices.remove(index)
-        standings[index]["team_id"] = seat["team_id"]
-        standings[index]["team_key"] = seat["team_key"]
-        standings[index]["team_name"] = seat["team_name"]
-        standings[index]["team_seat"] = seat["team_seat"]
-        standings[index]["team_prestige"] = seat["team_prestige"]
+        seat_plan = _build_team_seat_plan(len(standings), championship)
+    occupied = {
+        (str(driver.get("team_key") or driver.get("team_id") or driver.get("team_name", "")),
+         _safe_int(driver.get("team_seat"), 1))
+        for driver in standings if str(driver.get("team_name", "")).strip()
+    }
+    remaining_seats = [seat for seat in seat_plan
+                       if (str(seat.get("team_key") or seat.get("team_id") or seat.get("team_name", "")),
+                           _safe_int(seat.get("team_seat"), 1)) not in occupied]
+    remaining_seats.sort(key=lambda seat: (-_safe_int(seat.get("team_prestige"), 50),
+                                          str(seat.get("team_name", "")),
+                                          _safe_int(seat.get("team_seat"), 1)))
+    missing_indices.sort(key=lambda index: (-_safe_int(standings[index].get("mmr"), BASELINE_MMR),
+                                           str(standings[index].get("name", ""))))
+    for index, seat in zip(missing_indices, remaining_seats):
+        for key in ("team_id", "team_key", "team_name", "team_seat", "team_prestige"):
+            standings[index][key] = seat[key]
     return standings
 
 
@@ -5329,6 +5531,8 @@ def player_effective_mmr_for_style(save_name: str, player_names: list[str], styl
 
 
 def players_are_fresh_rookies(save_name: str, player_names: list[str]) -> bool:
+    if not world_db_path(save_name).exists():
+        return False
     initialize_driver_pool(save_name)
     player_set = {str(name).strip() for name in player_names if str(name).strip()}
     if not player_set:
@@ -5350,6 +5554,40 @@ def players_are_fresh_rookies(save_name: str, player_names: list[str]) -> bool:
         and not str(row["current_championship"] or "").strip()
         for row in matched_rows
     )
+
+
+def _rows_are_fresh_rookies(player_names: list[str], rows: list[Any]) -> bool:
+    """Check rookie status from a caller-supplied driver-row snapshot."""
+    player_set = {str(name).strip() for name in player_names if str(name).strip()}
+    matched_rows = [row for row in rows if bool(row["is_human"]) and str(row["name"]).strip() in player_set]
+    return bool(player_set) and len(matched_rows) == len(player_set) and all(
+        _safe_int(row["career_starts"], 0) == 0
+        and not str(row["current_championship"] or "").strip()
+        for row in matched_rows
+    )
+
+
+def _rookie_championship_ids_for_style(
+    championship_rows: list[dict[str, Any]],
+    style: str,
+    game: str,
+) -> set[str]:
+    normalized_style = _normalize_style(style)
+    normalized_game = str(game).strip().casefold()
+    style_rows = [
+        row for row in championship_rows
+        if _normalize_style(str(row.get("Style", ""))) == normalized_style
+        and str(row.get("Game", "")).strip().casefold() in {"", normalized_game}
+    ]
+    minimum_prestige = min((_safe_int(row.get("Prestige"), 0) for row in style_rows), default=None)
+    if minimum_prestige is None:
+        return set()
+    return {
+        str(row.get("id", "")).strip()
+        for row in style_rows
+        if _safe_int(row.get("Prestige"), 0) == minimum_prestige
+        and str(row.get("id", "")).strip()
+    }
 
 
 def _promotion_expectation_threshold(expectation_level: str) -> int:
@@ -5407,121 +5645,47 @@ def team_offers_for_player(
     save_name: str,
     player_names: list[str],
     championship: dict[str, Any],
-    max_offers: int = 5,
+    max_offers: int = 3,
     player_effective_mmr: int | None = None,
     reputation_map: dict[str, int] | None = None,
 ) -> list[dict[str, Any]]:
-    seat_offers = _team_seat_offers_for_championship(
-        save_name,
-        championship,
-        reputation_map=reputation_map,
-        max_offers=max_offers,
-    )
-    if seat_offers:
-        return seat_offers
-
-    eligible = _eligible_teams_for_championship(championship)
-    if not eligible:
+    # This function is called once per eligible class, including each class
+    # variant of a multiclass championship. Keep the per-class UI concise.
+    offer_limit = min(3, max(0, int(max_offers)))
+    if offer_limit == 0:
         return []
-
-    style = _normalize_style(str(championship.get("Style", "Sports Car")))
-    if player_effective_mmr is None:
-        player_effective_mmr = _player_group_effective_mmr_for_style(save_name, player_names, style)
-    championship_prestige = _safe_int(championship.get("Prestige"), 1)
-    reputations = reputation_map or {}
-
-    rng = random.Random(
-        _stable_seed(
-            save_name,
-            ",".join(sorted(str(name).strip() for name in player_names)),
-            str(_world_year(save_name)),
-            str(championship.get("id", "")),
-            str(championship.get("Championship", "")),
-            str(championship.get("Sub_Champ", "")),
-            "team-offers",
-        )
-    )
-    offer_count = rng.randint(1, max(1, min(int(max_offers), len(eligible))))
-
-    remaining = [dict(team) for team in eligible]
-    offers: list[dict[str, Any]] = []
-    championship_game = str(championship.get("Game", ""))
-    with _connect(save_name) as connection:
-        snapshot_cache: dict[tuple[str, str], dict[str, Any]] = {}
-        while remaining and len(offers) < offer_count:
-            weights = []
-            weighted_entries: list[tuple[dict[str, Any], dict[str, Any], int, int]] = []
-            for team in remaining:
-                team_prestige = _safe_int(team.get("Prestige"), 50)
-                team_key = _team_key(_team_row_id(team), _team_game(team, championship_game))
-                team_snapshot = _team_progression_snapshot(
-                    connection,
-                    team_id=_team_row_id(team),
-                    team_name=_team_row_name(team),
-                    game=_team_game(team, championship_game),
-                    fallback_prestige=team_prestige,
-                    team_key=team_key,
-                    snapshot_cache=snapshot_cache,
-                )
-                team_reputation = _safe_int(
-                    team_snapshot.get("current_strength"),
-                    reputations.get(team_key) or reputations.get(_team_row_id(team)) or reputations.get(_team_row_name(team)) or team_prestige,
-                )
-                weight = _player_team_fit_score(
-                    team_snapshot,
-                    team_prestige=team_prestige,
-                    team_reputation=team_reputation,
-                    championship_prestige=championship_prestige,
-                    player_effective_mmr=player_effective_mmr,
-                )
-                weights.append(weight)
-                weighted_entries.append((team, team_snapshot, team_reputation, weight))
-            chosen_index = rng.choices(range(len(remaining)), weights=weights, k=1)[0]
-            team, team_snapshot, team_reputation, chosen_weight = weighted_entries[chosen_index]
-            remaining.pop(chosen_index)
-            team_key = _team_key(_team_row_id(team), _team_game(team, championship_game))
-            offer_note = "Offer"
-            aggression = _team_market_aggression(team_snapshot)
-            normalized_player_rating = max(1, min(100, round((int(player_effective_mmr) - 700) / 8)))
-            if aggression >= 5 and normalized_player_rating >= team_reputation + 6:
-                offer_note = "Aggressive Move"
-            elif aggression <= -2 and team_reputation >= normalized_player_rating + 8:
-                offer_note = "Safe Fit"
-            elif chosen_weight >= max(weights) if weights else False:
-                offer_note = "Priority Target"
-            offers.append(
-                {
-                    "team_id": str(team.get("Team_ID", "")).strip() or str(team.get("ID", "")).strip(),
-                    "team_key": team_key,
-                    "team_name": str(team.get("Team", "")).strip() or "Independent",
-                    "team_prestige": _safe_int(team.get("Prestige"), 50),
-                    "team_reputation": team_reputation,
-                    "team_size": 1,
-                    "seat_quality": _team_seat_quality_score(
-                        team_snapshot,
-                        team_prestige=_safe_int(team.get("Prestige"), 50),
-                        team_reputation=team_reputation,
-                        championship_prestige=championship_prestige,
-                        team_seat=1,
-                        team_size=1,
-                    ),
-                    "offer_note": offer_note,
-                    "team_colors": _team_row_colors(team),
-                    "team_personality": _team_row_personality(team),
-                    "team_ambition": _safe_int(team_snapshot.get("team_ambition"), 50),
-                    "team_stability": _safe_int(team_snapshot.get("team_stability"), 50),
-                    "team_development": _safe_int(team_snapshot.get("team_development"), 50),
-                    "team_financial_strength": _safe_int(team_snapshot.get("team_financial_strength"), 50),
-                    "team_capital": team_capital,
-                    "sponsor_backing": sponsor_backing,
-                    "team_capital_band": _team_capital_band(team_capital),
-                    "sponsor_backing_band": _team_sponsor_backing_band(sponsor_backing),
-                    "team_pressure": _safe_int(team_snapshot.get("team_pressure"), 50),
-                    "team_philosophy": str(team_snapshot.get("team_philosophy", "Balanced")),
-                    "trajectory": str(team_snapshot.get("trajectory", "stable")),
-                }
-            )
-
+    game = str(championship.get("Game", "iRacing"))
+    save_data = save_manager.load_save(save_name) or {}
+    rows = load_championship_rows(game, save_data.get("career_path_id", "default"))
+    style = str(championship.get("Style", "Sports Car"))
+    rookie_ids = _rookie_championship_ids_for_style(rows, style, game)
+    if players_are_fresh_rookies(save_name, player_names) and str(championship.get("id", "")).strip() not in rookie_ids:
+        return []
+    position = player_draft_position_for_style(save_name, player_names, style, rows, game)
+    if position is None:
+        return []
+    seats = _draft_ordered_seat_entries(save_name, style, rows, game, reputation_map)
+    entry_rows = championship.get("_player_entry_rows") or [championship]
+    row_ids = {str(row.get("id", "")).strip() for row in entry_rows}
+    minimum = min((_safe_int(row.get("Prestige"), 0) for row in rows), default=0)
+    offers = []
+    seen = set()
+    for index, seat in enumerate(seats):
+        if seat["championship_id"] not in row_ids:
+            continue
+        if index < position and seat["prestige"] != minimum:
+            continue
+        key = seat["team_key"] or seat["team_id"] or seat["team_name"]
+        if key in seen:
+            continue
+        seen.add(key)
+        offer = dict(seat)
+        offer["offer_note"] = "Offer"
+        offer["team_colors"] = _team_colors_for_identity(seat["team_id"], seat["team_name"], game)
+        offer["team_personality"] = _team_personality_for_identity(seat["team_id"], seat["team_name"], game)
+        offers.append(offer)
+        if len(offers) >= offer_limit:
+            break
     return offers
 
 
@@ -5796,8 +5960,7 @@ def _elo_changes_for_finish_order(
     driver_ids_by_name: dict[str, str],
     current_ratings: dict[str, int],
 ) -> dict[str, int]:
-    driver_count = len(finish_order_names)
-    if driver_count < 2:
+    if len(finish_order_names) < 2:
         return {driver_ids_by_name[name]: 0 for name in finish_order_names if name in driver_ids_by_name}
 
     changes: dict[str, int] = {}
@@ -5819,9 +5982,11 @@ def _elo_changes_for_finish_order(
             expected = 1.0 / (1.0 + 10 ** ((opponent_rating - rating) / 400))
             score_delta += actual - expected
 
-        # Soften field-size normalization so large races move ratings more than they do now.
-        normalized_delta = score_delta / max(1.0, math.sqrt(driver_count - 1))
-        change = round(RACE_K_FACTOR * normalized_delta)
+        # A race is a collection of head-to-head Elo results.  Keep the sum
+        # rather than averaging it so every class opponent contributes to the
+        # rating change, as they would in a sequence of 1v1 races.  The
+        # per-race cap below still prevents unusually large swings.
+        change = round(RACE_K_FACTOR * score_delta)
         changes[driver_id] = max(-RACE_RATING_CHANGE_CAP, min(RACE_RATING_CHANGE_CAP, change))
     return changes
 
@@ -6885,10 +7050,9 @@ def latest_close_title_battles(save_name: str, season_year: int, max_gap: int = 
 
 
 def _effective_style_mmr(mmr: int, primary_style: str, target_style: str) -> int:
-    effective_mmr = int(mmr)
-    if str(primary_style) not in {"", "Unassigned", target_style}:
-        effective_mmr -= NON_PRIMARY_STYLE_PENALTY
-    return effective_mmr
+    # MMR is global across all racing disciplines. Style remains descriptive
+    # metadata, not a restriction or rating modifier.
+    return int(mmr)
 
 
 def _style_draft_bucket(primary_style: str, target_style: str) -> int:
@@ -6905,7 +7069,7 @@ def _estimated_championship_seat_count(
     championship_rows: list[dict[str, Any]],
 ) -> int:
     max_opp = _safe_int(row.get("Max_Opp"), 0)
-    field_size = max(1, max_opp)
+    field_size = max(2, min(40, max_opp or 20))
     championship_group_id = str(row.get("Championship_ID", "")).strip() or str(row.get("id", "")).strip()
     group_rows = [
         candidate
@@ -6913,7 +7077,9 @@ def _estimated_championship_seat_count(
         if (str(candidate.get("Championship_ID", "")).strip() or str(candidate.get("id", "")).strip()) == championship_group_id
     ]
     class_count = max(1, len(group_rows))
-    return max(1, round(field_size / class_count))
+    ordered = sorted(group_rows, key=lambda candidate: str(candidate.get("id", "")))
+    index = next((i for i, candidate in enumerate(ordered) if candidate.get("id") == row.get("id")), 0)
+    return field_size // class_count + (1 if index < field_size % class_count else 0)
 
 
 def _draft_seat_entries_for_championship(
@@ -7041,7 +7207,7 @@ def _draft_seat_entries_for_championship(
                     {
                         "championship_id": str(championship.get("id", "")).strip(),
                         "championship_name": str(championship.get("Championship", "")).strip(),
-                        "prestige": _seat_prestige_from_quality(championship_prestige, seat_quality),
+                        "prestige": championship_prestige,
                         "tier": championship_tier,
                         "game": game,
                         "team_id": str(seat.get("team_id", "")).strip(),
@@ -7050,6 +7216,8 @@ def _draft_seat_entries_for_championship(
                         "team_prestige": team_prestige,
                         "team_reputation": team_reputation,
                         "seat_index": seat_index,
+                        "seat_number": _safe_int(seat.get("seat_number"), seat_index),
+                        "team_seat": _safe_int(seat.get("team_seat"), 1),
                         "team_size": seat_team_size,
                         "seat_quality": seat_quality,
                     }
@@ -7073,7 +7241,7 @@ def _draft_seat_entries_for_championship(
                 {
                     "championship_id": str(championship.get("id", "")).strip(),
                     "championship_name": str(championship.get("Championship", "")).strip(),
-                    "prestige": _seat_prestige_from_quality(championship_prestige, seat_quality),
+                    "prestige": championship_prestige,
                     "tier": championship_tier,
                     "game": game,
                     "team_id": str(seat.get("team_id", "")).strip(),
@@ -7082,6 +7250,8 @@ def _draft_seat_entries_for_championship(
                     "team_prestige": team_prestige,
                     "team_reputation": team_reputation,
                     "seat_index": seat_index,
+                        "seat_number": _safe_int(seat.get("seat_number"), seat_index),
+                        "team_seat": _safe_int(seat.get("team_seat"), 1),
                     "team_size": seat_team_size,
                     "seat_quality": seat_quality,
                 }
@@ -7097,14 +7267,10 @@ def _draft_ordered_seat_entries(
     reputation_map: dict[str, int] | None = None,
     existing_seats_by_championship: dict[tuple[str, str], list[dict[str, Any]]] | None = None,
 ) -> list[dict[str, Any]]:
-    normalized_style = _normalize_style(style)
     normalized_game = str(game).strip().casefold()
-    style_rows = [
-        dict(row)
-        for row in championship_rows
-        if _normalize_style(str(row.get("Style", ""))) == normalized_style
-        and str(row.get("Game", "")).strip().casefold() in {"", normalized_game}
-    ]
+    # Driver rank is global, so the seat ledger must include every discipline.
+    style_rows = [dict(row) for row in championship_rows
+                  if str(row.get("Game", "")).strip().casefold() in {"", normalized_game}]
     seats: list[dict[str, Any]] = []
     for row in style_rows:
         seats.extend(
@@ -7134,21 +7300,28 @@ def _draft_ordered_seat_entries(
         group.sort(
             key=lambda seat: (
                 -_safe_int(seat.get("prestige"), 0),
-                -_safe_int(seat.get("team_reputation"), 50),
                 -_safe_int(seat.get("team_prestige"), 50),
                 str(seat.get("team_name", "")),
                 _safe_int(seat.get("seat_index"), 1),
             )
         )
     ordered: list[dict[str, Any]] = []
-    while any(group for group in ordered_groups):
-        for group in ordered_groups:
-            if group:
-                ordered.append(group.pop(0))
+    prestige_groups: dict[int, list[list[dict[str, Any]]]] = defaultdict(list)
+    for group in ordered_groups:
+        prestige = max((_safe_int(seat.get("prestige"), 0) for seat in group), default=0)
+        prestige_groups[prestige].append(group)
+    # Higher prestige levels are completed first. Only series at the same
+    # prestige level rotate picks against one another.
+    for prestige in sorted(prestige_groups, reverse=True):
+        groups = prestige_groups[prestige]
+        while any(group for group in groups):
+            for group in groups:
+                if group:
+                    ordered.append(group.pop(0))
     return ordered
 
 
-def player_entry_prestige_for_style(
+def player_draft_position_for_style(
     save_name: str,
     player_names: list[str],
     style: str,
@@ -7157,12 +7330,12 @@ def player_entry_prestige_for_style(
     driver_rows: list[sqlite3.Row] | None = None,
     reputation_map: dict[str, int] | None = None,
     existing_seats_by_championship: dict[tuple[str, str], list[dict[str, Any]]] | None = None,
-) -> int:
+) -> int | None:
     initialize_driver_pool(save_name)
     normalized_style = _normalize_style(style)
     player_set = {str(name).strip() for name in player_names if str(name).strip()}
     if not player_set:
-        return 0
+        return None
 
     if driver_rows is None:
         with _connect(save_name) as connection:
@@ -7179,8 +7352,6 @@ def player_entry_prestige_for_style(
     ai_draft_rows: list[tuple[int, int, str]] = []
     player_ratings: list[int] = []
     player_buckets: list[int] = []
-    player_row_count = 0
-    fresh_player_row_count = 0
     for row in rows:
         name = str(row["name"])
         primary_style = str(row["primary_style"])
@@ -7194,14 +7365,8 @@ def player_entry_prestige_for_style(
                 # Rivals players share a world but do not compete for one
                 # another's individual championship access.
                 continue
-            player_row_count += 1
             player_ratings.append(effective_mmr)
             player_buckets.append(_style_draft_bucket(primary_style, normalized_style))
-            if (
-                int(row["career_starts"] or 0) == 0
-                and not str(row["current_championship"] or "").strip()
-            ):
-                fresh_player_row_count += 1
         else:
             ai_draft_rows.append(
                 (
@@ -7212,7 +7377,7 @@ def player_entry_prestige_for_style(
             )
 
     if not player_ratings:
-        return 0
+        return None
 
     if championship_rows is None:
         championship_rows = load_championship_rows(game)
@@ -7223,13 +7388,18 @@ def player_entry_prestige_for_style(
         if _normalize_style(str(row.get("Style", ""))) == normalized_style
     ]
     if not style_rows:
-        return 0
-    minimum_prestige = min((_safe_int(row.get("Prestige"), 0) for row in style_rows), default=0)
+        return None
 
-    if player_row_count > 0 and fresh_player_row_count == player_row_count:
-        return minimum_prestige
-    if not ai_draft_rows:
-        return minimum_prestige
+    game_rows = [row for row in championship_rows
+                 if str(row.get("Game", "")).strip().casefold() in {"", str(game).strip().casefold()}]
+    minimum = min((_safe_int(row.get("Prestige"), 0) for row in game_rows), default=0)
+    quota = sum(_estimated_championship_seat_count(row, game_rows) // 2
+                for row in game_rows if _safe_int(row.get("Prestige"), 0) == minimum)
+    reserved_names = sorted(str(row["name"]) for row in rows
+                            if not bool(row["is_human"]) and _safe_int(row["career_starts"], 0) == 0
+                            and _safe_int(row["mmr"], 1000) == BASELINE_MMR)[:quota]
+    reserved_names = set(reserved_names)
+    ai_draft_rows = [row for row in ai_draft_rows if row[2] not in reserved_names]
 
     group_effective_mmr = round(sum(player_ratings) / len(player_ratings))
     group_style_bucket = min(player_buckets) if player_buckets else 1
@@ -7244,17 +7414,74 @@ def player_entry_prestige_for_style(
         (index for index, row in enumerate(draft_pool) if row[0] == "player"),
         len(draft_pool),
     )
-    seat_entries = _draft_ordered_seat_entries(
+    return player_pick_index
+
+
+def player_accessible_championship_ids_for_style(
+    save_name: str,
+    player_names: list[str],
+    style: str,
+    championship_rows: list[dict[str, Any]] | None = None,
+    game: str = "iRacing",
+    driver_rows: list[sqlite3.Row] | None = None,
+    reputation_map: dict[str, int] | None = None,
+    existing_seats_by_championship: dict[tuple[str, str], list[dict[str, Any]]] | None = None,
+) -> set[str]:
+    """Return series containing the player's draft seat or any lower seat."""
+    if championship_rows is None:
+        championship_rows = load_championship_rows(game)
+    if driver_rows is None:
+        fresh_rookies = players_are_fresh_rookies(save_name, player_names)
+    else:
+        fresh_rookies = _rows_are_fresh_rookies(player_names, driver_rows)
+    if fresh_rookies:
+        return _rookie_championship_ids_for_style(championship_rows, style, game)
+    position = player_draft_position_for_style(
         save_name,
-        normalized_style,
-        style_rows,
+        player_names,
+        style,
+        championship_rows=championship_rows,
+        game=game,
+        driver_rows=driver_rows,
+        reputation_map=reputation_map,
+        existing_seats_by_championship=existing_seats_by_championship,
+    )
+    if position is None:
+        return set()
+    seats = _draft_ordered_seat_entries(
+        save_name,
+        style,
+        championship_rows,
         game,
         reputation_map=reputation_map,
         existing_seats_by_championship=existing_seats_by_championship,
     )
-    if player_pick_index < len(seat_entries):
-        return _safe_int(seat_entries[player_pick_index].get("prestige"), 0)
-    return minimum_prestige
+    accessible_ids = {
+        str(seat.get("championship_id", "")).strip()
+        for seat in seats[position:]
+        if str(seat.get("championship_id", "")).strip()
+        and str(seat.get("championship_id", "")).strip() in {
+            str(row.get("id", "")).strip() for row in championship_rows
+            if _normalize_style(str(row.get("Style", ""))) == _normalize_style(style)
+        }
+    }
+    # A career must always have an entry point, even when the player drafts
+    # after the final available seat or a newly-created path has a very small
+    # seat pool. This is the only unconditional access rule.
+    minimum_prestige = min(
+        (_safe_int(row.get("Prestige"), 0) for row in championship_rows
+         if str(row.get("Game", "")).strip().casefold() in {"", str(game).strip().casefold()}),
+        default=None,
+    )
+    if minimum_prestige is not None:
+        accessible_ids.update(
+            str(row.get("id", "")).strip()
+            for row in championship_rows
+            if _safe_int(row.get("Prestige"), 0) == minimum_prestige
+            and _normalize_style(str(row.get("Style", ""))) == _normalize_style(style)
+            and str(row.get("Game", "")).strip().casefold() in {"", str(game).strip().casefold()}
+        )
+    return accessible_ids
 
 
 def list_drivers_page(

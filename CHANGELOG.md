@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.6.7
+
+### MMR, Drafting, and Offers
+
+- Updated race MMR to sum same-class head-to-head results with a smaller per-opponent K-factor, producing clearer position-based rating changes.
+- Seeded new-world AI MMR from their initially assigned championship prestige, starting at 1000 for Prestige 1–9 and increasing by 50 per 10 prestige points.
+- Restricted first-season human drivers to rookie championship access and offers.
+- Limited team offers to three per eligible class.
+
 ## 1.6.5
 
 ### Driver Drafting and Championship Access
