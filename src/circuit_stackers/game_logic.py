@@ -17,6 +17,7 @@ from .driver_pool import (
     best_driver_in_world,
     championship_storyline_drivers,
     championship_pool_display_name,
+    clear_player_draft_context_cache,
     build_world_championship_instances,
     build_standings_from_pool,
     existing_team_seats_by_championship,
@@ -1682,6 +1683,7 @@ def create_world_sim_progress(save_name: str, championship: dict[str, Any], play
 
 
 def prepare_offseason_championship_select(save_name: str, player_names: list[str]) -> list[dict[str, Any]]:
+    clear_player_draft_context_cache(save_name)
     refresh_shared_content_snapshot(save_name)
     save_data = load_save(save_name) or {}
     game = str(save_data.get("game", "iRacing"))
@@ -1698,6 +1700,10 @@ def prepare_offseason_championship_select(save_name: str, player_names: list[str
     else:
         market_summary = run_offseason_team_seat_market(save_name, championships, protected_team_keys=protected_team_keys)
         update_save(save_name, {"team_market_year": current_world_year, "team_market_summary": market_summary})
+    # Releasing the previous placeholder grid modifies the world database.
+    # Do it before calculating the draft so the just-built draft context stays
+    # valid when the championship-offer screen opens.
+    release_preseason_reservations(save_name, save_data.get("offseason_world_instances") or [])
     selection_driver_rows = active_driver_rows_for_selection(save_name)
     reputation_map = team_reputation_map(save_name)
     existing_seats = existing_team_seats_by_championship(save_name)
@@ -1718,7 +1724,6 @@ def prepare_offseason_championship_select(save_name: str, player_names: list[str
         style: sorted(championship_ids)
         for style, championship_ids in accessible_championship_ids.items()
     }
-    release_preseason_reservations(save_name, save_data.get("offseason_world_instances") or [])
     reserved_instances: list[dict[str, Any]] = []
 
     update_save(

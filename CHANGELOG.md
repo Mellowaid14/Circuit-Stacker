@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.6.7.1
+
+### Offseason Reliability
+
+- Fixed new-season team selection appearing to hang by reusing the global driver draft while championship offers are built.
+
 ## 1.6.7
 
 ### MMR, Drafting, and Offers

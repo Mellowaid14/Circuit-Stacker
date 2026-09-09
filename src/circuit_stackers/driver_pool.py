@@ -24,6 +24,12 @@ SCHEMA_VERSION = "1"
 STYLES = ("Sports Car", "Oval", "Open Wheel", "Rallycross")
 _INITIALIZED_POOLS: set[str] = set()
 _TEAMS_CACHE: list[dict[str, str]] | None = None
+# Championship offers are rendered one class at a time, but every class in a
+# discipline uses the same player draft order.  Retaining that order for the
+# lifetime of one offseason avoids rebuilding the full seat ledger for every
+# card on the championship-select screen.
+_PLAYER_DRAFT_CONTEXT_CACHE: dict[tuple[Any, ...], tuple[int | None, list[dict[str, Any]]]] = {}
+_PLAYER_DRAFT_CONTEXT_CACHE_LIMIT = 32
 POINTS_MAP = {1: 25, 2: 18, 3: 15, 4: 12, 5: 10, 6: 8, 7: 6, 8: 4, 9: 2, 10: 1}
 WORLD_SIM_MMR_WEIGHT = 0.72
 WORLD_SIM_SEASON_FORM_STDDEV = 130
@@ -5661,10 +5667,16 @@ def team_offers_for_player(
     rookie_ids = _rookie_championship_ids_for_style(rows, style, game)
     if players_are_fresh_rookies(save_name, player_names) and str(championship.get("id", "")).strip() not in rookie_ids:
         return []
-    position = player_draft_position_for_style(save_name, player_names, style, rows, game)
+    position, seats = _cached_player_draft_context(
+        save_name,
+        player_names,
+        style,
+        rows,
+        game,
+        reputation_map=reputation_map,
+    )
     if position is None:
         return []
-    seats = _draft_ordered_seat_entries(save_name, style, rows, game, reputation_map)
     entry_rows = championship.get("_player_entry_rows") or [championship]
     row_ids = {str(row.get("id", "")).strip() for row in entry_rows}
     minimum = min((_safe_int(row.get("Prestige"), 0) for row in rows), default=0)
@@ -5687,6 +5699,87 @@ def team_offers_for_player(
         if len(offers) >= offer_limit:
             break
     return offers
+
+
+def _cached_player_draft_context(
+    save_name: str,
+    player_names: list[str],
+    style: str,
+    championship_rows: list[dict[str, Any]],
+    game: str,
+    *,
+    driver_rows: list[sqlite3.Row] | None = None,
+    reputation_map: dict[str, int] | None = None,
+    existing_seats_by_championship: dict[tuple[str, str], list[dict[str, Any]]] | None = None,
+) -> tuple[int | None, list[dict[str, Any]]]:
+    """Return a player draft position and seat order, reusing a stable draft.
+
+    The offseason preparation flow clears this cache before rebuilding the
+    market. The optional database snapshots only avoid extra queries while
+    building a context.
+    """
+    try:
+        database_path = world_db_path(save_name)
+        database_path.stat()
+    except OSError:
+        # Tests and callers using synthetic saves should retain the original
+        # no-cache behaviour.
+        return (
+            player_draft_position_for_style(
+                save_name, player_names, style, championship_rows, game, driver_rows, reputation_map, existing_seats_by_championship
+            ),
+            _draft_ordered_seat_entries(
+                save_name, style, championship_rows, game, reputation_map, existing_seats_by_championship
+            ),
+        )
+
+    rows_key = tuple(
+        (
+            str(row.get("id", "")),
+            str(row.get("Championship_ID", "")),
+            str(row.get("Prestige", "")),
+            str(row.get("Max_Opp", "")),
+        )
+        for row in championship_rows
+    )
+    cache_key = (
+        str(database_path.resolve()),
+        tuple(sorted(str(name).strip() for name in player_names if str(name).strip())),
+        _normalize_style(style),
+        str(game).strip().casefold(),
+        rows_key,
+    )
+    cached = _PLAYER_DRAFT_CONTEXT_CACHE.get(cache_key)
+    if cached is not None:
+        return cached
+
+    context = (
+        player_draft_position_for_style(
+            save_name, player_names, style, championship_rows, game, driver_rows, reputation_map, existing_seats_by_championship
+        ),
+        _draft_ordered_seat_entries(
+            save_name, style, championship_rows, game, reputation_map, existing_seats_by_championship
+        ),
+    )
+    if len(_PLAYER_DRAFT_CONTEXT_CACHE) >= _PLAYER_DRAFT_CONTEXT_CACHE_LIMIT:
+        _PLAYER_DRAFT_CONTEXT_CACHE.clear()
+    _PLAYER_DRAFT_CONTEXT_CACHE[cache_key] = context
+    return context
+
+
+def clear_player_draft_context_cache(save_name: str | None = None) -> None:
+    """Discard cached draft contexts, optionally for a single career."""
+    if not save_name:
+        _PLAYER_DRAFT_CONTEXT_CACHE.clear()
+        return
+    try:
+        database_path = str(world_db_path(save_name).resolve())
+    except OSError:
+        _PLAYER_DRAFT_CONTEXT_CACHE.clear()
+        return
+    for cache_key in list(_PLAYER_DRAFT_CONTEXT_CACHE):
+        if cache_key and cache_key[0] == database_path:
+            del _PLAYER_DRAFT_CONTEXT_CACHE[cache_key]
 
 
 def current_team_offer_for_championship(
@@ -7436,26 +7529,18 @@ def player_accessible_championship_ids_for_style(
         fresh_rookies = _rows_are_fresh_rookies(player_names, driver_rows)
     if fresh_rookies:
         return _rookie_championship_ids_for_style(championship_rows, style, game)
-    position = player_draft_position_for_style(
+    position, seats = _cached_player_draft_context(
         save_name,
         player_names,
         style,
-        championship_rows=championship_rows,
-        game=game,
+        championship_rows,
+        game,
         driver_rows=driver_rows,
         reputation_map=reputation_map,
         existing_seats_by_championship=existing_seats_by_championship,
     )
     if position is None:
         return set()
-    seats = _draft_ordered_seat_entries(
-        save_name,
-        style,
-        championship_rows,
-        game,
-        reputation_map=reputation_map,
-        existing_seats_by_championship=existing_seats_by_championship,
-    )
     accessible_ids = {
         str(seat.get("championship_id", "")).strip()
         for seat in seats[position:]
